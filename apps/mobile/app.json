@@ -2,6 +2,7 @@
   "expo": {
     "name": "panelsync",
     "slug": "panelsync",
+    "scheme": "panelsync",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
