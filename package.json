@@ -1,10 +1,5 @@
 {
   "name": "panelsync",
   "version": "1.0.0",
-  "private": true,
-  "workspaces": [
-    "apps/*",
-    "backend",
-    "packages/*"
-  ]
+  "private": true
 }

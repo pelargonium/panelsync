@@ -8,12 +8,99 @@ import {
 
 const Stack = createNativeStackNavigator();
 
-// ── Mock Data ──────────────────────────────────────────
-
 const INITIAL_UNIVERSES = [
   { id: '1', name: 'The Voidborn Saga', seriesCount: 3, lastEdited: '2 hours ago' },
   { id: '2', name: 'Neon Requiem', seriesCount: 1, lastEdited: 'Yesterday' },
 ];
+
+const SIDEBAR_SECTIONS = [
+  { key: 'series',      label: 'SERIES',      color: '#C41E1E' },
+  { key: 'characters',  label: 'CHARACTERS',  color: '#1E6B3C' },
+  { key: 'locations',   label: 'LOCATIONS',   color: '#1E6B3C' },
+  { key: 'timeline',    label: 'TIMELINE',    color: '#1B4FD8' },
+  { key: 'notes',       label: 'NOTES',       color: '#6B6860' },
+];
+
+// ── Section placeholder views ──────────────────────────
+
+function SeriesPanel({ universe }) {
+  return (
+    <View style={panel.container}>
+      <Text style={panel.title}>Series</Text>
+      <Text style={panel.subtitle}>No series yet in {universe.name}.</Text>
+      <TouchableOpacity style={panel.addButton}>
+        <Text style={panel.addButtonText}>+ New Series</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function CharactersPanel({ universe }) {
+  return (
+    <View style={panel.container}>
+      <Text style={panel.title}>Characters</Text>
+      <Text style={panel.subtitle}>No characters yet. Add one to start building your world.</Text>
+      <TouchableOpacity style={panel.addButton}>
+        <Text style={panel.addButtonText}>+ New Character</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function LocationsPanel({ universe }) {
+  return (
+    <View style={panel.container}>
+      <Text style={panel.title}>Locations</Text>
+      <Text style={panel.subtitle}>No locations yet.</Text>
+      <TouchableOpacity style={panel.addButton}>
+        <Text style={panel.addButtonText}>+ New Location</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function TimelinePanel({ universe }) {
+  return (
+    <View style={panel.container}>
+      <Text style={panel.title}>Timeline</Text>
+      <Text style={panel.subtitle}>No timelines yet. Create one to start tracking events.</Text>
+      <TouchableOpacity style={panel.addButton}>
+        <Text style={panel.addButtonText}>+ New Timeline</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function NotesPanel({ universe }) {
+  return (
+    <View style={panel.container}>
+      <Text style={panel.title}>Notes</Text>
+      <Text style={panel.subtitle}>No notes yet.</Text>
+      <TouchableOpacity style={panel.addButton}>
+        <Text style={panel.addButtonText}>+ New Note</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function EmptyPanel() {
+  return (
+    <View style={panel.container}>
+      <Text style={panel.empty}>Select a section from the sidebar</Text>
+    </View>
+  );
+}
+
+function ActivePanel({ section, universe }) {
+  switch (section) {
+    case 'series':     return <SeriesPanel universe={universe} />;
+    case 'characters': return <CharactersPanel universe={universe} />;
+    case 'locations':  return <LocationsPanel universe={universe} />;
+    case 'timeline':   return <TimelinePanel universe={universe} />;
+    case 'notes':      return <NotesPanel universe={universe} />;
+    default:           return <EmptyPanel />;
+  }
+}
 
 // ── New Universe Modal ─────────────────────────────────
 
@@ -127,10 +214,10 @@ function UniversesDashboard({ navigation }) {
 
 function UniverseScreen({ route, navigation }) {
   const { universe } = route.params;
+  const [activeSection, setActiveSection] = useState(null);
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backButton}>← Universes</Text>
@@ -139,27 +226,33 @@ function UniverseScreen({ route, navigation }) {
         <View style={{ width: 80 }} />
       </View>
 
-      {/* Sidebar navigation */}
       <View style={styles.workspace}>
+        {/* Sidebar */}
         <View style={styles.sidebar}>
-          {[
-            { label: 'SERIES', color: '#C41E1E' },
-            { label: 'CHARACTERS', color: '#1E6B3C' },
-            { label: 'LOCATIONS', color: '#1E6B3C' },
-            { label: 'TIMELINE', color: '#1B4FD8' },
-            { label: 'NOTES', color: '#6B6860' },
-          ].map(item => (
-            <TouchableOpacity key={item.label} style={styles.sidebarItem}>
-              <View style={[styles.sidebarDot, { backgroundColor: item.color }]} />
-              <Text style={styles.sidebarLabel}>{item.label}</Text>
+          {SIDEBAR_SECTIONS.map(section => (
+            <TouchableOpacity
+              key={section.key}
+              style={[
+                styles.sidebarItem,
+                activeSection === section.key && styles.sidebarItemActive,
+              ]}
+              onPress={() => setActiveSection(section.key)}
+            >
+              <View style={[styles.sidebarDot, { backgroundColor: section.color }]} />
+              <Text style={[
+                styles.sidebarLabel,
+                activeSection === section.key && styles.sidebarLabelActive,
+              ]}>
+                {section.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Main content area */}
-        <View style={styles.mainContent}>
-          <Text style={styles.emptyLabel}>Select a section from the sidebar</Text>
-        </View>
+        {/* Main content */}
+        <ScrollView style={styles.mainContent}>
+          <ActivePanel section={activeSection} universe={universe} />
+        </ScrollView>
       </View>
     </View>
   );
@@ -204,8 +297,6 @@ const styles = StyleSheet.create({
   cardBody: { padding: 16 },
   cardName: { color: '#1A1A1A', fontSize: 16, fontWeight: '700', marginBottom: 4 },
   cardMeta: { color: '#6B6860', fontSize: 12 },
-
-  // Workspace
   workspace: { flex: 1, flexDirection: 'row' },
   sidebar: {
     width: 180,
@@ -223,12 +314,11 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     marginBottom: 2,
   },
+  sidebarItemActive: { backgroundColor: '#E8E4DC' },
   sidebarDot: { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
-  sidebarLabel: { color: '#1A1A1A', fontSize: 12, fontWeight: '600', letterSpacing: 1 },
-  mainContent: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyLabel: { color: '#A8A49E', fontSize: 13, fontStyle: 'italic' },
-
-  // Modal
+  sidebarLabel: { color: '#6B6860', fontSize: 12, fontWeight: '600', letterSpacing: 1 },
+  sidebarLabelActive: { color: '#1A1A1A' },
+  mainContent: { flex: 1 },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   modalSheet: { backgroundColor: '#F5F2EC', borderRadius: 12, padding: 24, width: '90%', maxWidth: 480, borderWidth: 1, borderColor: '#D4CFC7' },
@@ -241,4 +331,13 @@ const styles = StyleSheet.create({
   createButton: { backgroundColor: '#C41E1E', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 4 },
   createButtonDisabled: { backgroundColor: '#D4CFC7' },
   createButtonText: { color: '#FAFAF8', fontSize: 13, fontWeight: '700' },
+});
+
+const panel = StyleSheet.create({
+  container: { flex: 1, padding: 32 },
+  title: { color: '#1A1A1A', fontSize: 22, fontWeight: '700', marginBottom: 8 },
+  subtitle: { color: '#6B6860', fontSize: 14, lineHeight: 22, marginBottom: 24 },
+  addButton: { alignSelf: 'flex-start', backgroundColor: '#1A1A1A', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 4 },
+  addButtonText: { color: '#F5F2EC', fontSize: 13, fontWeight: '700' },
+  empty: { color: '#A8A49E', fontSize: 13, fontStyle: 'italic' },
 });
