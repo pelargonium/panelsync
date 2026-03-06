@@ -36,13 +36,97 @@ function SeriesPanel({ universe }) {
 }
 
 function CharactersPanel({ universe }) {
+  const [characters, setCharacters] = useState([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('');
+  const [description, setDescription] = useState('');
+
+  function handleCreate() {
+    if (name.trim().length === 0) return;
+    setCharacters(prev => [{
+      id: Date.now().toString(),
+      name: name.trim(),
+      role: role.trim(),
+      description: description.trim(),
+    }, ...prev]);
+    setName('');
+    setRole('');
+    setDescription('');
+    setModalVisible(false);
+  }
+
   return (
     <View style={panel.container}>
-      <Text style={panel.title}>Characters</Text>
-      <Text style={panel.subtitle}>No characters yet. Add one to start building your world.</Text>
-      <TouchableOpacity style={panel.addButton}>
-        <Text style={panel.addButtonText}>+ New Character</Text>
-      </TouchableOpacity>
+      <View style={panel.panelHeader}>
+        <Text style={panel.title}>Characters</Text>
+        <TouchableOpacity style={panel.addButton} onPress={() => setModalVisible(true)}>
+          <Text style={panel.addButtonText}>+ New Character</Text>
+        </TouchableOpacity>
+      </View>
+
+      {characters.length === 0 ? (
+        <Text style={panel.subtitle}>No characters yet. Add one to start building your world.</Text>
+      ) : (
+        <ScrollView>
+          {characters.map(c => (
+            <View key={c.id} style={panel.card}>
+              <View style={panel.cardaccent} />
+              <View style={panel.cardContent}>
+                <Text style={panel.cardName}>{c.name}</Text>
+                {c.role ? <Text style={panel.cardRole}>{c.role}</Text> : null}
+                {c.description ? <Text style={panel.cardDesc}>{c.description}</Text> : null}
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      )}
+
+      <Modal visible={modalVisible} transparent animationType="fade">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity style={styles.modalBackdrop} onPress={() => setModalVisible(false)} />
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>New Character</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Name..."
+              placeholderTextColor="#A8A49E"
+              value={name}
+              onChangeText={setName}
+              autoFocus
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Role (e.g. Protagonist, Antagonist, Supporting)..."
+              placeholderTextColor="#A8A49E"
+              value={role}
+              onChangeText={setRole}
+            />
+            <TextInput
+              style={[styles.modalInput, { height: 80 }]}
+              placeholder="Brief description..."
+              placeholderTextColor="#A8A49E"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisible(false)}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.createButton, name.trim().length === 0 && styles.createButtonDisabled]}
+                onPress={handleCreate}
+              >
+                <Text style={styles.createButtonText}>Create</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -340,4 +424,93 @@ const panel = StyleSheet.create({
   addButton: { alignSelf: 'flex-start', backgroundColor: '#1A1A1A', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 4 },
   addButtonText: { color: '#F5F2EC', fontSize: 13, fontWeight: '700' },
   empty: { color: '#A8A49E', fontSize: 13, fontStyle: 'italic' },
+  topRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: 20,
+},
+card: {
+  backgroundColor: '#F5F2EC',
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: '#D4CFC7',
+  padding: 16,
+  marginBottom: 10,
+},
+cardHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 8,
+},
+avatar: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  backgroundColor: '#1E6B3C',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginRight: 12,
+},
+avatarText: {
+  color: '#FAFAF8',
+  fontSize: 16,
+  fontWeight: '700',
+},
+cardName: {
+  color: '#1A1A1A',
+  fontSize: 15,
+  fontWeight: '700',
+},
+cardRole: {
+  color: '#6B6860',
+  fontSize: 12,
+  marginTop: 2,
+},
+cardDesc: {
+  color: '#6B6860',
+  fontSize: 13,
+  lineHeight: 20,
+},
+panelHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: 24,
+},
+card: {
+  flexDirection: 'row',
+  backgroundColor: '#F5F2EC',
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: '#D4CFC7',
+  marginBottom: 10,
+  overflow: 'hidden',
+},
+cardAccent: {
+  width: 4,
+  backgroundColor: '#1E6B3C',
+},
+cardContent: {
+  flex: 1,
+  padding: 14,
+},
+cardName: {
+  color: '#1A1A1A',
+  fontSize: 15,
+  fontWeight: '700',
+  marginBottom: 2,
+},
+cardRole: {
+  color: '#1E6B3C',
+  fontSize: 11,
+  fontWeight: '700',
+  letterSpacing: 1,
+  marginBottom: 4,
+},
+cardDesc: {
+  color: '#6B6860',
+  fontSize: 13,
+  lineHeight: 20,
+},
 });
