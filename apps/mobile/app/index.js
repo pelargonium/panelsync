@@ -22,7 +22,7 @@ function UniverseCard({ universe }) {
 export default function UniversesDashboard() {
   return (
     <View style={styles.container}>
-      
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.logo}>PANELSYNC</Text>
@@ -46,7 +46,7 @@ export default function UniversesDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0e0c0a',
+    backgroundColor: '#E8E4DC',
   },
   header: {
     flexDirection: 'row',
@@ -56,22 +56,23 @@ const styles = StyleSheet.create({
     paddingTop: 48,
     paddingBottom: 24,
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2826',
+    borderBottomColor: '#D4CFC7',
+    backgroundColor: '#F5F2EC',
   },
   logo: {
-    color: '#e8410a',
+    color: '#C41E1E',
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 3,
   },
   newButton: {
-    backgroundColor: '#e8410a',
+    backgroundColor: '#1A1A1A',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 4,
   },
   newButtonText: {
-    color: '#f5f0e8',
+    color: '#F5F2EC',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -79,35 +80,35 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   sectionLabel: {
-    color: '#888',
+    color: '#6B6860',
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 2,
     marginBottom: 16,
   },
   card: {
-    backgroundColor: '#1a1816',
+    backgroundColor: '#F5F2EC',
     borderRadius: 8,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#2a2826',
+    borderColor: '#D4CFC7',
     overflow: 'hidden',
   },
   cardCover: {
     height: 80,
-    backgroundColor: '#2a2826',
+    backgroundColor: '#D4CFC7',
   },
   cardBody: {
     padding: 16,
   },
   cardName: {
-    color: '#f5f0e8',
+    color: '#1A1A1A',
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 4,
   },
   cardMeta: {
-    color: '#888',
+    color: '#6B6860',
     fontSize: 12,
   },
 });

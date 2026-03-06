@@ -1,24 +1,29 @@
 export const colors = {
-  // Backgrounds
-  bg:         '#0e0c0a',
-  surface:    '#1a1816',
-  surfaceAlt: '#141210',
-  border:     '#2a2826',
+  // Base
+  bg:         '#E8E4DC',
+  surface:    '#F5F2EC',
+  pageWhite:  '#FAFAF8',
+  border:     '#D4CFC7',
 
   // Text
-  text:       '#f5f0e8',
-  muted:      '#888888',
-  faint:      '#444444',
+  text:       '#1A1A1A',
+  muted:      '#6B6860',
+  faint:      '#A8A49E',
 
-  // Accent
-  accent:     '#e8410a',
-  accentSoft: '#f5a623',
+  // Primary accents
+  accent:     '#C41E1E',
+  accentGold: '#D4960A',
+
+  // Section colors
+  timeline:   '#1B4FD8',
+  bible:      '#1E6B3C',
+  chalkboard: '#6B2D8B',
 
   // Status
-  draft:      '#4a90d9',
-  review:     '#f5a623',
-  locked:     '#e8410a',
-  complete:   '#2d8a4e',
+  draft:      '#1B4FD8',
+  review:     '#D4960A',
+  locked:     '#C41E1E',
+  complete:   '#1E6B3C',
 };
 
 export const spacing = {
