@@ -4,20 +4,28 @@ import {
   StyleSheet, TextInput
 } from 'react-native';
 import { colors } from '../theme';
+import type { Character } from '../types';
 
-export default function CharacterScreen({ character, onBack }) {
+interface Props {
+  character: Character;
+  onBack: () => void;
+}
+
+type TabKey = 'profile' | 'backstory' | 'notes';
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'profile',   label: 'PROFILE' },
+  { key: 'backstory', label: 'BACKSTORY' },
+  { key: 'notes',     label: 'NOTES' },
+];
+
+export default function CharacterScreen({ character, onBack }: Props) {
   const [name, setName] = useState(character.name);
-  const [role, setRole] = useState(character.role || '');
-  const [appearance, setAppearance] = useState(character.appearance || '');
-  const [backstory, setBackstory] = useState(character.backstory || '');
-  const [notes, setNotes] = useState(character.notes || '');
-  const [activeTab, setActiveTab] = useState('profile');
-
-  const TABS = [
-    { key: 'profile',   label: 'PROFILE' },
-    { key: 'backstory', label: 'BACKSTORY' },
-    { key: 'notes',     label: 'NOTES' },
-  ];
+  const [role, setRole] = useState(character.role ?? '');
+  const [appearance, setAppearance] = useState(character.appearance ?? '');
+  const [backstory, setBackstory] = useState(character.backstory ?? '');
+  const [notes, setNotes] = useState(character.notes ?? '');
+  const [activeTab, setActiveTab] = useState<TabKey>('profile');
 
   return (
     <View style={s.container}>

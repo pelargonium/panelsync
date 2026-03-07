@@ -3,15 +3,23 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Modal, TextInput, KeyboardAvoidingView, Platform
 } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors } from '../theme';
 import { modalStyles as m } from '../components/modalStyles';
+import type { RootStackParamList, Universe } from '../types';
 
-const INITIAL_UNIVERSES = [
+type Props = NativeStackScreenProps<RootStackParamList, 'Universes'>;
+
+const INITIAL_UNIVERSES: Universe[] = [
   { id: '1', name: 'The Voidborn Saga', seriesCount: 3, lastEdited: '2 hours ago' },
   { id: '2', name: 'Neon Requiem', seriesCount: 1, lastEdited: 'Yesterday' },
 ];
 
-function NewUniverseModal({ visible, onClose, onCreate }) {
+function NewUniverseModal({ visible, onClose, onCreate }: {
+  visible: boolean;
+  onClose: () => void;
+  onCreate: (name: string) => void;
+}) {
   const [name, setName] = useState('');
 
   function handleCreate() {
@@ -59,7 +67,7 @@ function NewUniverseModal({ visible, onClose, onCreate }) {
   );
 }
 
-function UniverseCard({ universe, onPress }) {
+function UniverseCard({ universe, onPress }: { universe: Universe; onPress: () => void }) {
   return (
     <TouchableOpacity style={s.card} onPress={onPress}>
       <View style={s.cardCover} />
@@ -73,11 +81,11 @@ function UniverseCard({ universe, onPress }) {
   );
 }
 
-export default function UniversesDashboard({ navigation }) {
-  const [universes, setUniverses] = useState(INITIAL_UNIVERSES);
+export default function UniversesDashboard({ navigation }: Props) {
+  const [universes, setUniverses] = useState<Universe[]>(INITIAL_UNIVERSES);
   const [modalVisible, setModalVisible] = useState(false);
 
-  function handleCreate(name) {
+  function handleCreate(name: string) {
     setUniverses(prev => [{
       id: Date.now().toString(),
       name,

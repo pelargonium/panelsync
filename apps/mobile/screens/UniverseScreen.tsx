@@ -1,13 +1,19 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors } from '../theme';
 import SeriesEntity from '../entities/SeriesEntity';
 import CharactersEntity from '../entities/CharactersEntity';
 import LocationsEntity from '../entities/LocationsEntity';
 import TimelineEntity from '../entities/TimelineEntity';
 import NotesEntity from '../entities/NotesEntity';
+import type { RootStackParamList, Universe } from '../types';
 
-const SIDEBAR_SECTIONS = [
+type Props = NativeStackScreenProps<RootStackParamList, 'Universe'>;
+
+type SectionKey = 'series' | 'characters' | 'locations' | 'timeline' | 'notes';
+
+const SIDEBAR_SECTIONS: { key: SectionKey; label: string; color: string }[] = [
   { key: 'series',     label: 'SERIES',     color: colors.accent },
   { key: 'characters', label: 'CHARACTERS', color: colors.bible },
   { key: 'locations',  label: 'LOCATIONS',  color: colors.bible },
@@ -15,7 +21,7 @@ const SIDEBAR_SECTIONS = [
   { key: 'notes',      label: 'NOTES',      color: colors.muted },
 ];
 
-function ActiveEntity({ section, universe }) {
+function ActiveEntity({ section, universe }: { section: SectionKey | null; universe: Universe }) {
   switch (section) {
     case 'series':     return <SeriesEntity universe={universe} />;
     case 'characters': return <CharactersEntity universe={universe} />;
@@ -30,9 +36,9 @@ function ActiveEntity({ section, universe }) {
   }
 }
 
-export default function UniverseScreen({ route, navigation }) {
+export default function UniverseScreen({ route, navigation }: Props) {
   const { universe } = route.params;
-  const [activeSection, setActiveSection] = useState(null);
+  const [activeSection, setActiveSection] = useState<SectionKey | null>(null);
 
   return (
     <View style={s.container}>
@@ -69,18 +75,18 @@ export default function UniverseScreen({ route, navigation }) {
 }
 
 const s = StyleSheet.create({
-  container:         { flex: 1, backgroundColor: colors.bg, display: 'flex', flexDirection: 'column', minHeight: '100vh' },
-  header:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 48, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
-  logo:              { color: colors.accent, fontSize: 14, fontWeight: '700', letterSpacing: 2 },
-  backButton:        { color: colors.accent, fontSize: 13, fontWeight: '600', width: 80 },
-  workspace:         { flex: 1, flexDirection: 'row', overflow: 'hidden', minHeight: 0 },
-  sidebar:           { width: 180, backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border, paddingTop: 24, paddingHorizontal: 12 },
-  sidebarItem:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 6, marginBottom: 2 },
-  sidebarItemActive: { backgroundColor: colors.bg },
-  sidebarDot:        { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
-  sidebarLabel:      { color: colors.muted, fontSize: 12, fontWeight: '600', letterSpacing: 1 },
-  sidebarLabelActive:{ color: colors.text },
-  mainContent:       { flex: 1, backgroundColor: 'pink', overflow: 'auto', minWidth: 0 },
-  empty:             { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 48 },
-  emptyText:         { color: colors.faint, fontSize: 13, fontStyle: 'italic' },
+  container:          { flex: 1, backgroundColor: colors.bg },
+  header:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 48, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
+  logo:               { color: colors.accent, fontSize: 14, fontWeight: '700', letterSpacing: 2 },
+  backButton:         { color: colors.accent, fontSize: 13, fontWeight: '600', width: 80 },
+  workspace:          { flex: 1, flexDirection: 'row', overflow: 'hidden' },
+  sidebar:            { width: 180, backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border, paddingTop: 24, paddingHorizontal: 12 },
+  sidebarItem:        { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 6, marginBottom: 2 },
+  sidebarItemActive:  { backgroundColor: colors.bg },
+  sidebarDot:         { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
+  sidebarLabel:       { color: colors.muted, fontSize: 12, fontWeight: '600', letterSpacing: 1 },
+  sidebarLabelActive: { color: colors.text },
+  mainContent:        { flex: 1 },
+  empty:              { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 48 },
+  emptyText:          { color: colors.faint, fontSize: 13, fontStyle: 'italic' },
 });

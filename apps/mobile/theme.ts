@@ -27,10 +27,10 @@ export const spacing = {
 };
 
 export const typography = {
-  label:   { fontSize: 11, fontWeight: '700', letterSpacing: 2 },
+  label:   { fontSize: 11, fontWeight: '700' as const, letterSpacing: 2 },
   body:    { fontSize: 14, lineHeight: 22 },
-  heading: { fontSize: 18, fontWeight: '700' },
-  title:   { fontSize: 28, fontWeight: '700' },
+  heading: { fontSize: 18, fontWeight: '700' as const },
+  title:   { fontSize: 28, fontWeight: '700' as const },
 };
 
 export const radius = {
