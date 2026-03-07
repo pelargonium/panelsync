@@ -1,15 +1,13 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { colors } from '../theme';
-import SeriesEntity from '../entities/SeriesEntity';
-import CharactersEntity from '../entities/CharactersEntity';
-import LocationsEntity from '../entities/LocationsEntity';
-import TimelineEntity from '../entities/TimelineEntity';
-import NotesEntity from '../entities/NotesEntity';
-import type { RootStackParamList, Universe } from '../types';
-
-type Props = NativeStackScreenProps<RootStackParamList, 'Universe'>;
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { colors } from '../../theme';
+import SeriesEntity from '../../entities/SeriesEntity';
+import CharactersEntity from '../../entities/CharactersEntity';
+import LocationsEntity from '../../entities/LocationsEntity';
+import TimelineEntity from '../../entities/TimelineEntity';
+import NotesEntity from '../../entities/NotesEntity';
+import type { Universe } from '../../types';
 
 type SectionKey = 'series' | 'characters' | 'locations' | 'timeline' | 'notes';
 
@@ -36,14 +34,22 @@ function ActiveEntity({ section, universe }: { section: SectionKey | null; unive
   }
 }
 
-export default function UniverseScreen({ route, navigation }: Props) {
-  const { universe } = route.params;
+export default function WorldScreen() {
+  const { id, name } = useLocalSearchParams<{ id: string; name: string }>();
+  const router = useRouter();
   const [activeSection, setActiveSection] = useState<SectionKey | null>(null);
+
+  const universe: Universe = {
+    id: id as string,
+    name: decodeURIComponent(name as string),
+    seriesCount: 0,
+    lastEdited: '',
+  };
 
   return (
     <View style={s.container}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => router.back()}>
           <Text style={s.backButton}>← Universes</Text>
         </TouchableOpacity>
         <Text style={s.logo}>{universe.name.toUpperCase()}</Text>

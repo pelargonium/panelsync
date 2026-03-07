@@ -3,12 +3,10 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Modal, TextInput, KeyboardAvoidingView, Platform
 } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useRouter } from 'expo-router';
 import { colors } from '../theme';
 import { modalStyles as m } from '../components/modalStyles';
-import type { RootStackParamList, Universe } from '../types';
-
-type Props = NativeStackScreenProps<RootStackParamList, 'Universes'>;
+import type { Universe } from '../types';
 
 const INITIAL_UNIVERSES: Universe[] = [
   { id: '1', name: 'The Voidborn Saga', seriesCount: 3, lastEdited: '2 hours ago' },
@@ -81,7 +79,8 @@ function UniverseCard({ universe, onPress }: { universe: Universe; onPress: () =
   );
 }
 
-export default function UniversesDashboard({ navigation }: Props) {
+export default function WorldsDashboard() {
+  const router = useRouter();
   const [universes, setUniverses] = useState<Universe[]>(INITIAL_UNIVERSES);
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -108,7 +107,7 @@ export default function UniversesDashboard({ navigation }: Props) {
           <UniverseCard
             key={u.id}
             universe={u}
-            onPress={() => navigation.navigate('Universe', { universe: u })}
+            onPress={() => router.push({ pathname: '/world/[id]', params: { id: u.id, name: u.name } })}
           />
         ))}
       </ScrollView>

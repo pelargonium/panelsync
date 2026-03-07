@@ -14,8 +14,3 @@ export interface Character {
   backstory?: string;
   notes?: string;
 }
-
-export type RootStackParamList = {
-  Universes: undefined;
-  Universe: { universe: Universe };
-};
