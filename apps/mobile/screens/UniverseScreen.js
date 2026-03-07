@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { colors } from '../theme';
 import SeriesEntity from '../entities/SeriesEntity';
 import CharactersEntity from '../entities/CharactersEntity';
@@ -60,27 +60,27 @@ export default function UniverseScreen({ route, navigation }) {
           ))}
         </View>
 
-        <ScrollView style={s.mainContent}>
+        <View style={s.mainContent}>
           <ActiveEntity section={activeSection} universe={universe} />
-        </ScrollView>
+        </View>
       </View>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  container:         { flex: 1, backgroundColor: colors.bg },
+  container:         { flex: 1, backgroundColor: colors.bg, display: 'flex', flexDirection: 'column', minHeight: '100vh' },
   header:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 48, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
   logo:              { color: colors.accent, fontSize: 14, fontWeight: '700', letterSpacing: 2 },
   backButton:        { color: colors.accent, fontSize: 13, fontWeight: '600', width: 80 },
-  workspace:         { flex: 1, flexDirection: 'row' },
+  workspace:         { flex: 1, flexDirection: 'row', overflow: 'hidden', minHeight: 0 },
   sidebar:           { width: 180, backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border, paddingTop: 24, paddingHorizontal: 12 },
   sidebarItem:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 6, marginBottom: 2 },
   sidebarItemActive: { backgroundColor: colors.bg },
   sidebarDot:        { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
   sidebarLabel:      { color: colors.muted, fontSize: 12, fontWeight: '600', letterSpacing: 1 },
   sidebarLabelActive:{ color: colors.text },
-  mainContent:       { flex: 1 },
+  mainContent:       { flex: 1, backgroundColor: 'pink', overflow: 'auto', minWidth: 0 },
   empty:             { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 48 },
   emptyText:         { color: colors.faint, fontSize: 13, fontStyle: 'italic' },
 });
