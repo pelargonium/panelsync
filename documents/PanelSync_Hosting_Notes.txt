@@ -1,0 +1,57 @@
+PANELSYNC — HOSTING & SCALING NOTES
+=====================================
+Date: 2026-03-07
+
+
+PIECES TO HOST
+--------------
+  Mobile app (iPad)   Distributed via App Store / TestFlight
+  Web app             Expo web build (static site)
+  API server          Fastify / Node.js backend
+  Database            PostgreSQL
+  File storage        Cloudflare R2 (already in spec)
+
+
+FOR 10 USERS: KEEP IT SIMPLE
+------------------------------
+
+API + Database → Railway
+  Railway is the easiest "real" hosting platform for a Node.js backend.
+  Connect your GitHub repo, it deploys on every push, and it includes
+  managed PostgreSQL as an add-on. No servers to manage, no config files
+  to write. Costs roughly $5–20/month at this scale.
+
+Web app → Cloudflare Pages
+  Expo web exports a static site. Cloudflare Pages hosts static sites for
+  free, deploys from GitHub, and serves them globally fast. Zero config,
+  zero cost early on.
+
+File storage → Cloudflare R2
+  Already in the spec. No egress fees (unlike AWS S3), generous free tier.
+
+Mobile → TestFlight first, App Store later
+  For 10 users you don't need to be on the App Store yet. TestFlight lets
+  you invite up to 10,000 external testers with just an Apple Developer
+  account ($99/year).
+
+
+SCALING PATH
+------------
+Railway scales vertically (bigger machines) and can run multiple instances.
+For a comic writing tool — even a popular one — you'd be on Railway for a
+long time before outgrowing it.
+
+When/if you do outgrow it:
+  API       → Fly.io (more control, global edge deployment) or AWS ECS
+  Database  → Neon or AWS RDS (dedicated managed Postgres)
+  Web       → Cloudflare Pages scales automatically, never needs changing
+
+The architecture (Fastify + Drizzle + Postgres + R2) is fully portable —
+none of these platforms lock you in.
+
+
+IMPLICATIONS FOR BACKEND
+-------------------------
+No changes needed to the backend design. Railway just runs `npm start`
+in the apps/api directory. All credentials (DB URL, R2 keys, auth secret)
+go in environment variables — .env locally, Railway's dashboard in production.
