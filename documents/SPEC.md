@@ -78,25 +78,99 @@ Universes Dashboard → Universe → Series → Issue → Page
 ### Universes Dashboard (Home)
 - All Universes shown as cards: cover image, name, last edited, stacked sub-cards
 - **Tap** → resumes at last open page (fastest path)
-- **Long-press** → reveals options: "Universe Home" or "Settings"
+- **Long-press** → reveals options including Universe Settings
 - First-launch peekaboo animation: sub-cards slide 18px down and back, tooltip appears once, never again
+- Universe switching always happens from this screen — you never switch universes mid-session
 
-### Contextual Sidebar
-- **Top** — Universe-level tools: Bible, Timeline, Chalkboard, Relationship Map, Mood Board, Notes
-- **Middle** — Series list → expandable to Issues → expandable to Pages
-- **Bottom** — current page context: quick links to script and storyboard
-- Collapsible. Universe switcher at top.
+### The Binder (Persistent Sidebar)
+The binder is the primary navigation and content tree for the open universe. Modeled on Scrivener's binder. It shows everything that exists in the universe — series, issues, pages, characters, locations, timelines, notes — all in one place, always accessible while working.
+
+**Layout:**
+- **Header**: search bar + sort dropdown + view mode toggle
+- **Body**: full content tree of the universe
+- **Footer**: row of type-tag icons
+
+**Collapse behavior:**
+- Persistent and visible by default
+- Resizable by dragging the edge
+- Collapses fully (slides off screen) via a button or 4-finger swipe from the left edge
+- No icon rail in collapsed state — fully hidden, content expands to fill
+
+**Search bar:**
+- Always at the top of the binder header
+- Hides on scroll up, reappears on scroll down
+- Searches all content within the universe
+
+**Sort dropdown:**
+- Options: Most recently changed, Most recently created, Alphabetical, Manual order
+
+**View modes (toggle in header):**
+- **Tree view** (default) — collapsible hierarchy, indent-based
+- **Column view** — Miller columns. Tap an item → next level opens as a new column to the right. Full path visible at top (Universe › Locations › Italy › Sicily).
+
+**Body — content tree:**
+- Contains all universe content: series/issue/page hierarchy, characters, locations, timelines, notes, and any user-created bins
+- Entity types (Character, Location, etc.) are tags, not rigid containers — an item can carry multiple type tags (e.g. Ego the Living Planet tagged as both Character and Location)
+- Items can be organized into user-created folders/bins
+- The series/issue/page hierarchy is the primary structural spine
+
+**Footer — type-tag icons:**
+- A single compact row of icons for each default type: Character, Location, Timeline, Notes
+- Tapping an icon opens a filtered view of all items in the universe carrying that tag
+- Lives at the bottom of the binder, always visible
+
+**Interactions:**
+- **Tap** → opens the item in the main content area
+- **Long press** → context menu (items include: Open, Open in Split, Rename, Delete, Select)
+- **"Select" from context menu** → enters selection mode. Single taps now accumulate selection. A bulk action toolbar appears at the bottom of the binder.
+- Selection mode exited by tapping Done or deselecting all items
+
+### Global Chrome (Top Bar)
+A minimal persistent top bar present on every screen inside a universe.
+
+| Position | Elements |
+|----------|----------|
+| Left | Undo / Redo |
+| Center | Save/sync status indicator |
+| Right | Share button · Collaborator avatars · Account avatar |
+
+**Save/sync indicator:**
+- Single small icon showing current state: editing, saving, saved, syncing, synced, offline, error
+- Tap → popover with plain-language description of current state ("All changes saved", "Offline — changes will sync when reconnected")
+- Offline and error states escalate the icon color (amber / red); no banner unless critical
+
+**Share button:**
+- If one editor pane is focused (active pane has a subtle highlight border): opens quick export options for that content
+- If two editors are open with no clear focus: modal asks which editor's content to export
+- Leads to the **Share Center** — a full export studio screen with search, output configuration, page order editing, and layer control
+
+**Collaborator avatars:**
+- Shows who has access to the universe
+- Tap → collaboration panel (manage roles, recent activity)
+- v2: becomes live presence with named cursors
+
+**Account avatar:**
+- Tap → account and app-level settings (profile, email, password, theme, notifications, keyboard shortcuts, sign out)
+- Universe-level settings (name, cover, collaborators, delete) live on the Universe card on the dashboard, not here
+
+### Editor Panes and Floating Toolbars
+- The main content area can show one or two editor panes side by side (split view)
+- Each editor (script, storyboard, timeline, notes) has its own discrete floating toolbar
+- **Default position**: top-center of its pane
+- **Reposition**: long press the toolbar + drag. Snaps to the four edges of its pane. Does not float freely (prevents collisions in split view).
+- The **active pane** is indicated by a subtle highlight border. Global actions (undo/redo, share) target the active pane.
+- Clicking into a pane makes it active.
 
 ### Split View
-Quick-launch pairs: Script + Storyboard, Script + Characters, Timeline + Script, Characters + Sketch, Locations + Sketch, Timeline + Characters.
+Any two editors can be placed side by side. Each pane is independent with its own toolbar and active state. Common pairs: Script + Storyboard, Script + Characters, Timeline + Script, Characters + Sketch, Locations + Sketch, Timeline + Characters.
 
 ### Route Structure (Expo Router)
 ```
-/                           Universes Dashboard
-/universe/[id]              Universe Home
-/universe/[id]/series/[id]  Series view
-/universe/[id]/series/[sid]/issue/[id]        Issue view
-/universe/[id]/series/[sid]/issue/[id]/page/[id]  Script + Storyboard
+/                                                           Universes Dashboard
+/universe/[id]                                              Universe Home
+/universe/[id]/series/[sid]                                 Series view
+/universe/[id]/series/[sid]/issue/[iid]                     Issue view
+/universe/[id]/series/[sid]/issue/[iid]/page/[pid]          Script + Storyboard
 ```
 
 ---

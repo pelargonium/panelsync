@@ -6,9 +6,10 @@
 - Auth middleware: `@fastify/jwt` plugin + `server.authenticate` decorator. Login/register stubs return 501.
 - Mobile API client: `apps/mobile/lib/api.ts` — typed fetch wrapper for auth, worlds, characters.
 - npm workspaces enabled. `apps/api` and `apps/mobile` are workspace members.
+- UX concepting in progress. Global chrome and binder fully specced (SPEC.md §3). No coding until UX is complete.
 
 ## Next Step
-UX concepting session: define the universal navigation layer first (app shell, navigation between sections, what is always present), then map the opening flow (app launch → first use). Output: updated SPEC.md sections and/or Expo mockup screens. Coding is deferred until UX is settled.
+Continue UX concepting: spec the Universes Dashboard (home screen) — card layout, universe settings access, first-launch flow, and the transition into a universe.
 
 ---
 
