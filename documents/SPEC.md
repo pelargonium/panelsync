@@ -175,14 +175,41 @@ Any two editors can be placed side by side. Each pane is independent with its ow
 
 ---
 
-## 4. Home Screen
+## 4. Universes Dashboard
 
-Three sections:
-1. **Resume** — primary card (most recent page) + secondary cards (recent pages in other issues)
-2. **Recent Activity** — feed of edits across all Universes
-3. **Universes Shelf** — all Universe cards with long-press interaction
+The dashboard is the home screen and the only place universe switching happens. No binder, no top bar chrome — those live inside a universe.
 
-Both dark and light modes fully designed. Reference: `panelsync-home.html`
+### Layout
+- **Default**: 2-column card grid
+- **List view**: toggled via a view control in the dashboard header (same icon pattern as the binder)
+- **"+" button**: always present in the dashboard header. Creates a new universe.
+
+### Universe Cards
+- Content: universe name (prominent), cover image if one exists, last edited timestamp (subtle)
+- If no cover image has been set, the card renders as styled text on a plain background — no placeholder imagery
+- **Tap** → opens the universe, resuming at the last open item
+- **Long press** → context menu: Open, Universe Settings, Duplicate, Delete
+
+### Empty and Ghost States
+- **0 universes**: full empty state — background prompt text ("Create your first universe"), large centered CTA button
+- **0 or 1 universes**: a ghost card (dashed border, no content) appears at the end of the grid as a visual affordance for creating a new universe. Disappears once 2 universes exist.
+
+### Create Universe Modal
+Triggered by tapping "+" or the ghost card. A tabbed modal with a persistent Create Universe / Cancel footer visible on every tab.
+
+| Tab | Fields |
+|-----|--------|
+| **Basics** | Universe name (required), cover image (optional) |
+| **Timeline** | Timescale setting: Pure Sequence / Standard Earth Time / Custom |
+| **Collaborators** | Invite by email, assign role (Editor / Viewer) |
+
+- Only the name is required. All other tabs are optional.
+- On Create → modal dismisses, universe is created and opened automatically.
+
+### First Open of a New Universe
+- Binder opens on the left, empty.
+- Main content area shows a **Get Started page**: shortcut actions (Create a character, Create a timeline, Start writing a script).
+- "Don't show this again" checkbox at the bottom. Once checked and dismissed, subsequent opens resume at the last open item instead.
 
 ---
 
