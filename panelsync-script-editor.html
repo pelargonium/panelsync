@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PanelSync — Script Editor</title>
+
+<!--
+  ═══════════════════════════════════════════════════════════════
+  PANELSYNC SCRIPT EDITOR — v3 Refactor
+  ═══════════════════════════════════════════════════════════════
+
+  KEYBOARD FLOW:
+  ENTER          → Commit block, create next (smart defaults)
+  TAB            → Cycle block type on empty blocks
+  BACKSPACE      → On empty block, delete & go back
+  ⌘/Ctrl+ENTER   → New page
+  Shift+ENTER    → Newline within desc/caption/dialogue
+
+  SPECIAL FLOW (Final Draft style):
+  Empty dialogue character + Enter → new Panel + Description
+  (assumes conversation ended, new visual beat)
+
+  BLOCK TYPES: Panel, Scene, Description, Dialogue, Caption, SFX
+  Panel numbering resets to 1 on each page.
+  Scenes can live outside of panels — fully flexible ordering.
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Geist+Mono:wght@300;400;500&family=Geist:wght@300;400;500;600&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+/* ── DARK THEME TOKENS ── */
+:root{
+  --bg:#0e0d0c;--bg-s:#161514;--bg-editor:#111110;
+  --bg-p:#1a1918;--bg-h:#222120;--bg-act:#1e1c10;
+  --bd:#2a2724;--bd-h:#38352e;--bd-s:#1e1c18;
+  --tx:#dfd9ce;--tx2:#9e9890;--tx3:#555048;--tx4:#333028;
+  --acc:#c8a768;--acc2:#6e5430;--acc3:#1c1a0e;
+  --cursor:#c8a768;
+}
+/* ── LIGHT THEME TOKENS ── */
+body.light{
+  --bg:#f2efe9;--bg-s:#e9e5de;--bg-editor:#fdfcf9;
+  --bg-p:#e1ddd5;--bg-h:#e5e1d9;--bg-act:#f4edda;
+  --bd:#d4cfc5;--bd-h:#c0bbb0;--bd-s:#e2ded6;
+  --tx:#1a1814;--tx2:#54504a;--tx3:#9a9690;--tx4:#c8c4bc;
+  --acc:#9a7030;--acc2:#b88840;--acc3:#f8f0e0;
+  --cursor:#9a7030;
+}
+body{
+  background:var(--bg);font-family:'Geist',sans-serif;
+  color:var(--tx);height:100vh;display:flex;flex-direction:column;overflow:hidden;
+}
+
+/* ── TOP BAR ── */
+.topbar{
+  height:44px;background:var(--bg-s);border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;padding:0 12px 0 0;flex-shrink:0;z-index:10;
+}
+.tb-wm{
+  font-family:'Lora',serif;font-size:14px;font-weight:600;color:var(--acc);
+  padding:0 14px;border-right:1px solid var(--bd);
+  height:100%;display:flex;align-items:center;flex-shrink:0;
+}
+.tb-bc{display:flex;align-items:center;gap:6px;padding:0 14px;flex:1;overflow:hidden}
+.tb-c{font-family:'Geist Mono',monospace;font-size:10px;color:var(--tx3);
+  letter-spacing:.04em;white-space:nowrap}
+.tb-c.on{color:var(--tx2)}
+.tb-r{display:flex;align-items:center;gap:8px;flex-shrink:0}
+
+/* Save indicator */
+.sav{display:flex;align-items:center;gap:5px;
+  font-family:'Geist Mono',monospace;font-size:10px;color:var(--tx3);letter-spacing:.05em}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--tx4);transition:background .3s}
+.sdot.ok{background:#507a5c}.sdot.go{background:#b89048;animation:pulse .8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.tb-div{width:1px;height:20px;background:var(--bd);flex-shrink:0}
+.tb-btn{
+  height:30px;padding:0 10px;border-radius:7px;border:1px solid var(--bd);
+  background:transparent;color:var(--tx2);font-family:'Geist Mono',monospace;
+  font-size:10px;letter-spacing:.04em;cursor:pointer;
+  display:flex;align-items:center;gap:5px;flex-shrink:0;transition:background .15s;
+}
+.tb-btn:hover{background:var(--bg-h)}.tb-btn:active{background:var(--bg-act)}
+.tb-btn svg{width:14px;height:14px;pointer-events:none}
+
+/* ── EDITOR TOOLBAR ── */
+.etb{
+  height:38px;background:var(--bg-s);border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0;
+}
+.bti{
+  display:flex;align-items:center;gap:8px;height:26px;padding:0 10px;
+  border-radius:7px;border:1px solid var(--bd-h);background:var(--bg-p);
+  transition:all .15s ease;cursor:default;
+}
+.btd{width:8px;height:8px;border-radius:2px;flex-shrink:0;transition:background .15s}
+.btn-name{font-family:'Geist Mono',monospace;font-size:10px;color:var(--tx);
+  letter-spacing:.05em;font-weight:500}
+.btn-hint{font-family:'Geist Mono',monospace;font-size:9px;color:var(--tx3);letter-spacing:.04em}
+.sp{flex:1}
+.sts{display:flex;align-items:center;gap:14px;font-family:'Geist Mono',monospace;
+  font-size:9px;color:var(--tx3);letter-spacing:.05em}
+.st-i{display:flex;align-items:center;gap:4px}
+.st-v{color:var(--tx2)}
+
+/* ── SCROLL AREA ── */
+.ss{
+  flex:1;overflow-y:auto;scrollbar-width:thin;
+  scrollbar-color:var(--bd) transparent;
+  padding:0 0 200px;display:flex;flex-direction:column;align-items:center;
+  background:var(--bg-editor);
+}
+.ss::-webkit-scrollbar{width:6px}
+.ss::-webkit-scrollbar-track{background:transparent}
+.ss::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px}
+
+/* ── PAGE ── */
+.sp-page{width:680px;flex-shrink:0;padding:40px 20px 60px;position:relative}
+.pg-gap{
+  width:680px;height:40px;display:flex;align-items:center;justify-content:center;
+  position:relative;flex-shrink:0;
+}
+.pg-gap::before{content:'';position:absolute;left:20px;right:20px;height:1px;background:var(--bd)}
+.pg-gap-lbl{
+  font-family:'Geist Mono',monospace;font-size:9px;color:var(--tx3);
+  letter-spacing:.1em;text-transform:uppercase;background:var(--bg-editor);
+  padding:0 12px;position:relative;z-index:1;
+}
+
+/* Page header */
+.sp-hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:24px;padding-bottom:14px;
+  border-bottom:1px solid var(--bd-s)}
+.sp-num{font-family:'Geist Mono',monospace;font-size:11px;color:var(--tx3);
+  letter-spacing:.12em;text-transform:uppercase;flex-shrink:0}
+.sp-title{
+  font-family:'Lora',serif;font-size:14px;font-weight:500;font-style:italic;
+  color:var(--tx2);background:transparent;border:none;outline:none;flex:1;padding:0;
+}
+.sp-title::placeholder{color:var(--tx4);font-style:italic}
+
+/* ── PANEL HEADER ── */
+.b-panel{margin:24px 0 8px;display:flex;align-items:center;user-select:none;outline:none}
+.b-panel:focus{outline:none}
+.p-rule{height:1px;background:var(--bd);flex:1}
+.p-lbl{padding:0 14px;display:flex;align-items:center;gap:8px}
+.p-num{font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;
+  color:var(--acc);letter-spacing:.1em}
+
+/* ── BLOCK STYLES ── */
+.b-scene{margin:6px 0;padding:4px 2px;min-height:1.4em}
+.b-desc{margin:4px 0;padding:4px 2px;min-height:1.4em}
+.b-dlg{margin:8px 0 4px;padding-left:140px}
+.b-cap{margin:6px 0;padding:7px 12px;border-left:2px solid var(--acc2);
+  background:var(--acc3);border-radius:0 4px 4px 0;min-height:1.4em}
+.b-sfx{margin:6px 0;min-height:1.4em}
+
+.dlg-ci{
+  font-family:'Courier Prime',monospace;font-size:13px;font-weight:700;
+  color:var(--tx);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px;
+  background:transparent;border:none;outline:none;width:100%;padding:2px 0;
+}
+.dlg-ci::placeholder{color:var(--tx4);text-transform:none;font-weight:400}
+.dlg-ti{
+  font-family:'Courier Prime',monospace;font-size:13px;color:var(--tx2);
+  line-height:1.6;background:transparent;border:none;outline:none;
+  width:100%;padding:2px 0;resize:none;min-height:1.4em;overflow:hidden;
+}
+.dlg-ti::placeholder{color:var(--tx4)}
+.cap-i{
+  font-family:'Courier Prime',monospace;font-size:12px;font-style:italic;
+  color:var(--tx2);line-height:1.6;background:transparent;border:none;outline:none;
+  width:100%;padding:0;resize:none;min-height:1.4em;overflow:hidden;
+}
+.cap-i::placeholder{color:var(--tx4);font-style:italic}
+.sfx-i{
+  font-family:'Lora',serif;font-size:22px;font-weight:600;color:var(--acc);
+  letter-spacing:.04em;opacity:.75;background:transparent;border:none;outline:none;
+  width:100%;padding:2px 0;
+}
+.sfx-i::placeholder{color:var(--tx4);opacity:.5;font-size:16px}
+
+.bi{background:transparent;border:none;outline:none;width:100%;padding:4px 2px;
+  resize:none;overflow:hidden}
+
+/* Active block highlight */
+.b-active{position:relative}
+.b-active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;
+  height:1.5px;background:var(--cursor);opacity:.3;border-radius:1px}
+
+/* ── TYPE PICKER ── */
+.pk-bd{display:none;position:fixed;inset:0;z-index:99}
+.pk-bd.open{display:block}
+.pk{
+  position:fixed;z-index:100;background:var(--bg-p);border:1px solid var(--bd-h);
+  border-radius:10px;padding:6px;width:230px;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);display:none;
+}
+body.light .pk{box-shadow:0 8px 32px rgba(0,0,0,.12)}
+.pk.open{display:block}
+.pk-hdr{font-family:'Geist Mono',monospace;font-size:8px;color:var(--tx3);
+  letter-spacing:.12em;text-transform:uppercase;padding:4px 8px 8px;
+  border-bottom:1px solid var(--bd-s);margin-bottom:4px}
+.pk-item{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;
+  cursor:pointer;transition:background .1s}
+.pk-item:hover{background:var(--bg-h)}
+.pk-item.active{background:var(--bg-act)}
+.pk-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.pk-name{font-family:'Geist Mono',monospace;font-size:10px;color:var(--tx);
+  letter-spacing:.05em;flex:1}
+.pk-item.active .pk-name{color:var(--acc)}
+
+/* ── HINT BAR ── */
+.gh{
+  position:fixed;bottom:12px;left:50%;transform:translateX(-50%);
+  font-family:'Geist Mono',monospace;font-size:9px;color:var(--tx4);
+  letter-spacing:.06em;text-align:center;line-height:1.8;
+  pointer-events:none;white-space:nowrap;z-index:5;transition:opacity .3s;
+}
+.gh kbd{display:inline-block;padding:1px 6px;border:1px solid var(--bd);border-radius:3px;
+  background:var(--bg-p);font-family:inherit;font-size:inherit;color:var(--tx3)}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:48px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--bg-p);color:var(--tx2);border:1px solid var(--bd-h);
+  border-radius:8px;padding:8px 16px;font-family:'Geist Mono',monospace;
+  font-size:11px;letter-spacing:.03em;opacity:0;pointer-events:none;
+  transition:opacity .3s,transform .3s;z-index:200;
+}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── MODALS ── */
+.mov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+  z-index:300;justify-content:center;align-items:center}
+body.light .mov{background:rgba(0,0,0,.25)}
+.mov.open{display:flex}
+.mcard{background:var(--bg-p);border:1px solid var(--bd-h);border-radius:14px;
+  padding:24px;width:340px;box-shadow:0 16px 48px rgba(0,0,0,.5)}
+body.light .mcard{box-shadow:0 16px 48px rgba(0,0,0,.12)}
+.mt{font-family:'Lora',serif;font-size:16px;font-weight:600;color:var(--tx);margin-bottom:6px}
+.ms{font-family:'Geist Mono',monospace;font-size:10px;color:var(--tx3);
+  letter-spacing:.04em;margin-bottom:18px}
+.mb{
+  width:100%;height:46px;border-radius:9px;border:1px solid var(--bd-h);
+  background:var(--bg-h);color:var(--tx);cursor:pointer;
+  font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.04em;
+  margin-bottom:8px;transition:background .15s;
+}
+.mb:hover{background:var(--bg-act)}
+.mb.pri{background:var(--acc3);border-color:var(--acc2);color:var(--acc)}
+.mb.pri:hover{background:var(--acc2);color:var(--tx)}
+.mb.dan{border-color:#5a2020;color:#c06060}
+.mb.dan:hover{background:#2a1010}
+body.light .mb.dan:hover{background:#f8e0e0}
+.mc{
+  width:100%;height:36px;border-radius:7px;border:none;background:transparent;
+  color:var(--tx3);cursor:pointer;font-family:'Geist Mono',monospace;
+  font-size:10px;letter-spacing:.04em;margin-top:4px;
+}
+.mc:hover{color:var(--tx2)}
+
+/* ── PRINT STYLES ── */
+@media print{
+  .topbar,.etb,.gh,.toast,.mov,.pk,.pk-bd,.pg-gap{display:none!important}
+  body,body.light{background:white!important;
+    --tx:#000!important;--tx2:#333!important;--tx3:#666!important;
+    --acc:#444!important;--acc2:#888!important;--acc3:#f4f4f4!important;
+    --bd:#ccc!important;--bd-s:#ddd!important;--bg-editor:white!important}
+  .ss{overflow:visible!important;padding:0!important}
+  .sp-page{page-break-after:always;padding:.5in!important;width:100%!important}
+  .sp-page:last-child{page-break-after:auto}
+  input::placeholder,textarea::placeholder{color:transparent!important}
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="tb-wm">PanelSync</div>
+  <div class="tb-bc"><span class="tb-c on">Script Editor</span></div>
+  <div class="tb-r">
+    <div class="sav"><div class="sdot" id="sdot"></div><span id="slbl">Ready</span></div>
+    <div class="tb-div"></div>
+    <button class="tb-btn" onclick="toggleTheme()" title="Toggle theme">
+      <svg id="ticon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/></svg>
+    </button>
+    <button class="tb-btn" onclick="addNewPage()" title="New page (⌘+Enter)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="1" width="10" height="14" rx="1"/><line x1="6" y1="8" x2="10" y2="8"/><line x1="8" y1="6" x2="8" y2="10"/></svg>
+      New Page
+    </button>
+    <button class="tb-btn" onclick="confirmClear()" title="Clear current page">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4h10M6 4V3h4v1M5 4v9h6V4"/></svg>
+      Clear
+    </button>
+    <button class="tb-btn" onclick="openExp()" title="Export">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 2h6l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z"/><polyline points="9,2 9,5 12,5"/></svg>
+      Export
+    </button>
+  </div>
+</div>
+
+<!-- EDITOR TOOLBAR -->
+<div class="etb" id="etb">
+  <div class="bti" id="bti">
+    <div class="btd" id="btd"></div>
+    <span class="btn-name" id="btn-name">Scene</span>
+    <span class="btn-hint">Tab to cycle</span>
+  </div>
+  <div class="sp"></div>
+  <div class="sts">
+    <div class="st-i"><span>Pg</span>&nbsp;<span class="st-v" id="stPg">1</span></div>
+    <div style="width:1px;height:12px;background:var(--bd)"></div>
+    <div class="st-i"><span class="st-v" id="stPn">0</span>&nbsp;<span>panels</span></div>
+    <div style="width:1px;height:12px;background:var(--bd)"></div>
+    <div class="st-i"><span class="st-v" id="stW">0</span>&nbsp;<span>words</span></div>
+  </div>
+</div>
+
+<!-- SCROLL AREA -->
+<div class="ss" id="ss"></div>
+
+<!-- HINTS -->
+<div class="gh" id="gh">
+  <kbd>Enter</kbd> commit &nbsp;
+  <kbd>Tab</kbd> cycle type &nbsp;
+  <kbd>⌘Enter</kbd> new page &nbsp;
+  <kbd>⌫</kbd> delete empty
+</div>
+
+<!-- PICKER -->
+<div class="pk-bd" id="pkbd"></div>
+<div class="pk" id="pk"></div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- EXPORT MODAL -->
+<div class="mov" id="mexp" onclick="if(event.target===this)closeExp()">
+  <div class="mcard">
+    <div class="mt">Export Script</div>
+    <div class="ms">Choose a format.</div>
+    <button class="mb pri" onclick="expPDF()">PDF — Open print dialog</button>
+    <button class="mb" onclick="expTXT()">Plain Text — .txt download</button>
+    <button class="mc" onclick="closeExp()">Cancel</button>
+  </div>
+</div>
+
+<!-- CLEAR MODAL -->
+<div class="mov" id="mclr" onclick="if(event.target===this)closeClr()">
+  <div class="mcard">
+    <div class="mt">Clear Page?</div>
+    <div class="ms">This removes all blocks on the current page.</div>
+    <button class="mb dan" onclick="doClear()">Clear this page</button>
+    <button class="mc" onclick="closeClr()">Cancel</button>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   PANELSYNC SCRIPT EDITOR — Core Engine
+   ═══════════════════════════════════════════════════════════════
+   
+   DATA MODEL:
+   pages[] → each has { id, title, blocks[] }
+   blocks[] → each has { id, type, text, character }
+   
+   Block types: panel, scene, desc, dialogue, caption, sfx
+   
+   Panel numbering resets to 1 on each page.
+   Any block type can go anywhere — maximum flexibility.
+   Smart defaults just make common flows faster.
+   ═══════════════════════════════════════════════════════════════ */
+
+// ── TYPE DEFINITIONS ──
+const T=[
+  {key:'panel',   name:'Panel',      color:'#c8a768'},
+  {key:'scene',   name:'Scene',      color:'#8898c0'},
+  {key:'desc',    name:'Description',color:'#888878'},
+  {key:'dialogue',name:'Dialogue',   color:'#7a9e8a'},
+  {key:'caption', name:'Caption',    color:'#a07858'},
+  {key:'sfx',     name:'SFX',        color:'#c87858'},
+];
+
+// ── AUTO-ADVANCE: what comes after each type on Enter ──
+const ADV={
+  panel:'scene', scene:'desc', desc:'dialogue',
+  dialogue:'dialogue', caption:'desc', sfx:'desc'
+};
+
+// ── STATE ──
+const KEY='panelsync_v3';
+let pages=[],aPI=0,aBID=null,nxId=1,isLt=false,saveT=null;
+
+// ── DOM ──
+const ss=document.getElementById('ss');
+const btd=document.getElementById('btd');
+const bname=document.getElementById('btn-name');
+const pk=document.getElementById('pk');
+const pkbd=document.getElementById('pkbd');
+
+// ── UTILS ──
+function uid(){return 'b'+(nxId++)}
+function mkB(type){return{id:uid(),type,text:'',character:''}}
+function mkP(t='scene'){return{id:uid(),title:'',blocks:[mkB(t)]}}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function escA(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+function cntPn(p){return p.blocks.filter(b=>b.type==='panel').length}
+function cntW(){
+  let n=0;
+  pages.forEach(p=>p.blocks.forEach(b=>{
+    const t=((b.character||'')+' '+(b.text||'')).trim();
+    if(t)n+=t.split(/\s+/).filter(w=>w).length;
+  }));
+  return n;
+}
+function findPI(bid){
+  for(let i=0;i<pages.length;i++)if(pages[i].blocks.find(b=>b.id===bid))return i;
+  return -1;
+}
+
+/* ═══════════════════════════════════
+   RENDERING
+   ═══════════════════════════════════ */
+
+function renderAll(){
+  ss.innerHTML='';
+  pages.forEach((pg,pi)=>{
+    // Page gap between pages
+    if(pi>0){
+      const g=document.createElement('div');g.className='pg-gap';
+      g.innerHTML=`<span class="pg-gap-lbl">Page ${pi+1}</span>`;
+      ss.appendChild(g);
+    }
+    // Page container
+    const pe=document.createElement('div');
+    pe.className='sp-page';pe.dataset.pi=pi;
+    // Header
+    const hd=document.createElement('div');hd.className='sp-hdr';
+    hd.innerHTML=`<span class="sp-num">Page ${String(pi+1).padStart(2,'0')}</span>
+      <input type="text" class="sp-title" placeholder="Page title (optional)"
+        spellcheck="false" value="${escA(pg.title)}" data-pi="${pi}">`;
+    const ti=hd.querySelector('.sp-title');
+    ti.addEventListener('input',()=>{pg.title=ti.value;dirty()});
+    ti.addEventListener('keydown',e=>{
+      if(e.key==='Enter'){e.preventDefault();const fb=pg.blocks[0];if(fb)focB(fb.id)}
+    });
+    pe.appendChild(hd);
+    // Blocks
+    const bc=document.createElement('div');bc.dataset.pi=pi;
+    let pn=0;
+    pg.blocks.forEach(b=>{if(b.type==='panel')pn++;renderB(bc,b,pi,b.type==='panel'?pn:0)});
+    pe.appendChild(bc);
+    ss.appendChild(pe);
+  });
+  upSt();
+}
+
+function renderB(cont,b,pi,pn){
+  const w=document.createElement('div');
+  w.dataset.bid=b.id;w.dataset.pi=pi;
+
+  switch(b.type){
+    case 'panel':
+      w.className='b-panel';w.tabIndex=0;
+      w.innerHTML=`<div class="p-rule"></div><div class="p-lbl">
+        <span class="p-num">PANEL ${pn}</span></div><div class="p-rule"></div>`;
+      w.addEventListener('focus',()=>{clrAct();w.classList.add('b-active');
+        aBID=b.id;aPI=pi;upTB('panel')});
+      w.addEventListener('keydown',e=>onPanelKey(e,b,w,pi));
+      break;
+    case 'scene':
+      w.className='b-scene';
+      w.innerHTML=`<textarea class="bi" style="font-family:'Courier Prime',monospace;
+        font-size:13px;font-weight:700;color:var(--tx);letter-spacing:.04em;
+        text-transform:uppercase;line-height:1.5" rows="1"
+        placeholder="INT./EXT. LOCATION — TIME" spellcheck="false">${esc(b.text)}</textarea>`;
+      break;
+    case 'desc':
+      w.className='b-desc';
+      w.innerHTML=`<textarea class="bi" style="font-family:'Courier Prime',monospace;
+        font-size:13px;color:var(--tx2);line-height:1.7" rows="1"
+        placeholder="Describe the action..." spellcheck="false">${esc(b.text)}</textarea>`;
+      break;
+    case 'dialogue':
+      w.className='b-dlg';
+      w.innerHTML=`<input type="text" class="dlg-ci" placeholder="Character name"
+          spellcheck="false" data-field="character" value="${escA(b.character)}">
+        <textarea class="bi dlg-ti" rows="1" placeholder="Dialogue..."
+          spellcheck="false" data-field="text">${esc(b.text)}</textarea>`;
+      break;
+    case 'caption':
+      w.className='b-cap';
+      w.innerHTML=`<textarea class="bi cap-i" rows="1" placeholder="Narration text..."
+        spellcheck="false">${esc(b.text)}</textarea>`;
+      break;
+    case 'sfx':
+      w.className='b-sfx';
+      w.innerHTML=`<input type="text" class="sfx-i" placeholder="KRAAKOOOM"
+        spellcheck="false" value="${escA(b.text)}">`;
+      break;
+  }
+  cont.appendChild(w);
+  if(b.type!=='panel')setupEv(w,b,pi);
+  w.querySelectorAll('textarea').forEach(autoG);
+}
+
+/* ═══════════════════════════════════
+   EVENT WIRING
+   ═══════════════════════════════════ */
+
+function setupEv(w,b,pi){
+  const inputs=getAll(w);
+  inputs.forEach(inp=>{
+    inp.addEventListener('keydown',e=>{
+      // ⌘+Enter → new page
+      if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();sync(w,b);addNewPage();return}
+      // Tab → cycle type
+      if(e.key==='Tab'){e.preventDefault();onTab(b,w,pi,inp);return}
+      // Enter → commit
+      if(e.key==='Enter'){
+        if(b.type==='dialogue'&&inp.dataset.field==='character'){
+          e.preventDefault();
+          const ti=w.querySelector('[data-field="text"]');if(ti)ti.focus();return;
+        }
+        if(e.shiftKey&&['desc','caption','dialogue'].includes(b.type))return;
+        e.preventDefault();onEnter(b,w,pi,inp);return;
+      }
+      // Backspace → delete empty
+      if(e.key==='Backspace')onBksp(e,b,w,pi,inp);
+    });
+    inp.addEventListener('input',()=>{sync(w,b);autoG(inp);upSt();dirty()});
+    inp.addEventListener('focus',()=>{clrAct();w.classList.add('b-active');
+      aBID=b.id;aPI=pi;upTB(b.type)});
+  });
+}
+
+/* ── ENTER ── */
+function onEnter(b,w,pi,inp){
+  sync(w,b);w.classList.remove('b-active');
+  const pg=pages[pi],idx=pg.blocks.findIndex(x=>x.id===b.id);
+
+  /*
+    FINAL DRAFT LOOP:
+    Empty dialogue (no character typed) + Enter →
+    Assume conversation is over. Insert Panel + Description.
+    This is the "new visual beat" pattern.
+  */
+  if(b.type==='dialogue'){
+    const ce=!(b.character||'').trim(),te=!(b.text||'').trim();
+    if(ce&&te){
+      // Replace empty dialogue with Panel + Desc
+      pg.blocks.splice(idx,1);
+      const pb=mkB('panel'),db=mkB('desc');
+      pg.blocks.splice(idx,0,pb,db);
+      dirty();renderAll();focB(db.id);return;
+    }
+  }
+
+  const nt=ADV[b.type]||'desc';
+  const nb=mkB(nt);
+  pg.blocks.splice(idx+1,0,nb);
+  dirty();renderAll();focB(nb.id);
+}
+
+/* ── TAB ── */
+function onTab(b,w,pi){
+  const has=(b.text||'').trim()||(b.character||'').trim();
+  if(!has){
+    const ci=T.findIndex(t=>t.key===b.type);
+    const ni=(ci+1)%T.length;
+    b.type=T[ni].key;b.text='';b.character='';
+    dirty();renderAll();focB(b.id);showPk(b.type);
+  }
+}
+
+/* ── BACKSPACE ── */
+function onBksp(e,b,w,pi,inp){
+  if(b.type==='dialogue'){
+    const ci=w.querySelector('[data-field="character"]');
+    const ti=w.querySelector('[data-field="text"]');
+    const ce=!(ci&&ci.value.trim()),te=!(ti&&ti.value.trim());
+    if(inp.dataset.field==='text'&&!inp.value){
+      e.preventDefault();if(ci){ci.focus();ci.selectionStart=ci.value.length}return;
+    }
+    if(inp.dataset.field==='character'&&ce&&te){
+      e.preventDefault();delBack(b,pi);return;
+    }
+    return;
+  }
+  if(inp.value===''&&pages[pi].blocks.length>1){e.preventDefault();delBack(b,pi)}
+}
+
+/* ── PANEL KEYDOWN ── */
+function onPanelKey(e,b,w,pi){
+  if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();delBack(b,pi);return}
+  if(e.key==='Enter'){
+    if(e.metaKey||e.ctrlKey){e.preventDefault();addNewPage();return}
+    e.preventDefault();
+    const pg=pages[pi],idx=pg.blocks.findIndex(x=>x.id===b.id);
+    const nb=mkB('scene');pg.blocks.splice(idx+1,0,nb);
+    dirty();renderAll();focB(nb.id);return;
+  }
+  if(e.key==='Tab'){
+    e.preventDefault();
+    const ci=T.findIndex(t=>t.key==='panel');
+    b.type=T[(ci+1)%T.length].key;
+    dirty();renderAll();focB(b.id);showPk(b.type);
+  }
+}
+
+/* ── DELETE BLOCK ── */
+function delBack(b,pi){
+  const pg=pages[pi],idx=pg.blocks.findIndex(x=>x.id===b.id);
+  // Only block on only page → don't delete
+  if(pages.length===1&&pg.blocks.length<=1)return;
+  // Only block on this page → delete the page
+  if(pg.blocks.length<=1&&pages.length>1){
+    const ppi=Math.max(0,pi-1);
+    const ppg=pages[ppi];
+    const tb=ppg.blocks[ppg.blocks.length-1];
+    pages.splice(pi,1);aPI=ppi;
+    dirty();renderAll();if(tb)focB(tb.id,true);return;
+  }
+  pg.blocks.splice(idx,1);
+  const ti=Math.max(0,idx-1);const tb=pg.blocks[ti];
+  dirty();renderAll();if(tb)focB(tb.id,true);
+}
+
+/* ═══════════════════════════════════
+   FOCUS MANAGEMENT
+   ═══════════════════════════════════ */
+
+function focB(bid,end=false){
+  requestAnimationFrame(()=>{
+    const w=document.querySelector(`[data-bid="${bid}"]`);
+    if(!w)return;
+    if(w.classList.contains('b-panel')){w.focus();w.scrollIntoView({behavior:'smooth',block:'center'});return}
+    const inp=w.querySelector('.dlg-ci')||w.querySelector('.bi')||w.querySelector('.sfx-i');
+    if(inp){
+      inp.focus();
+      if(end){const l=inp.value?inp.value.length:0;inp.selectionStart=l;inp.selectionEnd=l}
+      w.scrollIntoView({behavior:'smooth',block:'center'});
+    }
+  });
+}
+
+function getAll(w){
+  const r=[];
+  const a=w.querySelector('.dlg-ci');if(a)r.push(a);
+  const b=w.querySelector('.bi');if(b)r.push(b);
+  const c=w.querySelector('.sfx-i');if(c)r.push(c);
+  return r;
+}
+
+function clrAct(){document.querySelectorAll('.b-active').forEach(e=>e.classList.remove('b-active'))}
+
+function sync(w,b){
+  if(b.type==='dialogue'){
+    const ci=w.querySelector('[data-field="character"]');
+    const ti=w.querySelector('[data-field="text"]');
+    if(ci)b.character=ci.value;if(ti)b.text=ti.value;
+  }else if(b.type!=='panel'){
+    const inp=w.querySelector('.bi')||w.querySelector('.sfx-i');
+    if(inp)b.text=inp.value;
+  }
+}
+
+function autoG(el){if(el&&el.tagName==='TEXTAREA'){el.style.height='auto';el.style.height=el.scrollHeight+'px'}}
+
+/* ═══════════════════════════════════
+   TOOLBAR & STATS
+   ═══════════════════════════════════ */
+
+function upTB(type){
+  const info=T.find(t=>t.key===type);
+  if(info){btd.style.background=info.color;bname.textContent=info.name}
+}
+function upSt(){
+  document.getElementById('stPg').textContent=pages.length;
+  const cp=pages[aPI];
+  document.getElementById('stPn').textContent=cp?cntPn(cp):0;
+  document.getElementById('stW').textContent=cntW();
+}
+
+/* ═══════════════════════════════════
+   PAGES
+   ═══════════════════════════════════ */
+
+function addNewPage(){
+  const np=mkP('scene');
+  pages.splice(aPI+1,0,np);aPI++;
+  dirty();renderAll();focB(np.blocks[0].id);toast('New page added');
+}
+function confirmClear(){document.getElementById('mclr').classList.add('open')}
+function closeClr(){document.getElementById('mclr').classList.remove('open')}
+function doClear(){
+  closeClr();const pg=pages[aPI];if(!pg)return;
+  pg.blocks=[mkB('scene')];pg.title='';
+  dirty();renderAll();focB(pg.blocks[0].id);toast('Page cleared');
+}
+
+/* ═══════════════════════════════════
+   TYPE PICKER
+   ═══════════════════════════════════ */
+let pkT=null;
+function showPk(at){
+  pk.innerHTML='<div class="pk-hdr">Block type — Tab to cycle</div>';
+  T.forEach(t=>{
+    const d=document.createElement('div');
+    d.className='pk-item'+(t.key===at?' active':'');
+    d.innerHTML=`<div class="pk-dot" style="background:${t.color}"></div>
+      <span class="pk-name">${t.name}</span>`;
+    d.addEventListener('mousedown',e=>{e.preventDefault();selPk(t.key)});
+    pk.appendChild(d);
+  });
+  const r=document.getElementById('etb').getBoundingClientRect();
+  pk.style.top=(r.bottom+4)+'px';pk.style.left=(r.left+16)+'px';
+  pk.classList.add('open');pkbd.classList.add('open');
+  clearTimeout(pkT);pkT=setTimeout(()=>{pk.classList.remove('open');pkbd.classList.remove('open')},1500);
+}
+function selPk(key){
+  if(!aBID)return;
+  const pi=findPI(aBID);if(pi<0)return;
+  const b=pages[pi].blocks.find(x=>x.id===aBID);if(!b)return;
+  if((b.text||'').trim()||(b.character||'').trim())return;
+  b.type=key;b.text='';b.character='';
+  dirty();renderAll();focB(b.id);
+  pk.classList.remove('open');pkbd.classList.remove('open');clearTimeout(pkT);
+}
+pkbd.addEventListener('click',()=>{pk.classList.remove('open');pkbd.classList.remove('open')});
+
+/* ═══════════════════════════════════
+   SAVE / LOAD
+   ═══════════════════════════════════ */
+
+function dirty(){
+  setSS('go');clearTimeout(saveT);saveT=setTimeout(doSave,1500);
+}
+function doSave(){
+  try{
+    localStorage.setItem(KEY,JSON.stringify({
+      pages,nextId:nxId,theme:isLt?'light':'dark',aPI,at:Date.now()
+    }));
+    setSS('ok');
+  }catch(e){console.error('Save failed:',e);setSS('err')}
+}
+function loadS(){
+  try{
+    const r=localStorage.getItem(KEY);if(!r)return false;
+    const d=JSON.parse(r);
+    if(d.pages&&d.pages.length>0){
+      pages=d.pages;nxId=d.nextId||pages.length*10+100;
+      isLt=d.theme==='light';aPI=d.aPI||0;
+      if(aPI>=pages.length)aPI=pages.length-1;
+      return true;
+    }
+  }catch(e){console.error('Load failed:',e)}
+  return false;
+}
+function setSS(s){
+  const dot=document.getElementById('sdot'),lbl=document.getElementById('slbl');
+  dot.className='sdot';
+  if(s==='ok'){dot.classList.add('ok');lbl.textContent='Saved'}
+  else if(s==='go'){dot.classList.add('go');lbl.textContent='Saving…'}
+  else lbl.textContent='Ready';
+}
+
+/* ═══════════════════════════════════
+   EXPORT
+   ═══════════════════════════════════ */
+
+function openExp(){document.getElementById('mexp').classList.add('open')}
+function closeExp(){document.getElementById('mexp').classList.remove('open')}
+function expPDF(){closeExp();toast('Opening print dialog…');setTimeout(()=>window.print(),400)}
+function expTXT(){
+  closeExp();
+  const L=[];
+  pages.forEach((pg,pi)=>{
+    L.push('','═'.repeat(50));
+    L.push(`PAGE ${pi+1}${pg.title?' — '+pg.title:''}`);
+    L.push('═'.repeat(50),'');
+    let pn=0;
+    pg.blocks.forEach(b=>{
+      switch(b.type){
+        case 'panel':pn++;L.push('','─'.repeat(20)+` PANEL ${pn} `+'─'.repeat(20));break;
+        case 'scene':L.push('',(b.text||'').toUpperCase());break;
+        case 'desc':L.push('',b.text||'');break;
+        case 'dialogue':
+          L.push('','                      '+(b.character||'').toUpperCase());
+          if(b.text)(b.text||'').split('\n').forEach(l=>L.push('          '+l));
+          break;
+        case 'caption':L.push('',`[CAPTION: ${b.text||''}]`);break;
+        case 'sfx':L.push('',`**${(b.text||'').toUpperCase()}**`);break;
+      }
+    });
+  });
+  const blob=new Blob([L.join('\n')],{type:'text/plain'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='panelsync_script.txt';a.click();
+  URL.revokeObjectURL(url);toast('Script downloaded as .txt');
+}
+
+/* ═══════════════════════════════════
+   THEME
+   ═══════════════════════════════════ */
+
+function toggleTheme(){
+  isLt=!isLt;document.body.classList.toggle('light',isLt);dirty();
+  const ic=document.getElementById('ticon');
+  ic.innerHTML=isLt
+    ?'<path d="M8 12a4 4 0 100-8 4 4 0 000 8z"/><path d="M12 8a4 4 0 01-4 4"/>'
+    :'<circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/>';
+}
+
+/* ═══════════════════════════════════
+   TOAST
+   ═══════════════════════════════════ */
+let _tt;
+function toast(m){
+  const e=document.getElementById('toast');e.textContent=m;e.classList.add('on');
+  clearTimeout(_tt);_tt=setTimeout(()=>e.classList.remove('on'),2500);
+}
+
+/* ═══════════════════════════════════
+   GLOBAL KEYS
+   ═══════════════════════════════════ */
+
+document.addEventListener('keydown',e=>{
+  if(document.querySelector('.mov.open'))return;
+  if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){
+    if(!document.activeElement.closest('[data-bid]')){e.preventDefault();addNewPage()}
+    return;
+  }
+  const ae=document.activeElement;
+  if(ae===document.body||ae===ss){
+    if(e.key.length===1&&!e.ctrlKey&&!e.metaKey&&aBID)focB(aBID);
+  }
+});
+
+/* ═══════════════════════════════════
+   INIT
+   ═══════════════════════════════════ */
+
+function init(){
+  const ok=loadS();
+  if(!ok){pages=[mkP('scene')];aPI=0}
+  document.body.classList.toggle('light',isLt);
+  renderAll();
+  const fp=pages[aPI];
+  if(fp&&fp.blocks.length>0)focB(fp.blocks[0].id);
+  setSS('ok');
+}
+init();
+</script>
+</body>
+</html>
