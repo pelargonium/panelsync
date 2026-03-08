@@ -7,17 +7,18 @@
 1. [Information Hierarchy](#1-information-hierarchy)
 2. [Data Model](#2-data-model)
 3. [Navigation System](#3-navigation-system)
-4. [Home Screen](#4-home-screen)
-5. [Script Editor](#5-script-editor)
-6. [Storyboard Canvas](#6-storyboard-canvas)
-7. [Universe Bible](#7-universe-bible)
-8. [Timeline Tool](#8-timeline-tool)
-9. [Notes System](#9-notes-system)
-10. [Collaboration](#10-collaboration)
-11. [Export & Sharing](#11-export--sharing)
-12. [MVP Feature Status](#12-mvp-feature-status)
-13. [Deferred (v2+)](#13-deferred-v2)
-14. [Open Questions](#14-open-questions)
+4. [Universes Dashboard](#4-universes-dashboard)
+5. [Universe Home](#5-universe-home)
+6. [Script Editor](#6-script-editor)
+7. [Storyboard Canvas](#7-storyboard-canvas)
+8. [Universe Bible](#8-universe-bible)
+9. [Timeline Tool](#9-timeline-tool)
+10. [Notes System](#10-notes-system)
+11. [Collaboration](#11-collaboration)
+12. [Export & Sharing](#12-export--sharing)
+13. [MVP Feature Status](#13-mvp-feature-status)
+14. [Deferred (v2+)](#14-deferred-v2)
+15. [Open Questions](#15-open-questions)
 
 ---
 
@@ -86,7 +87,7 @@ Universes Dashboard → Universe → Series → Issue → Page
 The binder is the primary navigation and content tree for the open universe. Modeled on Scrivener's binder. It shows everything that exists in the universe — series, issues, pages, characters, locations, timelines, notes — all in one place, always accessible while working.
 
 **Layout:**
-- **Header**: search bar + sort dropdown + view mode toggle
+- **Header**: search bar only (sort and view mode moved to global View button)
 - **Body**: full content tree of the universe
 - **Footer**: row of type-tag icons
 
@@ -100,13 +101,6 @@ The binder is the primary navigation and content tree for the open universe. Mod
 - Always at the top of the binder header
 - Hides on scroll up, reappears on scroll down
 - Searches all content within the universe
-
-**Sort dropdown:**
-- Options: Most recently changed, Most recently created, Alphabetical, Manual order
-
-**View modes (toggle in header):**
-- **Tree view** (default) — collapsible hierarchy, indent-based
-- **Column view** — Miller columns. Tap an item → next level opens as a new column to the right. Full path visible at top (Universe › Locations › Italy › Sicily).
 
 **Body — content tree:**
 - Contains all universe content: series/issue/page hierarchy, characters, locations, timelines, notes, and any user-created bins
@@ -132,7 +126,7 @@ A minimal persistent top bar present on every screen inside a universe.
 |----------|----------|
 | Left | Undo / Redo |
 | Center | Save/sync status indicator |
-| Right | Share button · Collaborator avatars · Account avatar |
+| Right | View · Share · Collaborator avatars · Account avatar |
 
 **Save/sync indicator:**
 - Single small icon showing current state: editing, saving, saved, syncing, synced, offline, error
@@ -148,6 +142,12 @@ A minimal persistent top bar present on every screen inside a universe.
 - Shows who has access to the universe
 - Tap → collaboration panel (manage roles, recent activity)
 - v2: becomes live presence with named cursors
+
+**View button:**
+- Opens a contextual panel showing view options relevant to what is currently on screen
+- Content changes based on context — binder focused: sort order, tree/column mode; Universe Home: section visibility and order; editor focused: editor-specific display options
+- Single consistent location for all "how do I change how this looks" actions
+- Replaces scattered per-screen view controls (sort dropdown and view toggle moved out of binder header)
 
 **Account avatar:**
 - Tap → account and app-level settings (profile, email, password, theme, notifications, keyboard shortcuts, sign out)
@@ -213,7 +213,33 @@ Triggered by tapping "+" or the ghost card. A tabbed modal with a persistent Cre
 
 ---
 
-## 5. Script Editor
+## 5. Universe Home
+
+A persistent screen always navigable to within a universe. Not just a fallback — a real overview destination. Accessible from the binder (tap the universe name at the top) or by navigating to `/universe/[id]` directly.
+
+### Sections
+The Universe Home is composed of toggleable, reorderable sections. All four are on by default.
+
+| Section | Contents |
+|---------|----------|
+| **Series Overview** | Cards for each series: name, issue count, page count, last edited. Tap → opens that series. |
+| **Recent Activity** | Feed of changes across the universe: who edited what, when. Each item tappable to jump directly to it. |
+| **Universe Stats** | Read-only counters: total pages, characters, locations, timeline events. |
+| **Pinned Items** | Items explicitly pinned by the user from the binder context menu. Any type — character, page, note, etc. Tap → opens it. |
+
+### Customization
+- A **Customize** button on the Universe Home enters edit mode
+- In edit mode: sections can be dragged to reorder, and toggled off with a remove control
+- Section visibility and order are also accessible via the global View button when Universe Home is open
+- Settings persist per-universe per-user
+
+### Navigation to Universe Home
+- Tap the universe name at the top of the binder
+- Available as a route: `/universe/[id]`
+
+---
+
+## 6. Script Editor
 
 > Single shared component. Runs identically on iPad and web.
 
