@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PanelSync — Design System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400;1,600&family=Geist:wght@400;500;700&family=Geist+Mono:wght@400;500&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Caveat:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    /* ============================================================
+       COLOR TOKENS
+       ============================================================ */
+    :root {
+      /* Dark mode (primary) */
+      --bg:    #111110;
+      --bg-s:  #181715;
+      --bg-p:  #1d1c19;
+      --bd:    #2a2724;
+      --tx:    #dfd9ce;
+      --tx2:   #7e7870;
+      --tx3:   #44413a;
+      --acc:   #c8a768;
+      --acc2:  #6e5430;
+      --sd:    #507a5c;
+      --sr:    #b89048;
+      --sl:    #4a6898;
+
+      /* Spacing */
+      --sp-xs: 4px;
+      --sp-sm: 8px;
+      --sp-md: 16px;
+      --sp-lg: 24px;
+      --sp-xl: 32px;
+      --sp-xxl: 48px;
+
+      /* Radius */
+      --r-sm: 4px;
+      --r-md: 8px;
+      --r-lg: 16px;
+    }
+
+    .light {
+      --bg:    #E8E4DC;
+      --bg-s:  #F5F2EC;
+      --bg-p:  #FAFAF8;
+      --bd:    #D4CFC7;
+      --tx:    #1A1A1A;
+      --tx2:   #6B6860;
+      --tx3:   #A8A49E;
+      --acc:   #D4960A;
+      --acc2:  #F5E6C0;
+      --sd:    #1E6B3C;
+      --sr:    #D4960A;
+      --sl:    #1B4FD8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--tx);
+      font-family: 'Geist', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: var(--sp-xxl);
+    }
+
+    /* ============================================================
+       LAYOUT
+       ============================================================ */
+    .section { margin-bottom: var(--sp-xxl); }
+    .section-title {
+      font-family: 'Lora', serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--tx3);
+      margin-bottom: var(--sp-lg);
+      padding-bottom: var(--sp-sm);
+      border-bottom: 1px solid var(--bd);
+    }
+    .row { display: flex; flex-wrap: wrap; gap: var(--sp-md); align-items: flex-start; margin-bottom: var(--sp-md); }
+    .col { display: flex; flex-direction: column; gap: var(--sp-sm); }
+
+    /* ============================================================
+       COLOR SWATCHES
+       ============================================================ */
+    .swatches { display: flex; flex-wrap: wrap; gap: var(--sp-sm); }
+    .swatch {
+      width: 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .swatch-block {
+      width: 80px;
+      height: 48px;
+      border-radius: var(--r-sm);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .swatch-label {
+      font-family: 'Geist Mono', monospace;
+      font-size: 10px;
+      color: var(--tx2);
+    }
+    .swatch-name {
+      font-size: 11px;
+      color: var(--tx);
+    }
+
+    /* ============================================================
+       TYPOGRAPHY
+       ============================================================ */
+    .type-title {
+      font-family: 'Lora', serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--tx);
+    }
+    .type-heading {
+      font-family: 'Lora', serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--tx);
+    }
+    .type-subheading {
+      font-family: 'Geist', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--tx);
+    }
+    .type-body {
+      font-family: 'Geist', sans-serif;
+      font-size: 14px;
+      color: var(--tx);
+      line-height: 1.6;
+    }
+    .type-label {
+      font-family: 'Geist', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--tx2);
+    }
+    .type-muted {
+      font-family: 'Geist', sans-serif;
+      font-size: 13px;
+      color: var(--tx2);
+    }
+    .type-mono {
+      font-family: 'Geist Mono', monospace;
+      font-size: 12px;
+      color: var(--tx2);
+    }
+    .type-script {
+      font-family: 'Courier Prime', monospace;
+      font-size: 14px;
+      color: var(--tx);
+      line-height: 1.8;
+    }
+    .type-handwritten {
+      font-family: 'Caveat', cursive;
+      font-size: 20px;
+      color: var(--tx);
+    }
+    .type-accent { color: var(--acc); }
+
+    /* ============================================================
+       COMPONENTS
+       ============================================================ */
+
+    /* Cards */
+    .card {
+      background: var(--bg-s);
+      border: 1px solid var(--bd);
+      border-radius: var(--r-md);
+      padding: var(--sp-md);
+    }
+    .card-lg {
+      background: var(--bg-s);
+      border: 1px solid var(--bd);
+      border-radius: var(--r-lg);
+      padding: var(--sp-lg);
+    }
+    .card-universe {
+      background: var(--bg-s);
+      border: 1px solid var(--bd);
+      border-radius: var(--r-lg);
+      padding: var(--sp-lg);
+      width: 220px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    .card-universe:hover { border-color: var(--acc2); }
+    .card-universe .cover {
+      width: 100%;
+      height: 100px;
+      background: var(--bg-p);
+      border-radius: var(--r-sm);
+      margin-bottom: var(--sp-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--tx3);
+      font-family: 'Geist Mono', monospace;
+      font-size: 11px;
+    }
+    .card-universe .name {
+      font-family: 'Lora', serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--tx);
+      margin-bottom: var(--sp-xs);
+    }
+    .card-universe .meta {
+      font-family: 'Geist Mono', monospace;
+      font-size: 11px;
+      color: var(--tx2);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-sm);
+      padding: 8px 16px;
+      border-radius: var(--r-md);
+      font-family: 'Geist', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--acc); color: #111110; }
+    .btn-secondary { background: var(--bg-p); color: var(--tx); border: 1px solid var(--bd); }
+    .btn-ghost { background: transparent; color: var(--tx2); border: 1px solid var(--bd); }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+    /* Status badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: var(--r-sm);
+      font-family: 'Geist Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    .badge-draft    { background: rgba(74,104,152,0.15); color: var(--sl); }
+    .badge-draft .badge-dot { background: var(--sl); }
+    .badge-review   { background: rgba(184,144,72,0.15); color: var(--sr); }
+    .badge-review .badge-dot { background: var(--sr); }
+    .badge-locked   { background: rgba(200,167,104,0.15); color: var(--acc); }
+    .badge-locked .badge-dot { background: var(--acc); }
+    .badge-complete { background: rgba(80,122,92,0.15); color: var(--sd); }
+    .badge-complete .badge-dot { background: var(--sd); }
+
+    /* Script blocks */
+    .script-block {
+      font-family: 'Courier Prime', monospace;
+      font-size: 13px;
+      line-height: 1.8;
+      padding: var(--sp-sm) var(--sp-md);
+      border-left: 2px solid transparent;
+    }
+    .script-panel {
+      border-left-color: var(--acc);
+      color: var(--acc);
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding-top: var(--sp-md);
+    }
+    .script-scene {
+      text-transform: uppercase;
+      color: var(--tx);
+      font-weight: 700;
+    }
+    .script-description { color: var(--tx); }
+    .script-character {
+      color: var(--tx);
+      font-weight: 700;
+      text-align: center;
+      text-transform: uppercase;
+    }
+    .script-dialogue {
+      color: var(--tx);
+      padding-left: 40px;
+      padding-right: 40px;
+    }
+    .script-caption {
+      color: var(--tx2);
+      font-style: italic;
+      border-left-color: var(--tx3);
+    }
+    .script-sfx {
+      color: var(--acc);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 240px;
+      background: var(--bg-s);
+      border-right: 1px solid var(--bd);
+      height: 400px;
+      border-radius: var(--r-md);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar-section {
+      padding: var(--sp-sm) var(--sp-md);
+    }
+    .sidebar-label {
+      font-family: 'Geist', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--tx3);
+      padding: var(--sp-sm) var(--sp-md) var(--sp-xs);
+    }
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-sm);
+      padding: 6px var(--sp-md);
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--tx2);
+    }
+    .sidebar-item:hover, .sidebar-item.active {
+      background: var(--bg-p);
+      color: var(--tx);
+    }
+    .sidebar-item.active { color: var(--acc); }
+    .sidebar-divider {
+      height: 1px;
+      background: var(--bd);
+      margin: var(--sp-xs) 0;
+    }
+
+    /* Input */
+    .input {
+      background: var(--bg-p);
+      border: 1px solid var(--bd);
+      border-radius: var(--r-md);
+      padding: 8px 12px;
+      font-family: 'Geist', sans-serif;
+      font-size: 14px;
+      color: var(--tx);
+      width: 100%;
+      outline: none;
+    }
+    .input:focus { border-color: var(--acc2); }
+    .input::placeholder { color: var(--tx3); }
+
+    /* Mode toggle */
+    .mode-toggle {
+      display: flex;
+      gap: var(--sp-sm);
+      margin-bottom: var(--sp-xl);
+    }
+    .mode-btn {
+      padding: 6px 16px;
+      border-radius: var(--r-sm);
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid var(--bd);
+      background: var(--bg-p);
+      color: var(--tx2);
+    }
+    .mode-btn.active {
+      background: var(--acc2);
+      border-color: var(--acc);
+      color: var(--acc);
+    }
+
+    /* Spacing scale display */
+    .spacing-row { display: flex; align-items: center; gap: var(--sp-md); margin-bottom: var(--sp-sm); }
+    .spacing-bar { background: var(--acc2); height: 20px; border-radius: 2px; }
+    .spacing-info { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--tx2); }
+  </style>
+</head>
+<body>
+
+  <div style="margin-bottom: var(--sp-xl);">
+    <div class="type-title" style="margin-bottom: var(--sp-sm);">PanelSync Design System</div>
+    <div class="type-muted">Reference for all visual decisions. Keep in sync with <code>apps/mobile/theme.ts</code>.</div>
+    <div class="mode-toggle" style="margin-top: var(--sp-lg); margin-bottom: 0;">
+      <button class="mode-btn active" onclick="setMode('dark')">Dark Mode</button>
+      <button class="mode-btn" onclick="setMode('light')">Light Mode</button>
+    </div>
+  </div>
+
+  <!-- COLORS -->
+  <div class="section">
+    <div class="section-title">Color Tokens</div>
+    <div class="swatches">
+      <div class="swatch"><div class="swatch-block" style="background:#111110;"></div><div class="swatch-name">bg</div><div class="swatch-label">#111110</div></div>
+      <div class="swatch"><div class="swatch-block" style="background:#181715;"></div><div class="swatch-name">bg-s</div><div class="swatch-label">#181715</div></div>
+      <div class="swatch"><div class="swatch-block" style="background:#1d1c19;"></div><div class="swatch-name">bg-p</div><div class="swatch-label">#1d1c19</div></div>
+      <div class="swatch"><div class="swatch-block" style="background:#2a2724;"></div><div class="swatch-name">bd</div><div class="swatch-label">#2a2724</div></div>
+      <div class="swatch"><div class="swatch-block" style="background:#dfd9ce;"></div><div class="swatch-name">tx</div><div class="swatch-label">#dfd9ce</div></div>
+      <div class="swatch"><div class="swatch-block" style="background:#7e7870;"></div><div class="swatch-name">tx2</div><div class="swatch-label">#7e7870</div></div>
+      <div class="swatch"><div class="swatch-block" style="background:#44413a;"></div><div class="swatch-name">tx3</div><div class="swatch-label">#44413a</div></div>
+      <div class="swatch"><div class="swatch-block" style="background:#c8a768;"></div><div class="swatch-name">acc</div><div class="swatch-label">#c8a768</div></div>
+      <div class="swatch"><div class="swatch-block" style="background:#6e5430;"></div><div class="swatch-name">acc2</div><div class="swatch-label">#6e5430</div></div>
+      <div class="swatch"><div class="swatch-block" style="background:#507a5c;"></div><div class="swatch-name">sd (done)</div><div class="swatch-label">#507a5c</div></div>
+      <div class="swatch"><div class="swatch-block" style="background:#b89048;"></div><div class="swatch-name">sr (review)</div><div class="swatch-label">#b89048</div></div>
+      <div class="swatch"><div class="swatch-block" style="background:#4a6898;"></div><div class="swatch-name">sl (locked)</div><div class="swatch-label">#4a6898</div></div>
+    </div>
+  </div>
+
+  <!-- TYPOGRAPHY -->
+  <div class="section">
+    <div class="section-title">Typography</div>
+    <div class="col">
+      <div>
+        <div class="type-label" style="margin-bottom:6px;">Lora — Titles & Headings</div>
+        <div class="type-title">The Universe Begins Here</div>
+        <div class="type-heading">Series Arc Notes</div>
+        <div style="font-family:'Lora',serif;font-size:16px;font-style:italic;color:var(--tx2);">Timeline arc label (Lora Italic)</div>
+      </div>
+      <div style="margin-top:var(--sp-lg);">
+        <div class="type-label" style="margin-bottom:6px;">Geist — Body & UI</div>
+        <div class="type-body">The depth is always there for the people who want it. It never gets in the way of the people who don't.</div>
+        <div class="type-label" style="margin-top:var(--sp-sm);">Universe Bible · 4 Characters</div>
+        <div class="type-muted">Last edited 2 hours ago</div>
+      </div>
+      <div style="margin-top:var(--sp-lg);">
+        <div class="type-label" style="margin-bottom:6px;">Geist Mono — Metadata & Status</div>
+        <div class="type-mono">PAGE 12 · PANEL 3 · draft</div>
+        <div class="type-mono">Issue 01 · 24 pages</div>
+      </div>
+      <div style="margin-top:var(--sp-lg);">
+        <div class="type-label" style="margin-bottom:6px;">Courier Prime — Script Editor</div>
+        <div class="type-script">INT. ABANDONED WAREHOUSE - NIGHT<br><br>The room is silent except for dripping water.</div>
+      </div>
+      <div style="margin-top:var(--sp-lg);">
+        <div class="type-label" style="margin-bottom:6px;">Caveat — Timeline Cluster Labels</div>
+        <div class="type-handwritten">The Collapse Years</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATUS BADGES -->
+  <div class="section">
+    <div class="section-title">Page Status</div>
+    <div class="row">
+      <span class="badge badge-draft"><span class="badge-dot"></span>Draft</span>
+      <span class="badge badge-review"><span class="badge-dot"></span>In Review</span>
+      <span class="badge badge-locked"><span class="badge-dot"></span>Locked</span>
+      <span class="badge badge-complete"><span class="badge-dot"></span>Complete</span>
+    </div>
+  </div>
+
+  <!-- BUTTONS -->
+  <div class="section">
+    <div class="section-title">Buttons</div>
+    <div class="row">
+      <button class="btn btn-primary">Create Universe</button>
+      <button class="btn btn-secondary">Open Settings</button>
+      <button class="btn btn-ghost">Cancel</button>
+      <button class="btn btn-primary btn-sm">New Issue</button>
+      <button class="btn btn-secondary btn-sm">Outline View</button>
+    </div>
+  </div>
+
+  <!-- INPUT -->
+  <div class="section">
+    <div class="section-title">Input</div>
+    <div style="max-width:320px;">
+      <input class="input" placeholder="Universe name..." style="margin-bottom:var(--sp-sm);">
+      <input class="input" placeholder="Search characters...">
+    </div>
+  </div>
+
+  <!-- CARDS -->
+  <div class="section">
+    <div class="section-title">Universe Card</div>
+    <div class="row">
+      <div class="card-universe">
+        <div class="cover">cover image</div>
+        <div class="name">The Iron Meridian</div>
+        <div class="meta">3 series · edited 2h ago</div>
+      </div>
+      <div class="card-universe">
+        <div class="cover">cover image</div>
+        <div class="name">Voidborn</div>
+        <div class="meta">1 series · edited yesterday</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT EDITOR -->
+  <div class="section">
+    <div class="section-title">Script Editor Blocks</div>
+    <div class="card-lg" style="max-width:600px;">
+      <div class="script-block script-panel">Panel 1</div>
+      <div class="script-block script-scene">INT. ABANDONED WAREHOUSE - NIGHT</div>
+      <div class="script-block script-description">The room is silent. Water drips from a rusted pipe overhead. MARA crouches behind a shipping container, listening.</div>
+      <div class="script-block script-character">MARA</div>
+      <div class="script-block script-dialogue">They're already inside. We're too late.</div>
+      <div class="script-block script-caption">Three hours earlier, she had been asleep.</div>
+      <div class="script-block script-sfx">CRASH</div>
+      <div class="script-block script-panel" style="margin-top:var(--sp-md);">Panel 2</div>
+      <div class="script-block script-scene">CONTINUOUS</div>
+      <div class="script-block script-description">The container doors swing open. [page-width]</div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="section">
+    <div class="section-title">Sidebar</div>
+    <div class="sidebar">
+      <div class="sidebar-label">Universe</div>
+      <div class="sidebar-item">Universe Bible</div>
+      <div class="sidebar-item active">Timeline</div>
+      <div class="sidebar-item">Notes</div>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-label">Series</div>
+      <div class="sidebar-item">The Iron Meridian</div>
+      <div style="padding-left:var(--sp-md);">
+        <div class="sidebar-item">Issue 01</div>
+        <div style="padding-left:var(--sp-md);">
+          <div class="sidebar-item">Page 1</div>
+          <div class="sidebar-item">Page 2</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SPACING -->
+  <div class="section">
+    <div class="section-title">Spacing Scale</div>
+    <div class="col">
+      <div class="spacing-row"><div class="spacing-bar" style="width:4px;"></div><div class="spacing-info">xs — 4px</div></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:8px;"></div><div class="spacing-info">sm — 8px</div></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:16px;"></div><div class="spacing-info">md — 16px</div></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:24px;"></div><div class="spacing-info">lg — 24px</div></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:32px;"></div><div class="spacing-info">xl — 32px</div></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:48px;"></div><div class="spacing-info">xxl — 48px</div></div>
+    </div>
+  </div>
+
+  <script>
+    function setMode(mode) {
+      document.body.classList.toggle('light', mode === 'light');
+      document.querySelectorAll('.mode-btn').forEach((btn, i) => {
+        btn.classList.toggle('active', (i === 0 && mode === 'dark') || (i === 1 && mode === 'light'));
+      });
+    }
+  </script>
+</body>
+</html>

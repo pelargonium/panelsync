@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1600, initial-scale=1">
+<title>PanelSync — Universe Home</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Geist+Mono:wght@300;400;500&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#090908;
+  font-family:'Geist',sans-serif;
+  padding:48px;
+  min-width:1600px;
+}
+
+.page-header { margin-bottom:32px; }
+.page-header h1 { font-family:'Lora',serif; font-size:18px; font-weight:500; color:#c8a768; margin-bottom:4px; }
+.page-header p { font-family:'Geist Mono',monospace; font-size:10px; color:#333; letter-spacing:0.08em; }
+
+.mockup-row { display:flex; gap:36px; align-items:flex-start; }
+.col-label { font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:#2e2c28; margin-bottom:10px; }
+
+/* ── TOKENS ── */
+.dk {
+  --bg:       #111110;
+  --bg-s:     #181715;
+  --bg-p:     #1d1c19;
+  --bg-up:    #232220;
+  --bg-h:     #272624;
+  --bg-act:   #1e1c10;
+  --bd:       #2a2724;
+  --bd-h:     #38352e;
+  --bd-s:     #1e1c18;
+  --tx:       #dfd9ce;
+  --tx2:      #7e7870;
+  --tx3:      #44413a;
+  --tx4:      #26241e;
+  --acc:      #c8a768;
+  --acc2:     #6e5430;
+  --acc3:     #1c1a0e;
+  --sd:       #507a5c;
+  --sr:       #b89048;
+  --sl:       #4a6898;
+  --sdft:     #40403a;
+  --shadow:   0 24px 64px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.04);
+}
+.lt {
+  --bg:       #f2efe9;
+  --bg-s:     #e9e5de;
+  --bg-p:     #e1ddd5;
+  --bg-up:    #faf8f4;
+  --bg-h:     #e5e1d9;
+  --bg-act:   #f4edda;
+  --bd:       #d4cfc5;
+  --bd-h:     #c0bbb0;
+  --bd-s:     #e2ded6;
+  --tx:       #1a1814;
+  --tx2:      #54504a;
+  --tx3:      #9a9690;
+  --tx4:      #c8c4bc;
+  --acc:      #9a7030;
+  --acc2:     #b88840;
+  --acc3:     #f8f0e0;
+  --sd:       #3a6848;
+  --sr:       #987028;
+  --sl:       #3858a0;
+  --sdft:     #989490;
+  --shadow:   0 24px 64px rgba(0,0,0,0.10), 0 0 0 1px rgba(0,0,0,0.05);
+}
+
+/* ── iPAD FRAME ── */
+.ipad {
+  border-radius:20px;
+  overflow:hidden;
+  box-shadow: var(--shadow);
+  display:flex;
+  flex-direction:column;
+  background: var(--bg);
+  width:1024px;
+  height:1366px; /* iPad Pro 12.9 */
+  flex-shrink:0;
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  height:44px;
+  background:var(--bg-s);
+  border-bottom:1px solid var(--bd);
+  display:flex;
+  align-items:center;
+  padding:0 14px 0 0;
+  flex-shrink:0;
+  gap:0;
+}
+.tb-wordmark {
+  font-family:'Lora',serif;
+  font-size:13px; font-weight:600;
+  color:var(--acc);
+  letter-spacing:0.01em;
+  padding:0 14px;
+  border-right:1px solid var(--bd);
+  height:100%;
+  display:flex; align-items:center;
+  flex-shrink:0;
+  cursor:pointer;
+}
+/* breadcrumb */
+.tb-breadcrumb {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:0 14px;
+  flex:1;
+}
+.tb-crumb {
+  font-family:'Geist Mono',monospace;
+  font-size:10px; color:var(--tx3);
+  letter-spacing:0.04em;
+}
+.tb-crumb.active { color:var(--tx2); }
+.tb-sep { color:var(--tx3); font-size:11px; }
+
+.tb-right {
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+/* settings button — prominent in topbar */
+.tb-settings-btn {
+  height:28px; padding:0 12px;
+  border-radius:7px;
+  border:1px solid var(--bd-h);
+  background:var(--bg-p);
+  display:flex; align-items:center; gap:6px;
+  cursor:pointer;
+}
+.tb-settings-btn:hover { background:var(--bg-h); }
+.tb-settings-icon { color:var(--tx2); font-size:12px; }
+.tb-settings-label {
+  font-family:'Geist Mono',monospace;
+  font-size:9px; color:var(--tx2);
+  letter-spacing:0.06em;
+}
+
+.tb-search {
+  height:26px; width:148px;
+  border-radius:13px;
+  border:1px solid var(--bd);
+  background:var(--bg-p);
+  display:flex; align-items:center;
+  padding:0 10px; gap:6px;
+}
+.tb-search-txt { font-family:'Geist Mono',monospace; font-size:10px; color:var(--tx3); letter-spacing:0.04em; }
+
+.av { width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Geist Mono',monospace; font-size:9px; font-weight:500; flex-shrink:0; }
+.av-b { background:#2a3d5a; color:#8ab0d8; }
+
+/* ── APP LAYOUT ── */
+.app-layout {
+  display:flex;
+  flex:1;
+  overflow:hidden;
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  display:flex;
+  flex-shrink:0;
+  border-right:1px solid var(--bd);
+  overflow:hidden;
+}
+
+/* icon rail */
+.icon-rail {
+  width:48px;
+  background:var(--bg-s);
+  border-right:1px solid var(--bd);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:10px 0;
+  gap:4px;
+  flex-shrink:0;
+}
+.rail-icon {
+  width:34px; height:34px;
+  border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer;
+  color:var(--tx3);
+  position:relative;
+}
+.rail-icon:hover { background:var(--bg-p); color:var(--tx2); }
+.rail-icon.active {
+  background:var(--bg-act);
+  color:var(--acc);
+}
+.rail-icon svg { width:16px; height:16px; }
+.rail-icon.home-active { background:var(--bg-act); color:var(--acc); }
+.rail-spacer { flex:1; }
+.rail-divider { width:24px; height:1px; background:var(--bd-s); margin:4px 0; }
+
+/* tree panel */
+.tree-panel {
+  width:188px;
+  background:var(--bg);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.tree-header {
+  padding:10px 12px 8px;
+  border-bottom:1px solid var(--bd-s);
+  flex-shrink:0;
+}
+.tree-header-label {
+  font-family:'Geist Mono',monospace;
+  font-size:8px; color:var(--tx3);
+  letter-spacing:0.12em; text-transform:uppercase;
+  margin-bottom:6px;
+}
+.tree-universe-name {
+  font-family:'Lora',serif;
+  font-size:13px; font-weight:500;
+  color:var(--tx);
+}
+.tree-body { flex:1; overflow-y:auto; padding:6px 0; scrollbar-width:none; }
+
+.tree-series-row {
+  display:flex; align-items:center; gap:6px;
+  padding:5px 12px;
+  cursor:pointer;
+}
+.tree-series-row:hover { background:var(--bg-h); }
+.tree-series-row.active { background:var(--bg-act); }
+.tree-chevron { font-size:9px; color:var(--tx3); flex-shrink:0; }
+.tree-series-label {
+  font-family:'Geist',sans-serif;
+  font-size:11px; color:var(--tx2);
+  flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.tree-series-row.active .tree-series-label { color:var(--tx); }
+
+.tree-issue-row {
+  display:flex; align-items:center; gap:6px;
+  padding:3px 12px 3px 26px;
+  cursor:pointer;
+}
+.tree-issue-row:hover { background:var(--bg-h); }
+.tree-issue-label {
+  font-family:'Geist Mono',monospace;
+  font-size:9px; color:var(--tx3);
+  letter-spacing:0.03em;
+  flex:1;
+}
+.pip { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+.p-sd { background:var(--sd); }
+.p-sr { background:var(--sr); }
+.p-sl { background:var(--sl); }
+.p-dft { background:var(--sdft); }
+
+/* ── MAIN CONTENT ── */
+.main {
+  flex:1;
+  overflow-y:auto;
+  scrollbar-width:none;
+  display:flex;
+  flex-direction:column;
+}
+
+/* ── UNIVERSE HEADER BAND ── */
+.u-header {
+  padding:24px 28px 20px;
+  border-bottom:1px solid var(--bd);
+  background:var(--bg-s);
+  display:flex;
+  align-items:center;
+  gap:20px;
+  flex-shrink:0;
+}
+.u-cover-lg {
+  width:56px; height:56px;
+  border-radius:12px;
+  border:1px solid var(--bd-h);
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Lora',serif;
+  font-size:24px; font-style:italic;
+  flex-shrink:0;
+}
+.u-title-block { flex:1; }
+.u-label {
+  font-family:'Geist Mono',monospace;
+  font-size:8px; color:var(--tx3);
+  letter-spacing:0.14em; text-transform:uppercase;
+  margin-bottom:4px;
+}
+.u-title {
+  font-family:'Lora',serif;
+  font-size:22px; font-weight:600;
+  color:var(--tx);
+  letter-spacing:0.01em;
+}
+.u-meta-row {
+  display:flex; align-items:center; gap:14px;
+  margin-top:5px;
+}
+.u-meta-item {
+  font-family:'Geist Mono',monospace;
+  font-size:9px; color:var(--tx3);
+  letter-spacing:0.04em;
+  display:flex; align-items:center; gap:5px;
+}
+.u-meta-dot { width:4px; height:4px; border-radius:50%; background:var(--tx3); }
+
+/* collaborator cluster */
+.collab-cluster { display:flex; align-items:center; gap:0; }
+.collab-av {
+  width:26px; height:26px;
+  border-radius:50%;
+  border:2px solid var(--bg-s);
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Geist Mono',monospace;
+  font-size:8px; font-weight:500;
+  margin-left:-6px;
+  flex-shrink:0;
+  position:relative;
+}
+.collab-av:first-child { margin-left:0; }
+.collab-av .presence {
+  position:absolute; bottom:-1px; right:-1px;
+  width:7px; height:7px;
+  border-radius:50%;
+  border:1.5px solid var(--bg-s);
+}
+.presence.online { background:#4ea868; }
+.presence.away { background:#c89040; }
+.collab-label {
+  font-family:'Geist Mono',monospace;
+  font-size:9px; color:var(--tx3);
+  letter-spacing:0.04em;
+  margin-left:8px;
+}
+
+/* settings shortcut in header */
+.u-settings-shortcut {
+  height:30px; padding:0 12px;
+  border-radius:8px;
+  border:1px solid var(--bd-h);
+  background:transparent;
+  display:flex; align-items:center; gap:6px;
+  cursor:pointer;
+  flex-shrink:0;
+}
+.u-settings-shortcut:hover { background:var(--bg-h); }
+.u-settings-label { font-family:'Geist Mono',monospace; font-size:9px; color:var(--tx2); letter-spacing:0.06em; }
+
+/* ── CONTENT GRID ── */
+.content-grid {
+  flex:1;
+  display:grid;
+  grid-template-columns:1fr 300px;
+  grid-template-rows:auto auto 1fr;
+  gap:0;
+  padding:0;
+}
+
+/* ── STATS ROW ── */
+.stats-row {
+  grid-column:1 / -1;
+  display:flex;
+  border-bottom:1px solid var(--bd);
+  background:var(--bg);
+}
+.stat-block {
+  flex:1;
+  padding:16px 24px;
+  border-right:1px solid var(--bd);
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.stat-block:last-child { border-right:none; }
+.stat-value {
+  font-family:'Lora',serif;
+  font-size:26px; font-weight:500;
+  color:var(--tx);
+  letter-spacing:-0.01em;
+  line-height:1;
+}
+.stat-label {
+  font-family:'Geist Mono',monospace;
+  font-size:8px; color:var(--tx3);
+  letter-spacing:0.1em; text-transform:uppercase;
+}
+.stat-sub {
+  font-family:'Geist Mono',monospace;
+  font-size:9px; color:var(--tx3);
+  letter-spacing:0.04em; margin-top:2px;
+}
+.stat-bar {
+  height:2px; background:var(--bd);
+  border-radius:1px; margin-top:6px;
+  overflow:hidden;
+}
+.stat-bar-fill { height:100%; border-radius:1px; background:var(--acc2); }
+
+/* ── SERIES PANEL ── */
+.series-panel {
+  grid-column:1;
+  border-right:1px solid var(--bd);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+.panel-hd {
+  padding:14px 20px 10px;
+  border-bottom:1px solid var(--bd-s);
+  display:flex; align-items:center; gap:10px;
+  flex-shrink:0;
+}
+.panel-hd-label {
+  font-family:'Geist Mono',monospace;
+  font-size:9px; color:var(--tx3);
+  letter-spacing:0.14em; text-transform:uppercase;
+  flex:1;
+}
+.panel-hd-action {
+  font-family:'Geist Mono',monospace;
+  font-size:9px; color:var(--acc2);
+  letter-spacing:0.06em;
+  cursor:pointer;
+  display:flex; align-items:center; gap:4px;
+}
+
+.series-list { padding:12px 20px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; scrollbar-width:none; }
+
+.series-card {
+  border:1px solid var(--bd);
+  border-radius:10px;
+  overflow:hidden;
+  background:var(--bg-s);
+}
+.series-card-header {
+  padding:12px 16px;
+  display:flex; align-items:center; gap:12px;
+  border-bottom:1px solid var(--bd-s);
+  cursor:pointer;
+}
+.series-card-header:hover { background:var(--bg-h); }
+.sc-color { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+.sc-title {
+  font-family:'Lora',serif;
+  font-size:14px; font-weight:500;
+  color:var(--tx); flex:1;
+}
+.sc-meta {
+  font-family:'Geist Mono',monospace;
+  font-size:9px; color:var(--tx3);
+  letter-spacing:0.04em;
+  display:flex; gap:10px;
+}
+.sc-chevron { color:var(--tx3); font-size:10px; }
+
+/* issue grid inside series card */
+.issue-grid {
+  display:grid;
+  grid-template-columns:repeat(4, 1fr);
+  gap:0;
+}
+.issue-cell {
+  padding:10px 14px;
+  border-right:1px solid var(--bd-s);
+  border-bottom:1px solid var(--bd-s);
+  cursor:pointer;
+}
+.issue-cell:hover { background:var(--bg-h); }
+.issue-cell:nth-child(4n) { border-right:none; }
+.issue-cell:nth-last-child(-n+4) { border-bottom:none; }
+.issue-num {
+  font-family:'Geist Mono',monospace;
+  font-size:8px; color:var(--tx3);
+  letter-spacing:0.08em; text-transform:uppercase;
+  margin-bottom:3px;
+}
+.issue-title {
+  font-family:'Geist',sans-serif;
+  font-size:10px; color:var(--tx2);
+  line-height:1.35; margin-bottom:5px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+/* mini page strip */
+.issue-pages {
+  display:flex; gap:2px; flex-wrap:wrap;
+}
+.issue-page-pip {
+  width:6px; height:8px;
+  border-radius:1px;
+}
+
+/* ── TOOLS + ACTIVITY RIGHT COLUMN ── */
+.right-col {
+  grid-column:2;
+  grid-row:2 / 4;
+  display:flex; flex-direction:column;
+  overflow:hidden;
+  border-top:1px solid var(--bd);
+}
+
+/* tools section */
+.tools-section {
+  border-bottom:1px solid var(--bd);
+  flex-shrink:0;
+}
+.tool-row {
+  display:flex; align-items:center; gap:12px;
+  padding:12px 16px;
+  border-bottom:1px solid var(--bd-s);
+  cursor:pointer;
+}
+.tool-row:last-child { border-bottom:none; }
+.tool-row:hover { background:var(--bg-h); }
+.tool-icon {
+  width:32px; height:32px;
+  border-radius:8px;
+  border:1px solid var(--bd);
+  background:var(--bg-p);
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.tool-icon svg { width:14px; height:14px; color:var(--tx2); }
+.tool-body { flex:1; min-width:0; }
+.tool-name {
+  font-family:'Geist',sans-serif;
+  font-size:11px; font-weight:500;
+  color:var(--tx); margin-bottom:1px;
+}
+.tool-stat {
+  font-family:'Geist Mono',monospace;
+  font-size:9px; color:var(--tx3);
+  letter-spacing:0.04em;
+}
+.tool-arrow { color:var(--tx3); font-size:13px; }
+
+/* activity section */
+.activity-section { flex:1; overflow-y:auto; scrollbar-width:none; }
+.act-item {
+  display:flex; align-items:flex-start; gap:10px;
+  padding:10px 16px;
+  border-bottom:1px solid var(--bd-s);
+  cursor:pointer;
+}
+.act-item:last-child { border-bottom:none; }
+.act-item:hover { background:var(--bg-h); }
+.act-av {
+  width:24px; height:24px;
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Geist Mono',monospace;
+  font-size:8px; font-weight:500;
+  flex-shrink:0;
+  margin-top:1px;
+}
+.act-body-text {
+  font-family:'Geist',sans-serif;
+  font-size:11px; color:var(--tx2);
+  line-height:1.45; flex:1;
+}
+.act-body-text b { color:var(--tx); font-weight:500; }
+.act-time-sm {
+  font-family:'Geist Mono',monospace;
+  font-size:8px; color:var(--tx3);
+  letter-spacing:0.04em; flex-shrink:0;
+  padding-top:2px;
+}
+.act-quote {
+  font-family:'Lora',serif;
+  font-size:10px; font-style:italic;
+  color:var(--tx3); margin-top:3px;
+  padding-left:8px;
+  border-left:2px solid var(--acc2);
+  line-height:1.5;
+}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>PanelSync — Universe Home</h1>
+  <p>COSMIX UNIVERSE · DARK + LIGHT · FULL SIDEBAR · SETTINGS ACCESSIBLE FROM TOPBAR + UNIVERSE HEADER</p>
+</div>
+
+<div class="mockup-row">
+
+<!-- ══════════════════════════════
+     DARK MODE
+══════════════════════════════ -->
+<div>
+  <div class="col-label">Dark mode</div>
+  <div class="ipad dk">
+
+    <!-- top bar -->
+    <div class="topbar">
+      <div class="tb-wordmark">PanelSync</div>
+      <div class="tb-breadcrumb">
+        <span class="tb-crumb">Home</span>
+        <span class="tb-sep">›</span>
+        <span class="tb-crumb active">Cosmix Universe</span>
+      </div>
+      <div class="tb-right">
+        <div class="tb-settings-btn">
+          <span class="tb-settings-icon">⚙</span>
+          <span class="tb-settings-label">Universe Settings</span>
+        </div>
+        <div class="tb-search">
+          <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--tx3)"><circle cx="6" cy="6" r="4"/><line x1="9.5" y1="9.5" x2="13" y2="13"/></svg>
+          <span class="tb-search-txt">Search…</span>
+        </div>
+        <div class="av av-b">MB</div>
+      </div>
+    </div>
+
+    <!-- app layout -->
+    <div class="app-layout">
+
+      <!-- sidebar -->
+      <div class="sidebar">
+        <!-- icon rail -->
+        <div class="icon-rail">
+          <!-- home icon — active (we are on universe home) -->
+          <div class="rail-icon home-active" title="Universe Home">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 7L8 2l6 5v7a1 1 0 01-1 1H3a1 1 0 01-1-1V7z"/></svg>
+          </div>
+          <div class="rail-icon" title="Pages">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2" width="12" height="12" rx="1"/><line x1="5" y1="6" x2="11" y2="6"/><line x1="5" y1="9" x2="9" y2="9"/></svg>
+          </div>
+          <div class="rail-divider"></div>
+          <div class="rail-icon" title="World Bible">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="7" r="3"/><path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5"/></svg>
+          </div>
+          <div class="rail-icon" title="Timeline">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><line x1="2" y1="8" x2="14" y2="8"/><circle cx="5" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="11" cy="8" r="1.5" fill="currentColor"/></svg>
+          </div>
+          <div class="rail-icon" title="Notes">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><polyline points="10,2 10,5 13,5"/></svg>
+          </div>
+          <div class="rail-spacer"></div>
+          <div class="rail-divider"></div>
+          <div class="rail-icon" title="Settings">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/></svg>
+          </div>
+          <div class="av av-b" style="margin-bottom:4px;">MB</div>
+        </div>
+
+        <!-- tree panel -->
+        <div class="tree-panel">
+          <div class="tree-header">
+            <div class="tree-header-label">Series</div>
+            <div class="tree-universe-name">Cosmix Universe</div>
+          </div>
+          <div class="tree-body">
+            <!-- The Adequates -->
+            <div class="tree-series-row active">
+              <span class="tree-chevron">▾</span>
+              <span class="tree-series-label">The Adequates</span>
+            </div>
+            <div class="tree-issue-row">
+              <div class="pip p-sl" style="width:5px;height:5px;flex-shrink:0;"></div>
+              <span class="tree-issue-label">Issue 01 — Origin</span>
+            </div>
+            <div class="tree-issue-row">
+              <div class="pip p-dft" style="width:5px;height:5px;flex-shrink:0;"></div>
+              <span class="tree-issue-label">Issue 02 — Threat Level</span>
+            </div>
+            <!-- Baron Nullify -->
+            <div class="tree-series-row" style="margin-top:4px;">
+              <span class="tree-chevron">▸</span>
+              <span class="tree-series-label">Baron Nullify</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- main content -->
+      <div class="main">
+
+        <!-- universe header -->
+        <div class="u-header">
+          <div class="u-cover-lg" style="background:linear-gradient(135deg,#1a2738,#0e1820);">
+            <span style="color:rgba(200,167,104,0.85);font-family:'Lora',serif;font-style:italic;">C</span>
+          </div>
+          <div class="u-title-block">
+            <div class="u-label">Universe</div>
+            <div class="u-title">Cosmix Universe</div>
+            <div class="u-meta-row">
+              <div class="u-meta-item">2 series</div>
+              <div class="u-meta-dot"></div>
+              <div class="u-meta-item">38 pages total</div>
+              <div class="u-meta-dot"></div>
+              <div class="u-meta-item">
+                <div class="collab-cluster">
+                  <div class="collab-av av-b" style="background:#2a3d5a;color:#8ab0d8;">MB<div class="presence online"></div></div>
+                  <div class="collab-av" style="background:#3a2850;color:#a888d8;">SB<div class="presence online"></div></div>
+                </div>
+                <span class="collab-label">2 online now</span>
+              </div>
+            </div>
+          </div>
+          <div class="u-settings-shortcut">
+            <span style="font-size:12px;color:var(--tx2);">⚙</span>
+            <span class="u-settings-label">Settings</span>
+          </div>
+        </div>
+
+        <!-- content grid -->
+        <div class="content-grid">
+
+          <!-- stats row -->
+          <div class="stats-row">
+            <div class="stat-block">
+              <div class="stat-value">38</div>
+              <div class="stat-label">Pages written</div>
+              <div class="stat-bar"><div class="stat-bar-fill" style="width:62%;"></div></div>
+              <div class="stat-sub">of ~62 planned</div>
+            </div>
+            <div class="stat-block">
+              <div class="stat-value">1</div>
+              <div class="stat-label">Issues complete</div>
+              <div class="stat-bar"><div class="stat-bar-fill" style="width:25%;background:var(--sd);"></div></div>
+              <div class="stat-sub">of 4 across 2 series</div>
+            </div>
+            <div class="stat-block">
+              <div class="stat-value">12</div>
+              <div class="stat-label">Characters</div>
+              <div class="stat-sub">3 in active scenes</div>
+            </div>
+            <div class="stat-block">
+              <div class="stat-value">3</div>
+              <div class="stat-label">Open comments</div>
+              <div class="stat-bar"><div class="stat-bar-fill" style="width:40%;background:var(--sr);"></div></div>
+              <div class="stat-sub">2 need your response</div>
+            </div>
+          </div>
+
+          <!-- series panel -->
+          <div class="series-panel">
+            <div class="panel-hd">
+              <span class="panel-hd-label">Series</span>
+              <span class="panel-hd-action">+ New Series</span>
+            </div>
+            <div class="series-list">
+
+              <!-- The Adequates -->
+              <div class="series-card">
+                <div class="series-card-header">
+                  <div class="sc-color" style="background:#5a8068;"></div>
+                  <div class="sc-title">The Adequates</div>
+                  <div class="sc-meta">
+                    <span>2 issues</span>
+                    <span>·</span>
+                    <span>22 pgs</span>
+                  </div>
+                  <div class="sc-chevron">▾</div>
+                </div>
+                <div class="issue-grid">
+                  <!-- Issue 01 -->
+                  <div class="issue-cell" style="grid-column:1/3;">
+                    <div class="issue-num">Issue 01</div>
+                    <div class="issue-title">Vol.1 "Origin Story"</div>
+                    <div class="issue-pages">
+                      <div class="issue-page-pip" style="background:var(--sl);"></div>
+                      <div class="issue-page-pip" style="background:var(--sl);"></div>
+                      <div class="issue-page-pip" style="background:var(--sl);"></div>
+                      <div class="issue-page-pip" style="background:var(--sl);"></div>
+                      <div class="issue-page-pip" style="background:var(--sl);"></div>
+                      <div class="issue-page-pip" style="background:var(--sl);"></div>
+                      <div class="issue-page-pip" style="background:var(--sl);"></div>
+                      <div class="issue-page-pip" style="background:var(--sl);"></div>
+                      <div class="issue-page-pip" style="background:var(--sl);"></div>
+                      <div class="issue-page-pip" style="background:var(--sl);"></div>
+                      <div class="issue-page-pip" style="background:var(--sl);"></div>
+                      <div class="issue-page-pip" style="background:var(--sl);"></div>
+                      <div style="font-family:'Geist Mono',monospace;font-size:8px;color:var(--sl);letter-spacing:0.04em;margin-top:3px;align-self:center;">Locked</div>
+                    </div>
+                  </div>
+                  <!-- Issue 02 -->
+                  <div class="issue-cell" style="grid-column:3/5;">
+                    <div class="issue-num">Issue 02</div>
+                    <div class="issue-title">"Threat Level: Moderate"</div>
+                    <div class="issue-pages">
+                      <div class="issue-page-pip" style="background:var(--sd);"></div>
+                      <div class="issue-page-pip" style="background:var(--sd);"></div>
+                      <div class="issue-page-pip" style="background:var(--sd);"></div>
+                      <div class="issue-page-pip" style="background:var(--sr);"></div>
+                      <div class="issue-page-pip" style="background:var(--sdft);"></div>
+                      <div class="issue-page-pip" style="background:var(--sdft);"></div>
+                      <div class="issue-page-pip" style="background:var(--sdft);"></div>
+                      <div class="issue-page-pip" style="background:var(--sdft);"></div>
+                      <div class="issue-page-pip" style="background:var(--sdft);"></div>
+                      <div class="issue-page-pip" style="background:var(--sdft);"></div>
+                      <div style="font-family:'Geist Mono',monospace;font-size:8px;color:var(--tx3);letter-spacing:0.04em;margin-top:3px;align-self:center;">4/10 done</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Baron Nullify -->
+              <div class="series-card">
+                <div class="series-card-header">
+                  <div class="sc-color" style="background:#7850a8;"></div>
+                  <div class="sc-title">Baron Nullify</div>
+                  <div class="sc-meta">
+                    <span>1 issue</span>
+                    <span>·</span>
+                    <span>16 pgs</span>
+                  </div>
+                  <div class="sc-chevron">▸</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- right column: tools + activity -->
+          <div class="right-col">
+
+            <!-- tools -->
+            <div class="tools-section">
+              <div class="panel-hd" style="padding:12px 16px 10px;">
+                <span class="panel-hd-label">World tools</span>
+              </div>
+              <div class="tool-row">
+                <div class="tool-icon">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="7" r="3"/><path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5"/></svg>
+                </div>
+                <div class="tool-body">
+                  <div class="tool-name">World Bible</div>
+                  <div class="tool-stat">12 characters · 8 locations</div>
+                </div>
+                <div class="tool-arrow">›</div>
+              </div>
+              <div class="tool-row">
+                <div class="tool-icon">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><line x1="2" y1="8" x2="14" y2="8"/><circle cx="5" cy="8" r="1.5" fill="currentColor"/><circle cx="9" cy="8" r="1.5" fill="currentColor"/><circle cx="13" cy="8" r="1.5" fill="currentColor"/></svg>
+                </div>
+                <div class="tool-body">
+                  <div class="tool-name">Timeline</div>
+                  <div class="tool-stat">3 timelines · 47 events</div>
+                </div>
+                <div class="tool-arrow">›</div>
+              </div>
+              <div class="tool-row">
+                <div class="tool-icon">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><line x1="5" y1="8" x2="10" y2="8"/><line x1="5" y1="11" x2="8" y2="11"/></svg>
+                </div>
+                <div class="tool-body">
+                  <div class="tool-name">Notes</div>
+                  <div class="tool-stat">14 notes · last added 2h ago</div>
+                </div>
+                <div class="tool-arrow">›</div>
+              </div>
+            </div>
+
+            <!-- activity -->
+            <div class="panel-hd" style="padding:12px 16px 10px;border-bottom:1px solid var(--bd-s);flex-shrink:0;">
+              <span class="panel-hd-label">Activity</span>
+              <span style="font-family:'Geist Mono',monospace;font-size:8px;color:var(--tx3);letter-spacing:0.06em;margin-left:auto;">this universe only</span>
+            </div>
+            <div class="activity-section">
+              <div class="act-item">
+                <div class="act-av" style="background:#3a2850;color:#a888d8;">SB</div>
+                <div class="act-body-text">
+                  <b>Stacy</b> left a comment on Issue 02 · Page 03
+                  <div class="act-quote">"The rooftop panel feels rushed — more space before the reveal?"</div>
+                </div>
+                <div class="act-time-sm">1h ago</div>
+              </div>
+              <div class="act-item">
+                <div class="act-av av-b">MB</div>
+                <div class="act-body-text"><b>You</b> marked Issue 01 as locked</div>
+                <div class="act-time-sm">Yesterday</div>
+              </div>
+              <div class="act-item">
+                <div class="act-av" style="background:#3a2850;color:#a888d8;">SB</div>
+                <div class="act-body-text"><b>Stacy</b> resolved 3 comments on Issue 01</div>
+                <div class="act-time-sm">2d ago</div>
+              </div>
+              <div class="act-item" style="opacity:0.5;">
+                <div class="act-av av-b">MB</div>
+                <div class="act-body-text"><b>You</b> added Major Patriot to World Bible</div>
+                <div class="act-time-sm">4d ago</div>
+              </div>
+              <div class="act-item" style="opacity:0.4;">
+                <div class="act-av av-b">MB</div>
+                <div class="act-body-text"><b>You</b> created Baron Nullify · Issue 01</div>
+                <div class="act-time-sm">1wk ago</div>
+              </div>
+            </div>
+
+          </div>
+
+        </div><!-- /content-grid -->
+      </div><!-- /main -->
+    </div><!-- /app-layout -->
+  </div><!-- /ipad dark -->
+</div>
+
+
+<!-- ══════════════════════════════
+     LIGHT MODE
+══════════════════════════════ -->
+<div>
+  <div class="col-label">Light mode</div>
+  <div class="ipad lt">
+
+    <div class="topbar">
+      <div class="tb-wordmark">PanelSync</div>
+      <div class="tb-breadcrumb">
+        <span class="tb-crumb">Home</span>
+        <span class="tb-sep">›</span>
+        <span class="tb-crumb active">Cosmix Universe</span>
+      </div>
+      <div class="tb-right">
+        <div class="tb-settings-btn">
+          <span class="tb-settings-icon">⚙</span>
+          <span class="tb-settings-label">Universe Settings</span>
+        </div>
+        <div class="tb-search">
+          <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--tx3)"><circle cx="6" cy="6" r="4"/><line x1="9.5" y1="9.5" x2="13" y2="13"/></svg>
+          <span class="tb-search-txt">Search…</span>
+        </div>
+        <div class="av av-b">MB</div>
+      </div>
+    </div>
+
+    <div class="app-layout">
+      <div class="sidebar">
+        <div class="icon-rail">
+          <div class="rail-icon home-active"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 7L8 2l6 5v7a1 1 0 01-1 1H3a1 1 0 01-1-1V7z"/></svg></div>
+          <div class="rail-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2" width="12" height="12" rx="1"/><line x1="5" y1="6" x2="11" y2="6"/><line x1="5" y1="9" x2="9" y2="9"/></svg></div>
+          <div class="rail-divider"></div>
+          <div class="rail-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="7" r="3"/><path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5"/></svg></div>
+          <div class="rail-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><line x1="2" y1="8" x2="14" y2="8"/><circle cx="5" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="11" cy="8" r="1.5" fill="currentColor"/></svg></div>
+          <div class="rail-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><polyline points="10,2 10,5 13,5"/></svg></div>
+          <div class="rail-spacer"></div>
+          <div class="rail-divider"></div>
+          <div class="rail-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/></svg></div>
+          <div class="av av-b" style="margin-bottom:4px;">MB</div>
+        </div>
+        <div class="tree-panel">
+          <div class="tree-header">
+            <div class="tree-header-label">Series</div>
+            <div class="tree-universe-name">Cosmix Universe</div>
+          </div>
+          <div class="tree-body">
+            <div class="tree-series-row active">
+              <span class="tree-chevron">▾</span>
+              <span class="tree-series-label">The Adequates</span>
+            </div>
+            <div class="tree-issue-row"><div class="pip p-sl" style="width:5px;height:5px;flex-shrink:0;"></div><span class="tree-issue-label">Issue 01 — Origin</span></div>
+            <div class="tree-issue-row"><div class="pip p-dft" style="width:5px;height:5px;flex-shrink:0;"></div><span class="tree-issue-label">Issue 02 — Threat Level</span></div>
+            <div class="tree-series-row" style="margin-top:4px;">
+              <span class="tree-chevron">▸</span>
+              <span class="tree-series-label">Baron Nullify</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="main">
+        <div class="u-header">
+          <div class="u-cover-lg" style="background:linear-gradient(135deg,#dde8f8,#c8d8ee);">
+            <span style="color:#6888b0;font-family:'Lora',serif;font-style:italic;font-size:24px;">C</span>
+          </div>
+          <div class="u-title-block">
+            <div class="u-label">Universe</div>
+            <div class="u-title">Cosmix Universe</div>
+            <div class="u-meta-row">
+              <div class="u-meta-item">2 series</div>
+              <div class="u-meta-dot"></div>
+              <div class="u-meta-item">38 pages total</div>
+              <div class="u-meta-dot"></div>
+              <div class="u-meta-item">
+                <div class="collab-cluster">
+                  <div class="collab-av av-b" style="background:#2a3d5a;color:#8ab0d8;border-color:var(--bg-s);">MB<div class="presence online"></div></div>
+                  <div class="collab-av" style="background:#3a2850;color:#a888d8;border-color:var(--bg-s);">SB<div class="presence online"></div></div>
+                </div>
+                <span class="collab-label">2 online now</span>
+              </div>
+            </div>
+          </div>
+          <div class="u-settings-shortcut">
+            <span style="font-size:12px;color:var(--tx2);">⚙</span>
+            <span class="u-settings-label">Settings</span>
+          </div>
+        </div>
+
+        <div class="content-grid">
+          <div class="stats-row">
+            <div class="stat-block"><div class="stat-value">38</div><div class="stat-label">Pages written</div><div class="stat-bar"><div class="stat-bar-fill" style="width:62%;"></div></div><div class="stat-sub">of ~62 planned</div></div>
+            <div class="stat-block"><div class="stat-value">1</div><div class="stat-label">Issues complete</div><div class="stat-bar"><div class="stat-bar-fill" style="width:25%;background:var(--sd);"></div></div><div class="stat-sub">of 4 across 2 series</div></div>
+            <div class="stat-block"><div class="stat-value">12</div><div class="stat-label">Characters</div><div class="stat-sub">3 in active scenes</div></div>
+            <div class="stat-block"><div class="stat-value">3</div><div class="stat-label">Open comments</div><div class="stat-bar"><div class="stat-bar-fill" style="width:40%;background:var(--sr);"></div></div><div class="stat-sub">2 need your response</div></div>
+          </div>
+
+          <div class="series-panel">
+            <div class="panel-hd"><span class="panel-hd-label">Series</span><span class="panel-hd-action">+ New Series</span></div>
+            <div class="series-list">
+              <div class="series-card">
+                <div class="series-card-header">
+                  <div class="sc-color" style="background:#5a8068;"></div>
+                  <div class="sc-title">The Adequates</div>
+                  <div class="sc-meta"><span>2 issues</span><span>·</span><span>22 pgs</span></div>
+                  <div class="sc-chevron">▾</div>
+                </div>
+                <div class="issue-grid">
+                  <div class="issue-cell" style="grid-column:1/3;">
+                    <div class="issue-num">Issue 01</div>
+                    <div class="issue-title">Vol.1 "Origin Story"</div>
+                    <div class="issue-pages">
+                      <div class="issue-page-pip" style="background:var(--sl);"></div><div class="issue-page-pip" style="background:var(--sl);"></div><div class="issue-page-pip" style="background:var(--sl);"></div><div class="issue-page-pip" style="background:var(--sl);"></div><div class="issue-page-pip" style="background:var(--sl);"></div><div class="issue-page-pip" style="background:var(--sl);"></div><div class="issue-page-pip" style="background:var(--sl);"></div><div class="issue-page-pip" style="background:var(--sl);"></div><div class="issue-page-pip" style="background:var(--sl);"></div><div class="issue-page-pip" style="background:var(--sl);"></div><div class="issue-page-pip" style="background:var(--sl);"></div><div class="issue-page-pip" style="background:var(--sl);"></div>
+                      <div style="font-family:'Geist Mono',monospace;font-size:8px;color:var(--sl);letter-spacing:0.04em;margin-top:3px;align-self:center;">Locked</div>
+                    </div>
+                  </div>
+                  <div class="issue-cell" style="grid-column:3/5;">
+                    <div class="issue-num">Issue 02</div>
+                    <div class="issue-title">"Threat Level: Moderate"</div>
+                    <div class="issue-pages">
+                      <div class="issue-page-pip" style="background:var(--sd);"></div><div class="issue-page-pip" style="background:var(--sd);"></div><div class="issue-page-pip" style="background:var(--sd);"></div><div class="issue-page-pip" style="background:var(--sr);"></div><div class="issue-page-pip" style="background:var(--sdft);"></div><div class="issue-page-pip" style="background:var(--sdft);"></div><div class="issue-page-pip" style="background:var(--sdft);"></div><div class="issue-page-pip" style="background:var(--sdft);"></div><div class="issue-page-pip" style="background:var(--sdft);"></div><div class="issue-page-pip" style="background:var(--sdft);"></div>
+                      <div style="font-family:'Geist Mono',monospace;font-size:8px;color:var(--tx3);letter-spacing:0.04em;margin-top:3px;align-self:center;">4/10 done</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="series-card">
+                <div class="series-card-header">
+                  <div class="sc-color" style="background:#7850a8;"></div>
+                  <div class="sc-title">Baron Nullify</div>
+                  <div class="sc-meta"><span>1 issue</span><span>·</span><span>16 pgs</span></div>
+                  <div class="sc-chevron">▸</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="right-col">
+            <div class="tools-section">
+              <div class="panel-hd" style="padding:12px 16px 10px;"><span class="panel-hd-label">World tools</span></div>
+              <div class="tool-row"><div class="tool-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="7" r="3"/><path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5"/></svg></div><div class="tool-body"><div class="tool-name">World Bible</div><div class="tool-stat">12 characters · 8 locations</div></div><div class="tool-arrow">›</div></div>
+              <div class="tool-row"><div class="tool-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><line x1="2" y1="8" x2="14" y2="8"/><circle cx="5" cy="8" r="1.5" fill="currentColor"/><circle cx="9" cy="8" r="1.5" fill="currentColor"/><circle cx="13" cy="8" r="1.5" fill="currentColor"/></svg></div><div class="tool-body"><div class="tool-name">Timeline</div><div class="tool-stat">3 timelines · 47 events</div></div><div class="tool-arrow">›</div></div>
+              <div class="tool-row"><div class="tool-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><line x1="5" y1="8" x2="10" y2="8"/><line x1="5" y1="11" x2="8" y2="11"/></svg></div><div class="tool-body"><div class="tool-name">Notes</div><div class="tool-stat">14 notes · last added 2h ago</div></div><div class="tool-arrow">›</div></div>
+            </div>
+            <div class="panel-hd" style="padding:12px 16px 10px;border-bottom:1px solid var(--bd-s);flex-shrink:0;"><span class="panel-hd-label">Activity</span><span style="font-family:'Geist Mono',monospace;font-size:8px;color:var(--tx3);letter-spacing:0.06em;margin-left:auto;">this universe only</span></div>
+            <div class="activity-section">
+              <div class="act-item"><div class="act-av" style="background:#3a2850;color:#a888d8;">SB</div><div class="act-body-text"><b>Stacy</b> left a comment on Issue 02 · Page 03<div class="act-quote">"The rooftop panel feels rushed — more space before the reveal?"</div></div><div class="act-time-sm">1h ago</div></div>
+              <div class="act-item"><div class="act-av av-b">MB</div><div class="act-body-text"><b>You</b> marked Issue 01 as locked</div><div class="act-time-sm">Yesterday</div></div>
+              <div class="act-item"><div class="act-av" style="background:#3a2850;color:#a888d8;">SB</div><div class="act-body-text"><b>Stacy</b> resolved 3 comments on Issue 01</div><div class="act-time-sm">2d ago</div></div>
+              <div class="act-item" style="opacity:0.5;"><div class="act-av av-b">MB</div><div class="act-body-text"><b>You</b> added Major Patriot to World Bible</div><div class="act-time-sm">4d ago</div></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /mockup-row -->
+</body>
+</html>

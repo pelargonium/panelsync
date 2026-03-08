@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1194, initial-scale=1.0">
+<title>PanelSync — iPad Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-base: #0e0d0c;
+    --bg-surface: #141312;
+    --bg-panel: #1a1917;
+    --bg-elevated: #201f1d;
+    --bg-hover: #252321;
+    --border: #2c2a27;
+    --border-subtle: #201f1d;
+    --text-primary: #e8e4dc;
+    --text-secondary: #8a857a;
+    --text-muted: #4a4640;
+    --text-dim: #302e2b;
+    --accent: #c9a96e;
+    --accent-dim: #7a6440;
+    --accent-subtle: #1e1a13;
+    --red-note: #c96e6e;
+    --green-status: #6e9e7a;
+    --blue-status: #6e8bc9;
+    --panel-left: 58%;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #070706;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'DM Sans', sans-serif;
+    padding: 40px;
+  }
+
+  /* iPad frame */
+  .ipad-frame {
+    width: 1194px;
+    height: 834px;
+    background: #1c1c1e;
+    border-radius: 22px;
+    padding: 14px;
+    box-shadow:
+      0 0 0 1px #3a3a3c,
+      0 40px 120px rgba(0,0,0,0.9),
+      0 8px 32px rgba(0,0,0,0.6),
+      inset 0 1px 0 rgba(255,255,255,0.05);
+    position: relative;
+  }
+
+  .ipad-screen {
+    width: 100%;
+    height: 100%;
+    background: var(--bg-base);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Top bar */
+  .topbar {
+    height: 44px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 0;
+    flex-shrink: 0;
+  }
+
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 220px;
+    flex-shrink: 0;
+  }
+
+  .wordmark {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+  }
+
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    padding: 0 16px;
+  }
+
+  .breadcrumb-item {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 300;
+    color: var(--text-secondary);
+    letter-spacing: 0.04em;
+  }
+
+  .breadcrumb-sep {
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+
+  .breadcrumb-item.active {
+    color: var(--text-primary);
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tb-btn {
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .tb-btn.primary {
+    background: var(--accent-subtle);
+    border-color: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .save-indicator {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+  }
+
+  .save-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--green-status);
+    opacity: 0.7;
+  }
+
+  /* Main content area */
+  .main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* Left sidebar */
+  .sidebar {
+    width: 220px;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .sidebar-section {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .sidebar-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0 14px 8px;
+  }
+
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .sidebar-item:hover {
+    background: var(--bg-hover);
+  }
+
+  .sidebar-item.active {
+    background: var(--accent-subtle);
+  }
+
+  .sidebar-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 4px;
+    bottom: 4px;
+    width: 2px;
+    background: var(--accent);
+    border-radius: 0 2px 2px 0;
+  }
+
+  .sidebar-icon {
+    width: 14px;
+    height: 14px;
+    opacity: 0.6;
+    flex-shrink: 0;
+  }
+
+  .sidebar-item.active .sidebar-icon { opacity: 1; }
+
+  .sidebar-item-text {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-secondary);
+    flex: 1;
+  }
+
+  .sidebar-item.active .sidebar-item-text {
+    color: var(--text-primary);
+  }
+
+  .page-list {
+    padding: 4px 0;
+  }
+
+  .page-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 14px 5px 28px;
+    cursor: pointer;
+  }
+
+  .page-row:hover { background: var(--bg-hover); }
+  .page-row.active { background: var(--accent-subtle); }
+
+  .page-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    width: 20px;
+  }
+
+  .page-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .status-draft { background: var(--text-muted); }
+  .status-review { background: var(--accent); }
+  .status-locked { background: var(--blue-status); }
+  .status-complete { background: var(--green-status); }
+
+  .page-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    flex: 1;
+  }
+  .page-row.active .page-label { color: var(--text-primary); }
+
+  /* Split content area */
+  .content-split {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* Script editor */
+  .script-pane {
+    width: var(--panel-left);
+    background: var(--bg-base);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .script-toolbar {
+    height: 36px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .block-type-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    font-weight: 400;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    padding: 3px 7px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+
+  .block-type-btn.active-type {
+    color: var(--accent);
+    border-color: var(--accent-dim);
+    background: var(--accent-subtle);
+  }
+
+  .script-toolbar-sep {
+    width: 1px;
+    height: 16px;
+    background: var(--border);
+    margin: 0 2px;
+  }
+
+  .page-status-select {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+  }
+
+  .status-badge {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .status-badge.draft {
+    background: rgba(74,70,64,0.3);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+
+  /* Script content */
+  .script-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 48px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .script-page-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .script-page-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+  }
+
+  /* Script blocks */
+  .block {
+    margin-bottom: 0;
+    position: relative;
+  }
+
+  .block + .block {
+    margin-top: 2px;
+  }
+
+  .block-panel {
+    margin-top: 24px;
+    margin-bottom: 4px;
+  }
+
+  .block-panel:first-child {
+    margin-top: 0;
+  }
+
+  .block-panel-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .panel-number {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    min-width: 64px;
+  }
+
+  .panel-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, var(--accent-dim), transparent);
+    opacity: 0.4;
+  }
+
+  .panel-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  .block-scene {
+    padding: 6px 0 2px;
+  }
+
+  .scene-text {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .block-description {
+    padding: 4px 0;
+  }
+
+  .desc-text {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 300;
+    color: var(--text-primary);
+    line-height: 1.7;
+  }
+
+  .block-dialogue {
+    padding: 8px 0 4px;
+    padding-left: 48px;
+  }
+
+  .dialogue-char {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    margin-bottom: 3px;
+    text-transform: uppercase;
+  }
+
+  .dialogue-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 13px;
+    font-style: italic;
+    color: var(--text-primary);
+    line-height: 1.6;
+  }
+
+  .block-caption {
+    padding: 4px 0;
+    padding-left: 24px;
+    border-left: 2px solid var(--accent-dim);
+    margin-left: 4px;
+  }
+
+  .caption-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+  }
+
+  .block-sfx {
+    padding: 6px 0;
+  }
+
+  .sfx-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--red-note);
+    letter-spacing: 0.04em;
+    opacity: 0.8;
+    line-height: 1;
+  }
+
+  /* Cursor */
+  .cursor {
+    display: inline-block;
+    width: 1.5px;
+    height: 14px;
+    background: var(--accent);
+    margin-left: 1px;
+    vertical-align: middle;
+    animation: blink 1.1s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+
+  /* Comment pip */
+  .comment-pip {
+    position: absolute;
+    right: -24px;
+    top: 4px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .comment-pip-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  /* Storyboard pane */
+  .storyboard-pane {
+    flex: 1;
+    background: var(--bg-panel);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .storyboard-toolbar {
+    height: 36px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .storyboard-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    flex: 1;
+  }
+
+  .tool-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+  }
+
+  .tool-btn.active {
+    background: var(--bg-elevated);
+    border-color: var(--border);
+    color: var(--text-primary);
+  }
+
+  .tool-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .storyboard-canvas-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* The actual canvas / page */
+  .canvas-page {
+    width: 280px;
+    height: 400px;
+    background: #f5f0e8;
+    border-radius: 2px;
+    box-shadow:
+      0 4px 24px rgba(0,0,0,0.5),
+      0 1px 4px rgba(0,0,0,0.3);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Rough panel layout sketched in */
+  .sketch-panel {
+    position: absolute;
+    border: 1.5px solid #2a2520;
+  }
+
+  /* Rough pencil marks - SVG overlay */
+  .sketch-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  .page-grid-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    opacity: 0.12;
+    background-image:
+      linear-gradient(rgba(100,90,80,0.5) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(100,90,80,0.5) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  .canvas-page-label {
+    position: absolute;
+    bottom: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+
+  /* Reference panel strip collapsed on left */
+  .ref-strip {
+    width: 36px;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0;
+    gap: 16px;
+  }
+
+  .ref-strip-icon {
+    width: 20px;
+    height: 20px;
+    opacity: 0.4;
+    cursor: pointer;
+  }
+
+  /* Page strip at bottom */
+  .page-strip {
+    height: 72px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    overflow-x: auto;
+    flex-shrink: 0;
+    scrollbar-width: none;
+  }
+
+  .strip-thumb {
+    width: 44px;
+    height: 56px;
+    border-radius: 3px;
+    border: 1.5px solid var(--border);
+    background: var(--bg-elevated);
+    flex-shrink: 0;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .strip-thumb.active {
+    border-color: var(--accent);
+  }
+
+  .strip-thumb-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 8px;
+    color: var(--text-muted);
+    position: absolute;
+    bottom: 3px;
+    right: 4px;
+  }
+
+  .strip-thumb-sketch {
+    width: 100%;
+    height: 100%;
+    opacity: 0.5;
+  }
+
+  /* Pencil cursor hint */
+  .pencil-hint {
+    position: absolute;
+    top: 50%;
+    right: 30px;
+    transform: translateY(-50%) rotate(-35deg);
+    opacity: 0.15;
+    pointer-events: none;
+  }
+
+  /* Annotation: color selector */
+  .color-selector {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .color-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+  }
+
+  .color-dot.active {
+    border-color: var(--text-primary);
+    transform: scale(1.2);
+  }
+
+  /* weight slider */
+  .weight-slider {
+    position: absolute;
+    right: 14px;
+    bottom: 90px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .weight-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 8px;
+    color: var(--text-muted);
+    writing-mode: vertical-rl;
+    letter-spacing: 0.1em;
+  }
+
+  .weight-track {
+    width: 2px;
+    height: 60px;
+    background: var(--border);
+    border-radius: 1px;
+    position: relative;
+  }
+
+  .weight-thumb {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+    border: 1px solid var(--border);
+    position: absolute;
+    left: -3px;
+    top: 30%;
+  }
+
+  /* Floating comment thread */
+  .comment-thread {
+    position: absolute;
+    right: 0;
+    top: 110px;
+    width: 200px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 8px 0 0 8px;
+    padding: 10px 12px;
+    font-size: 11px;
+    transform: translateX(calc(100% - 8px));
+    transition: transform 0.2s;
+    border-right: none;
+  }
+
+  .comment-thread::before {
+    content: '';
+    position: absolute;
+    left: -1px;
+    top: 12px;
+    width: 4px;
+    height: 36px;
+    background: var(--accent);
+    border-radius: 0 2px 2px 0;
+  }
+
+  .comment-author {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+
+  .comment-body {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  /* Collaborator presence */
+  .presence-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+  }
+
+  .presence-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid var(--bg-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 8px;
+    font-weight: 500;
+  }
+
+  .avatar-1 { background: #5b7fa6; color: #c8dff5; }
+  .avatar-2 { background: #7a6eb0; color: #d5ccf5; }
+
+  /* Sidebar world switcher */
+  .world-switcher {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+
+  .world-cover {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #2a3545, #1a2535);
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .world-cover-inner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Playfair Display', serif;
+    font-size: 12px;
+    font-style: italic;
+    color: rgba(180,160,120,0.7);
+  }
+
+  .world-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+  }
+
+  .world-caret {
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+
+  /* Tool: distraction-free hint */
+  .kbd-hint {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    border: 1px solid var(--text-dim);
+    padding: 1px 4px;
+    border-radius: 3px;
+    letter-spacing: 0.04em;
+  }
+</style>
+</head>
+<body>
+
+<div class="ipad-frame">
+  <div class="ipad-screen">
+
+    <!-- Top bar -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <span class="wordmark">PanelSync</span>
+      </div>
+
+      <div class="breadcrumb">
+        <span class="breadcrumb-item">Ironveil</span>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-item">Vol. 1: The Warden</span>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-item">Issue 02</span>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-item active">Page 07</span>
+      </div>
+
+      <div class="topbar-right">
+        <div class="presence-bar">
+          <div class="presence-avatar avatar-1">M</div>
+          <div class="presence-avatar avatar-2">L</div>
+        </div>
+        <div class="save-indicator" style="margin-left:10px;">
+          <div class="save-dot"></div>
+          <span>saved</span>
+        </div>
+        <div class="tb-btn" style="margin-left:8px;">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><path d="M2 2h8v1H2zM2 5.5h8v1H2zM2 9h8v1H2z"/></svg>
+          Outline
+        </div>
+        <div class="tb-btn primary">
+          <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor"><path d="M1 1h10v10H1z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+          Focus
+        </div>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <!-- World switcher -->
+        <div class="world-switcher">
+          <div class="world-cover"><div class="world-cover-inner">I</div></div>
+          <span class="world-name">Ironveil</span>
+          <span class="world-caret">⌄</span>
+        </div>
+
+        <!-- World-level tools -->
+        <div class="sidebar-section">
+          <div class="sidebar-label">World</div>
+
+          <div class="sidebar-item">
+            <svg class="sidebar-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="5" height="6" rx="1"/><rect x="9" y="3" width="5" height="4" rx="1"/><rect x="9" y="9" width="5" height="4" rx="1"/><rect x="2" y="11" width="5" height="2" rx="1"/></svg>
+            <span class="sidebar-item-text">World Bible</span>
+          </div>
+
+          <div class="sidebar-item">
+            <svg class="sidebar-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><line x1="2" y1="8" x2="14" y2="8"/><circle cx="4" cy="8" r="1.5" fill="currentColor"/><circle cx="9" cy="8" r="1.5" fill="currentColor"/><circle cx="13" cy="8" r="1.5" fill="currentColor"/><line x1="4" y1="5" x2="4" y2="8"/><line x1="9" y1="4" x2="9" y2="8"/><line x1="13" y1="6" x2="13" y2="8"/></svg>
+            <span class="sidebar-item-text">Timeline</span>
+          </div>
+
+          <div class="sidebar-item">
+            <svg class="sidebar-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="2" width="4" height="4" rx="1"/><rect x="10" y="2" width="4" height="4" rx="1"/><rect x="6" y="10" width="4" height="4" rx="1"/><line x1="4" y1="6" x2="8" y2="10"/><line x1="12" y1="6" x2="8" y2="10"/></svg>
+            <span class="sidebar-item-text">Notes</span>
+          </div>
+        </div>
+
+        <!-- Series / issues -->
+        <div class="sidebar-section" style="flex:1; overflow-y:auto;">
+          <div class="sidebar-label">Vol. 1: The Warden</div>
+
+          <div class="sidebar-item" style="padding-left:14px;">
+            <svg class="sidebar-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="2" width="10" height="12" rx="1"/><line x1="5" y1="6" x2="11" y2="6"/><line x1="5" y1="9" x2="9" y2="9"/></svg>
+            <span class="sidebar-item-text">Issue 01</span>
+            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--green-status);">●</span>
+          </div>
+
+          <div class="sidebar-item" style="padding-left:14px;background:var(--accent-subtle);">
+            <svg class="sidebar-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" style="opacity:1;color:var(--accent);"><rect x="3" y="2" width="10" height="12" rx="1"/><line x1="5" y1="6" x2="11" y2="6"/><line x1="5" y1="9" x2="9" y2="9"/></svg>
+            <span class="sidebar-item-text" style="color:var(--text-primary);">Issue 02</span>
+            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--accent);">›</span>
+          </div>
+
+          <!-- Pages for issue 02 -->
+          <div class="page-list">
+            <div class="page-row">
+              <span class="page-num">01</span>
+              <div class="page-status-dot status-complete"></div>
+              <span class="page-label">pg 01</span>
+            </div>
+            <div class="page-row">
+              <span class="page-num">02</span>
+              <div class="page-status-dot status-complete"></div>
+              <span class="page-label">pg 02</span>
+            </div>
+            <div class="page-row">
+              <span class="page-num">03</span>
+              <div class="page-status-dot status-locked"></div>
+              <span class="page-label">pg 03</span>
+            </div>
+            <div class="page-row">
+              <span class="page-num">04</span>
+              <div class="page-status-dot status-review"></div>
+              <span class="page-label">pg 04</span>
+            </div>
+            <div class="page-row">
+              <span class="page-num">05</span>
+              <div class="page-status-dot status-review"></div>
+              <span class="page-label">pg 05</span>
+            </div>
+            <div class="page-row">
+              <span class="page-num">06</span>
+              <div class="page-status-dot status-draft"></div>
+              <span class="page-label">pg 06</span>
+            </div>
+            <div class="page-row active">
+              <span class="page-num" style="color:var(--accent);">07</span>
+              <div class="page-status-dot status-draft"></div>
+              <span class="page-label">pg 07</span>
+            </div>
+            <div class="page-row">
+              <span class="page-num">08</span>
+              <div class="page-status-dot status-draft" style="background:var(--border);"></div>
+              <span class="page-label" style="color:var(--text-muted);">pg 08</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status legend at bottom -->
+        <div style="padding:10px 14px; border-top:1px solid var(--border-subtle);">
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <div class="page-status-dot status-draft" style="width:5px;height:5px;"></div>
+              <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted);">Draft</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <div class="page-status-dot status-review" style="width:5px;height:5px;"></div>
+              <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted);">Review</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <div class="page-status-dot status-locked" style="width:5px;height:5px;"></div>
+              <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted);">Locked</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <div class="page-status-dot status-complete" style="width:5px;height:5px;"></div>
+              <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted);">Done</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Split content -->
+      <div class="content-split">
+
+        <!-- Script pane -->
+        <div class="script-pane">
+          <div class="script-toolbar">
+            <span class="block-type-btn">Panel</span>
+            <span class="block-type-btn">Scene</span>
+            <span class="block-type-btn active-type">Desc</span>
+            <span class="block-type-btn">Dlg</span>
+            <span class="block-type-btn">Caption</span>
+            <span class="block-type-btn">SFX</span>
+            <div class="script-toolbar-sep"></div>
+            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:0.06em;">TAB to cycle</span>
+
+            <div class="status-badge draft" style="margin-left:auto;">Draft</div>
+            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);margin-left:4px;letter-spacing:0.06em;">⌘⇧F focus</span>
+          </div>
+
+          <div class="script-content">
+
+            <!-- Panel 1 -->
+            <div class="block block-panel">
+              <div class="block-panel-inner">
+                <span class="panel-number">PANEL 1</span>
+                <div class="panel-line"></div>
+                <span class="panel-tag">half</span>
+              </div>
+            </div>
+
+            <div class="block block-scene">
+              <span class="scene-text">INT. The Maw — Suspension Level — Night</span>
+            </div>
+
+            <div class="block block-description">
+              <p class="desc-text">A rusted catwalk suspended over absolute darkness. MAREN stands at the railing, not looking down — she already knows what's there. The chains at her wrists are new. Someone brought her here deliberately.</p>
+            </div>
+
+            <!-- Panel 2 -->
+            <div class="block block-panel" style="margin-top:20px;">
+              <div class="block-panel-inner">
+                <span class="panel-number">PANEL 2</span>
+                <div class="panel-line"></div>
+                <span class="panel-tag">1/3</span>
+              </div>
+            </div>
+
+            <div class="block block-scene">
+              <span class="scene-text">CLOSEUP — Maren's face</span>
+            </div>
+
+            <div class="block block-caption">
+              <p class="caption-text">Three years since the Accord. Two since I stopped pretending the Accord meant anything.</p>
+            </div>
+
+            <!-- Panel 3 -->
+            <div class="block block-panel" style="margin-top:20px;">
+              <div class="block-panel-inner">
+                <span class="panel-number">PANEL 3</span>
+                <div class="panel-line"></div>
+                <span class="panel-tag">remainder</span>
+              </div>
+            </div>
+
+            <div class="block block-scene">
+              <span class="scene-text">Wide — reveal of the figure behind Maren</span>
+            </div>
+
+            <div class="block block-description" style="position:relative;">
+              <p class="desc-text">COMMANDER VOSS steps out of the shadows. His uniform is wrong — too clean for this place. He's holding something she doesn't recognize: small, cylindrical, sealed with the Warden's mark.</p>
+              <div class="comment-pip"><div class="comment-pip-dot"></div></div>
+            </div>
+
+            <div class="block block-dialogue">
+              <div class="dialogue-char">Voss</div>
+              <div class="dialogue-text">"I'm not here to arrest you, Maren. I'm here because you're the only person left who knows where Rennick hid the third key."</div>
+            </div>
+
+            <!-- Panel 4 -->
+            <div class="block block-panel" style="margin-top:20px;">
+              <div class="block-panel-inner">
+                <span class="panel-number">PANEL 4</span>
+                <div class="panel-line"></div>
+                <span class="panel-tag">1/3</span>
+              </div>
+            </div>
+
+            <div class="block block-scene">
+              <span class="scene-text">CLOSEUP — the sealed cylinder in Voss's hand</span>
+            </div>
+
+            <div class="block block-description">
+              <p class="desc-text">The Warden's mark catches the faint light. Maren's hands tighten on the railing.</p>
+            </div>
+
+            <div class="block block-sfx">
+              <span class="sfx-text">KRAK</span>
+            </div>
+
+            <div class="block block-dialogue" style="margin-top:8px;">
+              <div class="dialogue-char">Maren</div>
+              <div class="dialogue-text">"Rennick's been dead for six years."<span class="cursor"></span></div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Storyboard pane -->
+        <div class="storyboard-pane">
+          <div class="storyboard-toolbar">
+            <span class="storyboard-title">Storyboard — pg 07</span>
+
+            <!-- Tool buttons -->
+            <div class="tool-btn active" title="Pencil">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M11 2l3 3-9 9H2v-3L11 2z"/><line x1="9" y1="4" x2="12" y2="7"/></svg>
+            </div>
+            <div class="tool-btn" title="Eraser">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2" y="9" width="12" height="5" rx="1"/><path d="M5 9L9 3l5 5-6 1z"/></svg>
+            </div>
+            <div class="tool-btn" title="Grid">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2" y="2" width="5" height="5" rx="0.5"/><rect x="9" y="2" width="5" height="5" rx="0.5"/><rect x="2" y="9" width="5" height="5" rx="0.5"/><rect x="9" y="9" width="5" height="5" rx="0.5"/></svg>
+            </div>
+            <div class="tool-btn" title="Reference image">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2" y="3" width="12" height="10" rx="1"/><circle cx="5.5" cy="6.5" r="1.5"/><path d="M2 11l4-3 3 3 2-2 3 3"/></svg>
+            </div>
+          </div>
+
+          <!-- Color + canvas -->
+          <div class="storyboard-canvas-area">
+
+            <!-- Reference script strip (collapsed) -->
+            <div class="ref-strip">
+              <svg class="ref-strip-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="2" width="10" height="12" rx="1"/><line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="9" y2="8"/></svg>
+            </div>
+
+            <!-- Canvas page -->
+            <div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative;">
+              <div class="canvas-page">
+                <div class="page-grid-overlay"></div>
+
+                <!-- Rough sketch layout SVG -->
+                <svg class="sketch-svg" viewBox="0 0 280 400" fill="none">
+                  <!-- Panel boundaries (rough, slightly imperfect) -->
+                  <!-- Panel 1: top half, rough border -->
+                  <rect x="8" y="8" width="264" height="185" fill="none" stroke="#2a2520" stroke-width="1.5" rx="1"/>
+                  <!-- Panel 2: bottom left third -->
+                  <rect x="8" y="199" width="84" height="97" fill="none" stroke="#2a2520" stroke-width="1.5" rx="1"/>
+                  <!-- Panel 3: bottom right two-thirds -->
+                  <rect x="98" y="199" width="174" height="97" fill="none" stroke="#2a2520" stroke-width="1.5" rx="1"/>
+                  <!-- Panel 4: page bottom strip -->
+                  <rect x="8" y="302" width="264" height="90" fill="none" stroke="#2a2520" stroke-width="1.5" rx="1"/>
+
+                  <!-- Panel 1 rough sketch: catwalk, figure, darkness below -->
+                  <!-- Darkness fill -->
+                  <rect x="8" y="130" width="264" height="63" fill="#e8e0d0" rx="0"/>
+                  <!-- Catwalk horizontal line, rough -->
+                  <path d="M10 128 Q70 126 140 129 Q210 131 270 128" stroke="#3a3028" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.7"/>
+                  <!-- Railing verticals -->
+                  <line x1="30" y1="110" x2="30" y2="128" stroke="#3a3028" stroke-width="1.5" opacity="0.6"/>
+                  <line x1="60" y1="108" x2="60" y2="128" stroke="#3a3028" stroke-width="1.5" opacity="0.6"/>
+                  <line x1="90" y1="109" x2="90" y2="128" stroke="#3a3028" stroke-width="1.5" opacity="0.6"/>
+                  <line x1="120" y1="110" x2="120" y2="128" stroke="#3a3028" stroke-width="1.5" opacity="0.6"/>
+                  <line x1="150" y1="108" x2="150" y2="128" stroke="#3a3028" stroke-width="1.5" opacity="0.6"/>
+                  <line x1="180" y1="110" x2="180" y2="128" stroke="#3a3028" stroke-width="1.5" opacity="0.6"/>
+                  <line x1="210" y1="109" x2="210" y2="128" stroke="#3a3028" stroke-width="1.5" opacity="0.6"/>
+                  <line x1="240" y1="110" x2="240" y2="128" stroke="#3a3028" stroke-width="1.5" opacity="0.6"/>
+                  <!-- Railing top rail -->
+                  <path d="M10 110 Q70 107 140 110 Q210 113 270 110" stroke="#3a3028" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.55"/>
+
+                  <!-- Figure: Maren at railing - rough sketch form -->
+                  <!-- Head -->
+                  <ellipse cx="100" cy="62" rx="9" ry="10" stroke="#2a2520" stroke-width="1.5" fill="#e8e3d5" opacity="0.9"/>
+                  <!-- Body -->
+                  <path d="M94 72 Q92 95 90 120 Q95 125 100 126 Q106 125 110 120 Q108 95 106 72" stroke="#2a2520" stroke-width="1.5" fill="none" opacity="0.8"/>
+                  <!-- Arms at railing -->
+                  <path d="M90 85 Q70 100 52 110" stroke="#2a2520" stroke-width="1.5" fill="none" opacity="0.7"/>
+                  <path d="M110 85 Q130 100 148 110" stroke="#2a2520" stroke-width="1.5" fill="none" opacity="0.7"/>
+                  <!-- Chains (rough lines at wrists) -->
+                  <path d="M52 110 Q48 115 44 118" stroke="#2a2520" stroke-width="1" stroke-dasharray="2,1" opacity="0.5"/>
+                  <path d="M148 110 Q152 115 156 118" stroke="#2a2520" stroke-width="1" stroke-dasharray="2,1" opacity="0.5"/>
+
+                  <!-- Background figure: Voss in shadows -->
+                  <!-- Rough, darker silhouette -->
+                  <ellipse cx="195" cy="58" rx="8" ry="9" stroke="#4a4038" stroke-width="1.5" fill="#d8d0c0" opacity="0.7"/>
+                  <path d="M188 67 Q186 92 184 118 Q190 122 195 123 Q200 122 206 118 Q204 92 202 67" stroke="#4a4038" stroke-width="1.5" fill="none" opacity="0.6"/>
+
+                  <!-- Darkness hatching below catwalk -->
+                  <line x1="20" y1="140" x2="260" y2="155" stroke="#6a6058" stroke-width="0.5" opacity="0.3"/>
+                  <line x1="20" y1="148" x2="260" y2="163" stroke="#6a6058" stroke-width="0.5" opacity="0.3"/>
+                  <line x1="20" y1="156" x2="260" y2="171" stroke="#6a6058" stroke-width="0.5" opacity="0.25"/>
+                  <line x1="20" y1="164" x2="260" y2="179" stroke="#6a6058" stroke-width="0.5" opacity="0.2"/>
+
+                  <!-- Panel 2: Maren closeup - rough oval face shape -->
+                  <ellipse cx="50" cy="248" rx="22" ry="26" stroke="#2a2520" stroke-width="1.5" fill="#e8e3d5" opacity="0.9"/>
+                  <!-- Eye -->
+                  <ellipse cx="44" cy="244" rx="4" ry="3" stroke="#2a2520" stroke-width="1" fill="none" opacity="0.7"/>
+                  <ellipse cx="57" cy="244" rx="4" ry="3" stroke="#2a2520" stroke-width="1" fill="none" opacity="0.7"/>
+                  <!-- Rough expression lines -->
+                  <path d="M46 254 Q50 257 55 254" stroke="#2a2520" stroke-width="1" fill="none" opacity="0.5"/>
+                  <!-- Hair rough -->
+                  <path d="M28 235 Q40 220 50 218 Q60 220 72 235" stroke="#3a3028" stroke-width="2" fill="none" opacity="0.5"/>
+
+                  <!-- Panel 3: Wide shot reveal -->
+                  <!-- Rough environment lines -->
+                  <line x1="100" y1="210" x2="270" y2="225" stroke="#5a5248" stroke-width="0.8" opacity="0.3"/>
+                  <line x1="100" y1="218" x2="270" y2="230" stroke="#5a5248" stroke-width="0.8" opacity="0.25"/>
+                  <!-- Figure in shadows -->
+                  <path d="M220 210 Q218 240 215 292" stroke="#3a3028" stroke-width="1" fill="none" opacity="0.5"/>
+                  <ellipse cx="222" cy="207" rx="8" ry="9" stroke="#2a2520" stroke-width="1.2" fill="#d8d0c0" opacity="0.7"/>
+                  <!-- Small cylinder object in hand -->
+                  <rect x="208" y="250" width="10" height="22" rx="3" stroke="#2a2520" stroke-width="1" fill="#d0c8b8" opacity="0.8"/>
+                  <!-- Red annotation circle around it -->
+                  <circle cx="213" cy="261" r="14" stroke="#c96e6e" stroke-width="1" stroke-dasharray="3,2" fill="none" opacity="0.6"/>
+
+                  <!-- Panel 4: Closeup of cylinder -->
+                  <!-- Close detail sketch of cylinder -->
+                  <rect x="95" y="315" width="90" height="55" rx="8" stroke="#2a2520" stroke-width="1.5" fill="#d8d0c0" opacity="0.7"/>
+                  <!-- Warden's mark - rough star/seal shape -->
+                  <path d="M140 330 L144 342 L156 342 L146 350 L150 362 L140 354 L130 362 L134 350 L124 342 L136 342Z" stroke="#2a2520" stroke-width="1" fill="none" opacity="0.6"/>
+                  <!-- Light catch -->
+                  <path d="M100 320 Q110 316 125 319" stroke="#c9b090" stroke-width="1" opacity="0.4"/>
+
+                  <!-- Page number -->
+                  <text x="260" y="395" font-family="monospace" font-size="7" fill="#8a857a" opacity="0.6" text-anchor="end">07</text>
+                </svg>
+              </div>
+
+              <div class="canvas-page-label">Page 07 of Issue 02</div>
+
+              <!-- Color selector -->
+              <div class="color-selector">
+                <div class="color-dot active" style="background:#2a2520;"></div>
+                <div class="color-dot" style="background:#5a5248;"></div>
+                <div class="color-dot" style="background:#c96e6e;"></div>
+              </div>
+
+              <!-- Weight slider -->
+              <div class="weight-slider">
+                <div class="weight-track">
+                  <div class="weight-thumb"></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Page strip -->
+          <div class="page-strip">
+            <div class="strip-thumb">
+              <svg class="strip-thumb-sketch" viewBox="0 0 44 56"><rect x="2" y="2" width="40" height="52" fill="#d8d0c0" rx="1"/><rect x="4" y="4" width="38" height="24" fill="none" stroke="#3a3028" stroke-width="0.8"/><rect x="4" y="30" width="18" height="24" fill="none" stroke="#3a3028" stroke-width="0.8"/><rect x="24" y="30" width="18" height="24" fill="none" stroke="#3a3028" stroke-width="0.8"/></svg>
+              <span class="strip-thumb-num">05</span>
+              <div style="position:absolute;top:2px;left:2px;width:5px;height:5px;border-radius:50%;background:#c9a96e;"></div>
+            </div>
+            <div class="strip-thumb">
+              <svg class="strip-thumb-sketch" viewBox="0 0 44 56"><rect x="2" y="2" width="40" height="52" fill="#d8d0c0" rx="1"/><rect x="4" y="4" width="40" height="50" fill="none" stroke="#3a3028" stroke-width="0.8"/><ellipse cx="22" cy="24" rx="10" ry="12" fill="none" stroke="#3a3028" stroke-width="0.8"/></svg>
+              <span class="strip-thumb-num">06</span>
+            </div>
+            <div class="strip-thumb active">
+              <svg class="strip-thumb-sketch" viewBox="0 0 44 56"><rect x="2" y="2" width="40" height="52" fill="#d8d0c0" rx="1"/><rect x="4" y="4" width="38" height="28" fill="none" stroke="#3a3028" stroke-width="0.8"/><rect x="4" y="34" width="13" height="20" fill="none" stroke="#3a3028" stroke-width="0.8"/><rect x="19" y="34" width="27" height="20" fill="none" stroke="#3a3028" stroke-width="0.8"/></svg>
+              <span class="strip-thumb-num" style="color:var(--accent);">07</span>
+            </div>
+            <div class="strip-thumb">
+              <svg class="strip-thumb-sketch" viewBox="0 0 44 56"><rect x="2" y="2" width="40" height="52" fill="#e8e4dc" rx="1" opacity="0.5"/></svg>
+              <span class="strip-thumb-num">08</span>
+            </div>
+            <div class="strip-thumb">
+              <svg class="strip-thumb-sketch" viewBox="0 0 44 56"><rect x="2" y="2" width="40" height="52" fill="#e8e4dc" rx="1" opacity="0.3"/></svg>
+              <span class="strip-thumb-num">09</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- end content-split -->
+    </div><!-- end main -->
+
+  </div><!-- end ipad-screen -->
+</div><!-- end ipad-frame -->
+
+</body>
+</html>

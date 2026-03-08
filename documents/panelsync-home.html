@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1400, initial-scale=1">
+<title>PanelSync — Home Screen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Geist+Mono:wght@300;400;500&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: #0a0a09;
+  font-family: 'Geist', sans-serif;
+  padding: 48px;
+  min-width: 1400px;
+}
+
+/* ── PAGE CHROME ── */
+.page-header { margin-bottom: 36px; }
+.page-header h1 { font-family:'Lora',serif; font-size:18px; font-weight:500; color:#c8a768; margin-bottom:4px; }
+.page-header p { font-family:'Geist Mono',monospace; font-size:10px; color:#333; letter-spacing:0.08em; }
+
+.mockup-row { display:flex; gap:32px; align-items:flex-start; margin-bottom:48px; }
+.col-label { font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:#333; margin-bottom:10px; }
+
+/* ── TOKENS ── */
+.dk {
+  --bg:       #111110;
+  --bg-s:     #181715;
+  --bg-p:     #1e1d1a;
+  --bg-up:    #242320;
+  --bg-h:     #2a2826;
+  --bg-act:   #201e12;
+  --bd-h:     #353228;
+  --bd:       #2a2724;
+  --bd-s:     #1e1c18;
+  --tx:       #e0dbd0;
+  --tx2:      #847e74;
+  --tx3:      #44413a;
+  --tx4:      #28261f;
+  --acc:      #c8a768;
+  --acc2:     #745e38;
+  --acc3:     #1c1810;
+  --sd:       #5a9066;
+  --sr:       #c8a768;
+  --sl:       #6080bc;
+  --sdft:     #44413a;
+  --shadow:   0 20px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.04);
+}
+.lt {
+  --bg:       #f4f1ec;
+  --bg-s:     #ebe8e1;
+  --bg-p:     #e3e0d8;
+  --bg-up:    #fdfcf9;
+  --bg-h:     #e7e3db;
+  --bg-act:   #f3ecda;
+  --bd-h:     #c4bfb3;
+  --bd:       #d6d1c6;
+  --bd-s:     #e4e0d8;
+  --tx:       #1c1a16;
+  --tx2:      #58544e;
+  --tx3:      #9e9890;
+  --tx4:      #cac5bc;
+  --acc:      #9a7030;
+  --acc2:     #c09050;
+  --acc3:     #f8f0e0;
+  --sd:       #367044;
+  --sr:       #9a7030;
+  --sl:       #385e9c;
+  --sdft:     #9a9690;
+  --shadow:   0 20px 60px rgba(0,0,0,0.10), 0 0 0 1px rgba(0,0,0,0.05);
+}
+
+/* ── iPAD FRAME ── */
+.ipad {
+  border-radius:18px;
+  overflow:hidden;
+  box-shadow: var(--shadow);
+  display:flex;
+  flex-direction:column;
+  background: var(--bg);
+  width: 834px;
+  height: 1112px; /* iPad portrait */
+  flex-shrink: 0;
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  height: 44px;
+  background: var(--bg-s);
+  border-bottom: 1px solid var(--bd);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  flex-shrink: 0;
+  gap: 0;
+}
+.wordmark {
+  font-family: 'Lora', serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--acc);
+  letter-spacing: 0.01em;
+  flex: 1;
+}
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.av {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Geist Mono', monospace;
+  font-size: 9px; font-weight: 500;
+}
+.av-b { background: #3a5a8a; color: #9cc0f0; }
+.tb-btn {
+  height: 26px; padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--bd-h);
+  background: transparent;
+  font-family: 'Geist Mono', monospace;
+  font-size: 9px; letter-spacing: 0.05em;
+  color: var(--tx2);
+  display: flex; align-items: center; gap: 5px;
+}
+.tb-search {
+  height: 26px; width: 160px;
+  border-radius: 13px;
+  border: 1px solid var(--bd);
+  background: var(--bg-p);
+  display: flex; align-items: center;
+  padding: 0 10px; gap: 6px;
+}
+.tb-search-icon { color: var(--tx3); }
+.tb-search-text {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px; color: var(--tx3);
+  letter-spacing: 0.04em;
+}
+
+/* ── HOME SCROLL BODY ── */
+.home-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 24px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  scrollbar-width: none;
+}
+
+/* ── GREETING ── */
+.greeting {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.greeting-text {
+  font-family: 'Lora', serif;
+  font-size: 22px;
+  font-weight: 500;
+  font-style: italic;
+  color: var(--tx);
+  letter-spacing: 0.01em;
+}
+.greeting-time {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  color: var(--tx3);
+  letter-spacing: 0.08em;
+}
+
+/* ── SECTION HEADERS ── */
+.section-hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.section-hd-label {
+  font-family: 'Geist Mono', monospace;
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--tx3);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.section-hd-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--bd-s);
+}
+
+/* ── ① RESUME CARDS ── */
+.resume-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.resume-card {
+  background: var(--bg-s);
+  border: 1px solid var(--bd);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.12s;
+}
+.resume-card:hover { background: var(--bg-h); }
+
+.resume-card.primary {
+  background: var(--bg-act);
+  border-color: var(--acc2);
+  padding: 18px 18px;
+}
+
+/* thumbnail sketch */
+.resume-thumb {
+  width: 44px;
+  height: 56px;
+  border-radius: 4px;
+  background: #f4f0e8;
+  flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.lt .resume-thumb { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+.resume-card.primary .resume-thumb {
+  width: 54px;
+  height: 68px;
+}
+
+.resume-info { flex: 1; min-width: 0; }
+.resume-universe {
+  font-family: 'Geist Mono', monospace;
+  font-size: 9px;
+  color: var(--tx3);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+.resume-card.primary .resume-universe { color: var(--acc2); }
+
+.resume-title {
+  font-family: 'Lora', serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tx);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.resume-card.primary .resume-title { font-size: 15px; }
+
+.resume-meta {
+  font-family: 'Geist Mono', monospace;
+  font-size: 9px;
+  color: var(--tx3);
+  letter-spacing: 0.04em;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.resume-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pip { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+.p-sd { background: var(--sd); }
+.p-sr { background: var(--sr); }
+.p-sdft { background: var(--sdft); }
+
+.resume-arrow {
+  color: var(--tx3);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.resume-card.primary .resume-arrow { color: var(--acc2); }
+
+/* Continue badge on primary */
+.continue-badge {
+  position: absolute;
+  top: -8px; right: 14px;
+  background: var(--acc);
+  color: var(--bg);
+  font-family: 'Geist Mono', monospace;
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.lt .continue-badge { color: #fff; }
+
+/* time ago label */
+.time-ago {
+  font-family: 'Geist Mono', monospace;
+  font-size: 9px;
+  color: var(--tx3);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+/* ── ② ACTIVITY FEED ── */
+.activity-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--bd-s);
+  cursor: pointer;
+}
+.activity-item:last-child { border-bottom: none; }
+.activity-item:hover .act-title { color: var(--tx); }
+
+.act-icon {
+  width: 28px; height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--bd);
+  background: var(--bg-p);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.act-icon svg { width: 13px; height: 13px; color: var(--tx3); }
+
+.act-body { flex: 1; min-width: 0; }
+.act-title {
+  font-family: 'Geist', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--tx2);
+  line-height: 1.4;
+  margin-bottom: 2px;
+}
+.act-title b { color: var(--tx); font-weight: 500; }
+.act-meta {
+  font-family: 'Geist Mono', monospace;
+  font-size: 9px;
+  color: var(--tx3);
+  letter-spacing: 0.04em;
+  display: flex;
+  gap: 8px;
+}
+.act-time { flex-shrink: 0; color: var(--tx3); font-family:'Geist Mono',monospace; font-size:9px; letter-spacing:0.04em; padding-top:2px; }
+
+/* comment bubble accent */
+.act-comment { border-left: 2px solid var(--acc2); padding-left: 10px; margin-top: 4px; }
+.act-comment-text {
+  font-family: 'Lora', serif;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--tx3);
+  line-height: 1.5;
+}
+
+/* ── ③ UNIVERSES SHELF ── */
+.universes-shelf {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Universe card stack */
+.u-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+
+.u-main-card {
+  width: 100%;
+  background: var(--bg-s);
+  border: 1px solid var(--bd-h);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  position: relative;
+  z-index: 3;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+}
+.lt .u-main-card { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+
+.u-sub-card {
+  width: calc(100% - 12px);
+  height: 8px;
+  background: var(--bg-p);
+  border: 1px solid var(--bd);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  position: relative;
+  z-index: 2;
+  margin-top: -2px;
+}
+.u-sub-card2 {
+  width: calc(100% - 24px);
+  height: 6px;
+  background: var(--bg-up);
+  border: 1px solid var(--bd-s);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  position: relative;
+  z-index: 1;
+  margin-top: -2px;
+  opacity: 0.5;
+}
+
+.u-cover {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Lora', serif;
+  font-size: 16px; font-style: italic;
+  flex-shrink: 0;
+  border: 1px solid var(--bd);
+}
+
+.u-info { flex: 1; }
+.u-name {
+  font-family: 'Lora', serif;
+  font-size: 13px; font-weight: 500;
+  color: var(--tx);
+  margin-bottom: 2px;
+}
+.u-meta {
+  font-family: 'Geist Mono', monospace;
+  font-size: 9px; color: var(--tx3);
+  letter-spacing: 0.04em;
+  display: flex; gap: 10px;
+}
+
+.u-chevron {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px; color: var(--tx3);
+}
+
+/* new universe button */
+.new-universe-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1.5px dashed var(--bd-h);
+  border-radius: 10px;
+  cursor: pointer;
+  background: transparent;
+  margin-top: 4px;
+}
+.new-universe-btn:hover { background: var(--bg-h); }
+.new-icon {
+  width: 28px; height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--bd-h);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; color: var(--tx3);
+}
+.new-label {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px; color: var(--tx3);
+  letter-spacing: 0.06em;
+}
+
+/* long-press revealed state annotation */
+.longpress-state {
+  width: 100%;
+  background: var(--bg-s);
+  border: 1px solid var(--acc2);
+  border-radius: 10px;
+  padding: 14px 16px 0;
+  position: relative;
+  z-index: 3;
+  margin-bottom: 0;
+}
+.lp-card-top {
+  display: flex; align-items: center; gap: 14px;
+  padding-bottom: 14px;
+}
+.lp-subcards {
+  display: flex; gap: 8px;
+  padding: 10px 0 14px;
+  border-top: 1px solid var(--bd-s);
+}
+.lp-subcard {
+  flex: 1;
+  background: var(--bg-p);
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  padding: 10px 8px;
+  text-align: center;
+  cursor: pointer;
+}
+.lp-subcard.hi {
+  background: var(--bg-act);
+  border-color: var(--acc2);
+}
+.lp-sc-icon { font-size: 18px; margin-bottom: 4px; }
+.lp-sc-lbl {
+  font-family: 'Geist Mono', monospace;
+  font-size: 8px; color: var(--tx3);
+  letter-spacing: 0.04em; line-height: 1.45;
+}
+.lp-subcard.hi .lp-sc-lbl { color: var(--acc); }
+.lp-hint {
+  font-family: 'Geist Mono', monospace;
+  font-size: 8px; color: var(--tx3);
+  letter-spacing: 0.06em;
+  text-align: center;
+  padding-bottom: 8px;
+}
+
+/* tooltip */
+.tooltip-bubble {
+  background: var(--bg-act);
+  border: 1px solid var(--acc2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 8px;
+  position: relative;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.tooltip-bubble::before {
+  content: '';
+  position: absolute;
+  top: -6px; left: 24px;
+  width: 0; height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid var(--acc2);
+}
+.tt-title {
+  font-family: 'Geist Mono', monospace;
+  font-size: 9px; color: var(--acc);
+  letter-spacing: 0.07em; text-transform: uppercase;
+}
+.tt-body {
+  font-family: 'Geist', sans-serif;
+  font-size: 11px; color: var(--tx2);
+  line-height: 1.55;
+}
+.tt-dismiss {
+  font-family: 'Geist Mono', monospace;
+  font-size: 8px; color: var(--tx3);
+  letter-spacing: 0.06em;
+  margin-top: 4px;
+  text-align: right;
+}
+
+/* sketch SVGs */
+svg.sketch { position:absolute; top:0; left:0; }
+
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>PanelSync — Home Screen</h1>
+  <p>COSMIX UNIVERSE · DARK + LIGHT · NORMAL STATE + LONG-PRESS STATE</p>
+</div>
+
+<div class="mockup-row">
+
+  <!-- ══ DARK — NORMAL STATE ══ -->
+  <div>
+    <div class="col-label">Dark — normal state</div>
+    <div class="ipad dk">
+
+      <!-- top bar -->
+      <div class="topbar">
+        <div class="wordmark">PanelSync</div>
+        <div class="topbar-right">
+          <div class="tb-search">
+            <svg class="tb-search-icon" width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="4"/><line x1="9.5" y1="9.5" x2="13" y2="13"/></svg>
+            <span class="tb-search-text">Search everything…</span>
+          </div>
+          <div class="av av-b">MB</div>
+        </div>
+      </div>
+
+      <!-- body -->
+      <div class="home-body">
+
+        <!-- greeting -->
+        <div class="greeting">
+          <span class="greeting-text">Good evening, Maya.</span>
+          <span class="greeting-time">THU · 9:14 PM</span>
+        </div>
+
+        <!-- ① RESUME -->
+        <div>
+          <div class="section-hd">
+            <span class="section-hd-label">① Resume</span>
+            <div class="section-hd-rule"></div>
+          </div>
+
+          <div class="resume-grid">
+
+            <!-- Primary card — most recent -->
+            <div class="resume-card primary">
+              <div class="continue-badge">Continue</div>
+              <div class="resume-thumb">
+                <svg width="44" height="56" viewBox="0 0 44 56" fill="none">
+                  <rect width="44" height="56" fill="#f4f0e8"/>
+                  <rect x="3" y="3" width="38" height="28" stroke="#2a2520" stroke-width="1" rx="0.5"/>
+                  <rect x="3" y="33" width="17" height="20" stroke="#2a2520" stroke-width="1" rx="0.5"/>
+                  <rect x="22" y="33" width="19" height="20" stroke="#2a2520" stroke-width="1" rx="0.5"/>
+                  <ellipse cx="14" cy="14" rx="4" ry="5" stroke="#3a3028" stroke-width="0.8" fill="#ede8d8"/>
+                  <path d="M10 19 Q9 28 9 31 Q12 32 14 32 Q16 32 19 31 Q19 28 18 19" stroke="#3a3028" stroke-width="0.8" fill="none"/>
+                  <ellipse cx="10" cy="23" rx="4.5" ry="6" stroke="#3a3028" stroke-width="0.9" fill="#d8d0c0"/>
+                </svg>
+              </div>
+              <div class="resume-info">
+                <div class="resume-universe">Cosmix Universe · The Adequates</div>
+                <div class="resume-title">Issue 02 — Page 04: Confrontation</div>
+                <div class="resume-meta">
+                  <div class="resume-status"><div class="pip p-sdft"></div>Draft</div>
+                  <span>·</span>
+                  <span>Panel 3 of 4</span>
+                </div>
+              </div>
+              <div class="time-ago">2h ago</div>
+              <div class="resume-arrow">›</div>
+            </div>
+
+            <!-- Secondary cards -->
+            <div class="resume-card">
+              <div class="resume-thumb">
+                <svg width="44" height="56" viewBox="0 0 44 56" fill="none">
+                  <rect width="44" height="56" fill="#f4f0e8"/>
+                  <rect x="3" y="3" width="38" height="50" stroke="#2a2520" stroke-width="1" rx="0.5"/>
+                  <ellipse cx="22" cy="22" rx="9" ry="11" stroke="#3a3028" stroke-width="0.9" fill="#ede8d8"/>
+                  <path d="M18 18 Q22 13 26 18" stroke="#3a3028" stroke-width="0.8" fill="none"/>
+                </svg>
+              </div>
+              <div class="resume-info">
+                <div class="resume-universe">Cosmix Universe · Baron Nullify</div>
+                <div class="resume-title">Issue 01 — Page 08: The Kiln</div>
+                <div class="resume-meta">
+                  <div class="resume-status"><div class="pip p-sr"></div>Review</div>
+                  <span>·</span>
+                  <span>Stacy left a comment</span>
+                </div>
+              </div>
+              <div class="time-ago">Yesterday</div>
+              <div class="resume-arrow">›</div>
+            </div>
+
+            <div class="resume-card">
+              <div class="resume-thumb" style="background:#f4f0e8;display:flex;align-items:center;justify-content:center;">
+                <svg width="44" height="56" viewBox="0 0 44 56" fill="none">
+                  <rect width="44" height="56" fill="#f4f0e8"/>
+                  <line x1="2" y1="28" x2="42" y2="28" stroke="#2a2520" stroke-width="0.7"/>
+                  <circle cx="8" cy="28" r="2.5" fill="#c8a768" opacity="0.6"/>
+                  <circle cx="22" cy="28" r="2.5" fill="#c8a768" opacity="0.6"/>
+                  <circle cx="36" cy="28" r="2.5" fill="#c8a768" opacity="0.6"/>
+                  <line x1="8" y1="22" x2="8" y2="28" stroke="#c8a768" stroke-width="0.7" opacity="0.5"/>
+                  <line x1="22" y1="18" x2="22" y2="28" stroke="#c8a768" stroke-width="0.7" opacity="0.5"/>
+                  <line x1="36" y1="24" x2="36" y2="28" stroke="#c8a768" stroke-width="0.7" opacity="0.5"/>
+                </svg>
+              </div>
+              <div class="resume-info">
+                <div class="resume-universe">Cosmix Universe · Story Timeline</div>
+                <div class="resume-title">Year 3 — The Nullify Accord events</div>
+                <div class="resume-meta">
+                  <span>3 new events tagged</span>
+                </div>
+              </div>
+              <div class="time-ago">3 days ago</div>
+              <div class="resume-arrow">›</div>
+            </div>
+
+            <div class="resume-card" style="opacity:0.6;">
+              <div class="resume-thumb">
+                <svg width="44" height="56" viewBox="0 0 44 56" fill="none">
+                  <rect width="44" height="56" fill="#f4f0e8"/>
+                  <rect x="3" y="3" width="38" height="50" stroke="#2a2520" stroke-width="0.8" rx="0.5" opacity="0.4"/>
+                </svg>
+              </div>
+              <div class="resume-info">
+                <div class="resume-universe">Cosmix Universe · World Bible</div>
+                <div class="resume-title">Baron Nullify — Character profile</div>
+                <div class="resume-meta">
+                  <span>Knowledge gaps updated</span>
+                </div>
+              </div>
+              <div class="time-ago">1 week ago</div>
+              <div class="resume-arrow">›</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ② ACTIVITY -->
+        <div>
+          <div class="section-hd">
+            <span class="section-hd-label">② Activity</span>
+            <div class="section-hd-rule"></div>
+            <span style="font-family:'Geist Mono',monospace;font-size:9px;color:var(--tx3);letter-spacing:0.06em;">since last session</span>
+          </div>
+
+          <div class="activity-feed">
+
+            <div class="activity-item">
+              <div class="act-icon">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 12V4a1 1 0 011-1h10a1 1 0 011 1v6a1 1 0 01-1 1H5l-3 2z"/></svg>
+              </div>
+              <div class="act-body">
+                <div class="act-title"><b>Stacy</b> left a comment on Issue 02 · Page 03</div>
+                <div class="act-comment">
+                  <div class="act-comment-text">"The rooftop panel feels rushed — can we add more space before the reveal?"</div>
+                </div>
+                <div class="act-meta"><span>The Adequates · Issue 02</span></div>
+              </div>
+              <div class="act-time">1h ago</div>
+            </div>
+
+            <div class="activity-item">
+              <div class="act-icon">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="5"/><path d="M8 5v3l2 2"/></svg>
+              </div>
+              <div class="act-body">
+                <div class="act-title"><b>You</b> marked Issue 01 as complete</div>
+                <div class="act-meta"><span>Baron Nullify · Issue 01</span><span>22 pages</span></div>
+              </div>
+              <div class="act-time">Yesterday</div>
+            </div>
+
+            <div class="activity-item">
+              <div class="act-icon">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 12V4a1 1 0 011-1h10a1 1 0 011 1v6a1 1 0 01-1 1H5l-3 2z"/></svg>
+              </div>
+              <div class="act-body">
+                <div class="act-title"><b>Stacy</b> resolved 3 comments on Issue 01</div>
+                <div class="act-meta"><span>The Adequates · Issue 01</span></div>
+              </div>
+              <div class="act-time">2 days ago</div>
+            </div>
+
+            <div class="activity-item" style="opacity:0.5;">
+              <div class="act-icon">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2" y="3" width="12" height="10" rx="1"/><line x1="5" y1="7" x2="11" y2="7"/><line x1="5" y1="10" x2="8" y2="10"/></svg>
+              </div>
+              <div class="act-body">
+                <div class="act-title"><b>You</b> locked Page 06 · Issue 01</div>
+                <div class="act-meta"><span>The Adequates</span></div>
+              </div>
+              <div class="act-time">5 days ago</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ③ UNIVERSES SHELF -->
+        <div>
+          <div class="section-hd">
+            <span class="section-hd-label">③ Universes</span>
+            <div class="section-hd-rule"></div>
+          </div>
+
+          <div class="universes-shelf">
+
+            <!-- Cosmix Universe stack -->
+            <div class="u-stack">
+              <div class="u-main-card">
+                <div class="u-cover" style="background:linear-gradient(135deg,#1e2d40,#14202e);">
+                  <span style="color:rgba(200,167,104,0.8);font-size:15px;">C</span>
+                </div>
+                <div class="u-info">
+                  <div class="u-name">Cosmix Universe</div>
+                  <div class="u-meta">
+                    <span>2 series</span>
+                    <span>·</span>
+                    <span>2 collaborators</span>
+                    <span>·</span>
+                    <span>Active now</span>
+                  </div>
+                </div>
+                <div class="u-chevron">⋯</div>
+              </div>
+              <div class="u-sub-card"></div>
+              <div class="u-sub-card2"></div>
+            </div>
+
+            <!-- New universe -->
+            <div class="new-universe-btn">
+              <div class="new-icon">+</div>
+              <span class="new-label">New Universe</span>
+            </div>
+
+          </div>
+        </div>
+
+      </div><!-- /home-body -->
+    </div><!-- /ipad dark -->
+  </div>
+
+  <!-- ══ LIGHT — NORMAL STATE ══ -->
+  <div>
+    <div class="col-label">Light — normal state</div>
+    <div class="ipad lt">
+      <div class="topbar">
+        <div class="wordmark">PanelSync</div>
+        <div class="topbar-right">
+          <div class="tb-search">
+            <svg class="tb-search-icon" width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="4"/><line x1="9.5" y1="9.5" x2="13" y2="13"/></svg>
+            <span class="tb-search-text">Search everything…</span>
+          </div>
+          <div class="av av-b">MB</div>
+        </div>
+      </div>
+      <div class="home-body">
+        <div class="greeting">
+          <span class="greeting-text">Good evening, Maya.</span>
+          <span class="greeting-time">THU · 9:14 PM</span>
+        </div>
+
+        <!-- ① RESUME -->
+        <div>
+          <div class="section-hd"><span class="section-hd-label">① Resume</span><div class="section-hd-rule"></div></div>
+          <div class="resume-grid">
+            <div class="resume-card primary">
+              <div class="continue-badge">Continue</div>
+              <div class="resume-thumb">
+                <svg width="54" height="68" viewBox="0 0 54 68" fill="none">
+                  <rect width="54" height="68" fill="#f4f0e8"/>
+                  <rect x="3" y="3" width="48" height="34" stroke="#2a2520" stroke-width="1" rx="0.5"/>
+                  <rect x="3" y="39" width="22" height="26" stroke="#2a2520" stroke-width="1" rx="0.5"/>
+                  <rect x="27" y="39" width="24" height="26" stroke="#2a2520" stroke-width="1" rx="0.5"/>
+                  <ellipse cx="18" cy="16" rx="5" ry="6" stroke="#3a3028" stroke-width="0.9" fill="#ede8d8"/>
+                  <path d="M13 22 Q11 32 11 37 Q15 39 18 39 Q21 39 25 37 Q25 32 23 22" stroke="#3a3028" stroke-width="0.9" fill="none"/>
+                  <ellipse cx="12" cy="28" rx="5.5" ry="7" stroke="#3a3028" stroke-width="1" fill="#d8d0c0"/>
+                </svg>
+              </div>
+              <div class="resume-info">
+                <div class="resume-universe">Cosmix Universe · The Adequates</div>
+                <div class="resume-title">Issue 02 — Page 04: Confrontation</div>
+                <div class="resume-meta">
+                  <div class="resume-status"><div class="pip p-sdft"></div>Draft</div>
+                  <span>·</span><span>Panel 3 of 4</span>
+                </div>
+              </div>
+              <div class="time-ago">2h ago</div>
+              <div class="resume-arrow">›</div>
+            </div>
+            <div class="resume-card">
+              <div class="resume-thumb">
+                <svg width="44" height="56" viewBox="0 0 44 56" fill="none"><rect width="44" height="56" fill="#f4f0e8"/><rect x="3" y="3" width="38" height="50" stroke="#2a2520" stroke-width="1" rx="0.5"/><ellipse cx="22" cy="22" rx="9" ry="11" stroke="#3a3028" stroke-width="0.9" fill="#ede8d8"/></svg>
+              </div>
+              <div class="resume-info">
+                <div class="resume-universe">Cosmix Universe · Baron Nullify</div>
+                <div class="resume-title">Issue 01 — Page 08: The Kiln</div>
+                <div class="resume-meta"><div class="resume-status"><div class="pip p-sr"></div>Review</div><span>·</span><span>Stacy left a comment</span></div>
+              </div>
+              <div class="time-ago">Yesterday</div>
+              <div class="resume-arrow">›</div>
+            </div>
+            <div class="resume-card">
+              <div class="resume-thumb" style="background:#f4f0e8;">
+                <svg width="44" height="56" viewBox="0 0 44 56" fill="none"><rect width="44" height="56" fill="#f4f0e8"/><line x1="2" y1="28" x2="42" y2="28" stroke="#2a2520" stroke-width="0.7"/><circle cx="8" cy="28" r="2.5" fill="#9a7030" opacity="0.6"/><circle cx="22" cy="28" r="2.5" fill="#9a7030" opacity="0.6"/><circle cx="36" cy="28" r="2.5" fill="#9a7030" opacity="0.6"/><line x1="8" y1="22" x2="8" y2="28" stroke="#9a7030" stroke-width="0.7" opacity="0.5"/><line x1="22" y1="18" x2="22" y2="28" stroke="#9a7030" stroke-width="0.7" opacity="0.5"/></svg>
+              </div>
+              <div class="resume-info">
+                <div class="resume-universe">Cosmix Universe · Story Timeline</div>
+                <div class="resume-title">Year 3 — The Nullify Accord events</div>
+                <div class="resume-meta"><span>3 new events tagged</span></div>
+              </div>
+              <div class="time-ago">3 days ago</div>
+              <div class="resume-arrow">›</div>
+            </div>
+            <div class="resume-card" style="opacity:0.55;">
+              <div class="resume-thumb"><svg width="44" height="56" viewBox="0 0 44 56" fill="none"><rect width="44" height="56" fill="#f4f0e8"/><rect x="3" y="3" width="38" height="50" stroke="#2a2520" stroke-width="0.8" rx="0.5" opacity="0.4"/></svg></div>
+              <div class="resume-info">
+                <div class="resume-universe">Cosmix Universe · World Bible</div>
+                <div class="resume-title">Baron Nullify — Character profile</div>
+                <div class="resume-meta"><span>Knowledge gaps updated</span></div>
+              </div>
+              <div class="time-ago">1 week ago</div>
+              <div class="resume-arrow">›</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ② ACTIVITY -->
+        <div>
+          <div class="section-hd"><span class="section-hd-label">② Activity</span><div class="section-hd-rule"></div><span style="font-family:'Geist Mono',monospace;font-size:9px;color:var(--tx3);letter-spacing:0.06em;">since last session</span></div>
+          <div class="activity-feed">
+            <div class="activity-item">
+              <div class="act-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 12V4a1 1 0 011-1h10a1 1 0 011 1v6a1 1 0 01-1 1H5l-3 2z"/></svg></div>
+              <div class="act-body">
+                <div class="act-title"><b>Stacy</b> left a comment on Issue 02 · Page 03</div>
+                <div class="act-comment"><div class="act-comment-text">"The rooftop panel feels rushed — can we add more space before the reveal?"</div></div>
+                <div class="act-meta"><span>The Adequates · Issue 02</span></div>
+              </div>
+              <div class="act-time">1h ago</div>
+            </div>
+            <div class="activity-item">
+              <div class="act-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="5"/><path d="M8 5v3l2 2"/></svg></div>
+              <div class="act-body">
+                <div class="act-title"><b>You</b> marked Issue 01 as complete</div>
+                <div class="act-meta"><span>Baron Nullify · Issue 01</span><span>22 pages</span></div>
+              </div>
+              <div class="act-time">Yesterday</div>
+            </div>
+            <div class="activity-item">
+              <div class="act-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2 12V4a1 1 0 011-1h10a1 1 0 011 1v6a1 1 0 01-1 1H5l-3 2z"/></svg></div>
+              <div class="act-body">
+                <div class="act-title"><b>Stacy</b> resolved 3 comments on Issue 01</div>
+                <div class="act-meta"><span>The Adequates · Issue 01</span></div>
+              </div>
+              <div class="act-time">2 days ago</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ③ UNIVERSES SHELF -->
+        <div>
+          <div class="section-hd"><span class="section-hd-label">③ Universes</span><div class="section-hd-rule"></div></div>
+          <div class="universes-shelf">
+            <div class="u-stack">
+              <div class="u-main-card">
+                <div class="u-cover" style="background:linear-gradient(135deg,#dde8f4,#ccd8ec);">
+                  <span style="color:#6888a8;font-size:15px;font-family:'Lora',serif;font-style:italic;">C</span>
+                </div>
+                <div class="u-info">
+                  <div class="u-name">Cosmix Universe</div>
+                  <div class="u-meta"><span>2 series</span><span>·</span><span>2 collaborators</span><span>·</span><span>Active now</span></div>
+                </div>
+                <div class="u-chevron">⋯</div>
+              </div>
+              <div class="u-sub-card"></div>
+              <div class="u-sub-card2"></div>
+            </div>
+            <div class="new-universe-btn">
+              <div class="new-icon">+</div>
+              <span class="new-label">New Universe</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ DARK — LONG PRESS STATE ══ -->
+  <div>
+    <div class="col-label">Dark — universe card long-pressed</div>
+    <div class="ipad dk" style="height:auto;min-height:480px;width:420px;">
+      <div class="topbar">
+        <div class="wordmark">PanelSync</div>
+        <div class="topbar-right"><div class="av av-b">MB</div></div>
+      </div>
+      <div class="home-body" style="gap:24px;">
+
+        <div class="greeting">
+          <span class="greeting-text">Good evening, Maya.</span>
+        </div>
+
+        <!-- Resume abbreviated -->
+        <div>
+          <div class="section-hd"><span class="section-hd-label">① Resume</span><div class="section-hd-rule"></div></div>
+          <div class="resume-card primary" style="opacity:0.3;pointer-events:none;">
+            <div class="continue-badge">Continue</div>
+            <div class="resume-thumb"><svg width="44" height="56" viewBox="0 0 44 56" fill="none"><rect width="44" height="56" fill="#f4f0e8"/><rect x="3" y="3" width="38" height="28" stroke="#2a2520" stroke-width="1" rx="0.5"/></svg></div>
+            <div class="resume-info">
+              <div class="resume-universe">Cosmix Universe · The Adequates</div>
+              <div class="resume-title">Issue 02 — Page 04: Confrontation</div>
+            </div>
+            <div class="resume-arrow">›</div>
+          </div>
+        </div>
+
+        <!-- Universes with long-press active -->
+        <div>
+          <div class="section-hd"><span class="section-hd-label">③ Universes</span><div class="section-hd-rule"></div></div>
+          <div class="universes-shelf">
+
+            <!-- Long-press active state -->
+            <div class="longpress-state">
+              <div class="lp-card-top">
+                <div class="u-cover" style="background:linear-gradient(135deg,#1e2d40,#14202e);">
+                  <span style="color:rgba(200,167,104,0.8);font-size:15px;">C</span>
+                </div>
+                <div class="u-info">
+                  <div class="u-name">Cosmix Universe</div>
+                  <div class="u-meta"><span>2 series</span><span>·</span><span>Active now</span></div>
+                </div>
+              </div>
+              <div class="lp-subcards">
+                <div class="lp-subcard hi">
+                  <div class="lp-sc-icon">↩</div>
+                  <div class="lp-sc-lbl" style="color:var(--acc);">Pick up where<br>you left off</div>
+                </div>
+                <div class="lp-subcard">
+                  <div class="lp-sc-icon">⌂</div>
+                  <div class="lp-sc-lbl">Universe<br>Home</div>
+                </div>
+                <div class="lp-subcard">
+                  <div class="lp-sc-icon">⚙</div>
+                  <div class="lp-sc-lbl">Universe<br>Settings</div>
+                </div>
+              </div>
+              <div class="lp-hint">tap a card or tap outside to dismiss</div>
+            </div>
+
+            <!-- First-visit tooltip (shown below card) -->
+            <div class="tooltip-bubble" style="margin-top:10px;">
+              <div class="tt-title">Hold to see options</div>
+              <div class="tt-body">Long press any universe to pick up where you left off, or visit Universe Home.</div>
+              <div class="tt-dismiss">Got it — don't show again</div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

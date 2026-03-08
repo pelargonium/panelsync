@@ -1,0 +1,1572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PanelSync — Script Editor</title>
+
+<!--
+  ═══════════════════════════════════════════════════════════════
+  PANELSYNC SCRIPT EDITOR — v3 Refactor
+  ═══════════════════════════════════════════════════════════════
+
+  KEYBOARD FLOW:
+  ENTER          → Commit block, create next (smart defaults)
+  TAB            → Cycle block type on empty blocks
+  BACKSPACE      → On empty block, delete & go back
+  ⌘/Ctrl+ENTER   → New page
+  Shift+ENTER    → Newline within desc/caption/dialogue
+
+  SPECIAL FLOW (Final Draft style):
+  Empty dialogue character + Enter → new Panel + Description
+  (assumes conversation ended, new visual beat)
+
+  BLOCK TYPES: Panel, Scene, Description, Dialogue, Caption, SFX
+  Panel numbering resets to 1 on each page.
+  Scenes can live outside of panels — fully flexible ordering.
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Geist+Mono:wght@300;400;500&family=Geist:wght@300;400;500;600&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+/* ── DARK THEME TOKENS ── */
+:root{
+  --bg:#0e0d0c;--bg-s:#161514;--bg-editor:#111110;
+  --bg-p:#1a1918;--bg-h:#222120;--bg-act:#1e1c10;
+  --bd:#2a2724;--bd-h:#38352e;--bd-s:#1e1c18;
+  --tx:#dfd9ce;--tx2:#9e9890;--tx3:#555048;--tx4:#333028;
+  --acc:#c8a768;--acc2:#6e5430;--acc3:#1c1a0e;
+  --cursor:#c8a768;
+}
+/* ── LIGHT THEME TOKENS ── */
+body.light{
+  --bg:#f2efe9;--bg-s:#e9e5de;--bg-editor:#fdfcf9;
+  --bg-p:#e1ddd5;--bg-h:#e5e1d9;--bg-act:#f4edda;
+  --bd:#d4cfc5;--bd-h:#c0bbb0;--bd-s:#e2ded6;
+  --tx:#1a1814;--tx2:#54504a;--tx3:#9a9690;--tx4:#c8c4bc;
+  --acc:#9a7030;--acc2:#b88840;--acc3:#f8f0e0;
+  --cursor:#9a7030;
+}
+body{
+  background:var(--bg);font-family:'Geist',sans-serif;
+  color:var(--tx);height:100vh;overflow:hidden;
+}
+#screen-home,#screen-editor{height:100vh}
+
+/* ── TOP BAR ── */
+.topbar{
+  height:44px;background:var(--bg-s);border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;padding:0 12px 0 0;flex-shrink:0;z-index:10;
+}
+.tb-wm{
+  font-family:'Lora',serif;font-size:14px;font-weight:600;color:var(--acc);
+  padding:0 14px;border-right:1px solid var(--bd);
+  height:100%;display:flex;align-items:center;flex-shrink:0;
+}
+.tb-bc{display:flex;align-items:center;gap:6px;padding:0 14px;flex:1;overflow:hidden}
+.tb-c{font-family:'Geist Mono',monospace;font-size:10px;color:var(--tx3);
+  letter-spacing:.04em;white-space:nowrap}
+.tb-c.on{color:var(--tx2)}
+.tb-r{display:flex;align-items:center;gap:8px;flex-shrink:0}
+
+/* Save indicator */
+.sav{display:flex;align-items:center;gap:5px;
+  font-family:'Geist Mono',monospace;font-size:10px;color:var(--tx3);letter-spacing:.05em}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--tx4);transition:background .3s}
+.sdot.ok{background:#507a5c}.sdot.go{background:#b89048;animation:pulse .8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.tb-div{width:1px;height:20px;background:var(--bd);flex-shrink:0}
+.tb-btn{
+  height:30px;padding:0 10px;border-radius:7px;border:1px solid var(--bd);
+  background:transparent;color:var(--tx2);font-family:'Geist Mono',monospace;
+  font-size:10px;letter-spacing:.04em;cursor:pointer;
+  display:flex;align-items:center;gap:5px;flex-shrink:0;transition:background .15s;
+}
+.tb-btn:hover{background:var(--bg-h)}.tb-btn:active{background:var(--bg-act)}
+.tb-btn svg{width:14px;height:14px;pointer-events:none}
+
+/* ── EDITOR TOOLBAR ── */
+.etb{
+  height:38px;background:var(--bg-s);border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0;
+}
+.bti{
+  display:flex;align-items:center;gap:8px;height:26px;padding:0 10px;
+  border-radius:7px;border:1px solid var(--bd-h);background:var(--bg-p);
+  transition:all .15s ease;cursor:default;
+}
+.btd{width:8px;height:8px;border-radius:2px;flex-shrink:0;transition:background .15s}
+.btn-name{font-family:'Geist Mono',monospace;font-size:10px;color:var(--tx);
+  letter-spacing:.05em;font-weight:500}
+.btn-hint{font-family:'Geist Mono',monospace;font-size:9px;color:var(--tx3);letter-spacing:.04em}
+.sp{flex:1}
+.sts{display:flex;align-items:center;gap:14px;font-family:'Geist Mono',monospace;
+  font-size:9px;color:var(--tx3);letter-spacing:.05em}
+.st-i{display:flex;align-items:center;gap:4px}
+.st-v{color:var(--tx2)}
+
+/* ── SCROLL AREA ── */
+.ss{
+  flex:1;overflow-y:auto;scrollbar-width:thin;
+  scrollbar-color:var(--bd) transparent;
+  padding:0 0 200px;display:flex;flex-direction:column;align-items:center;
+  background:var(--bg-editor);
+}
+.ss::-webkit-scrollbar{width:6px}
+.ss::-webkit-scrollbar-track{background:transparent}
+.ss::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px}
+
+/* ── PAGE ── */
+.sp-page{width:680px;flex-shrink:0;padding:40px 20px 80px;position:relative}
+.pg-gap{
+  width:680px;height:72px;display:flex;align-items:center;justify-content:center;
+  position:relative;flex-shrink:0;
+}
+.pg-gap::before{content:'';position:absolute;left:20px;right:20px;height:1px;background:var(--bd)}
+.pg-gap-lbl{
+  font-family:'Geist Mono',monospace;font-size:9px;color:var(--tx3);
+  letter-spacing:.1em;text-transform:uppercase;background:var(--bg-editor);
+  padding:0 12px;position:relative;z-index:1;
+}
+
+/* Page header */
+.sp-hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:24px;padding-bottom:14px;
+  border-bottom:1px solid var(--bd-s)}
+.sp-num{font-family:'Geist Mono',monospace;font-size:11px;color:var(--tx3);
+  letter-spacing:.12em;text-transform:uppercase;flex-shrink:0}
+.sp-title{
+  font-family:'Lora',serif;font-size:14px;font-weight:500;font-style:italic;
+  color:var(--tx2);background:transparent;border:none;outline:none;flex:1;padding:0;
+}
+.sp-title::placeholder{color:var(--tx4);font-style:italic}
+
+/* ── PANEL HEADER ── */
+.b-panel{margin:24px 0 8px;display:flex;align-items:center;user-select:none;outline:none}
+.b-panel:focus{outline:none}
+.p-rule{height:1px;background:var(--bd);flex:1}
+.p-lbl{padding:0 14px;display:flex;align-items:center;gap:8px}
+.p-num{font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;
+  color:var(--acc);letter-spacing:.1em}
+
+/* ── BLOCK STYLES ── */
+.b-scene{margin:6px 0;padding:4px 2px;min-height:1.4em}
+.b-desc{margin:4px 0;padding:4px 2px;min-height:1.4em}
+.b-dlg{margin:8px 0 4px;padding-left:140px}
+.b-cap{margin:6px 0;padding:7px 12px;border-left:2px solid var(--acc2);
+  background:var(--acc3);border-radius:0 4px 4px 0;min-height:1.4em}
+.b-sfx{margin:6px 0;min-height:1.4em}
+
+.dlg-ci{
+  font-family:'Courier Prime',monospace;font-size:13px;font-weight:700;
+  color:var(--tx);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px;
+  background:transparent;border:none;outline:none;width:100%;padding:2px 0;
+}
+.dlg-ci::placeholder{color:var(--tx4);text-transform:none;font-weight:400}
+.dlg-ti{
+  font-family:'Courier Prime',monospace;font-size:13px;color:var(--tx2);
+  line-height:1.6;background:transparent;border:none;outline:none;
+  width:100%;padding:2px 0;resize:none;min-height:1.4em;overflow:hidden;
+}
+.dlg-ti::placeholder{color:var(--tx4)}
+.cap-i{
+  font-family:'Courier Prime',monospace;font-size:12px;font-style:italic;
+  color:var(--tx2);line-height:1.6;background:transparent;border:none;outline:none;
+  width:100%;padding:0;resize:none;min-height:1.4em;overflow:hidden;
+}
+.cap-i::placeholder{color:var(--tx4);font-style:italic}
+.sfx-i{
+  font-family:'Lora',serif;font-size:22px;font-weight:600;color:var(--acc);
+  letter-spacing:.04em;opacity:.75;background:transparent;border:none;outline:none;
+  width:100%;padding:2px 0;
+}
+.sfx-i::placeholder{color:var(--tx4);opacity:.5;font-size:16px}
+
+.bi{background:transparent;border:none;outline:none;width:100%;padding:4px 2px;
+  resize:none;overflow:hidden;min-height:1.8em;line-height:1.5}
+
+/* Active block highlight */
+/* Active block tracking (no visual indicator — cursor is enough) */
+
+/* ── TYPE PICKER ── */
+.pk-bd{display:none;position:fixed;inset:0;z-index:99}
+.pk-bd.open{display:block}
+.pk{
+  position:fixed;z-index:100;background:var(--bg-p);border:1px solid var(--bd-h);
+  border-radius:10px;padding:6px;width:230px;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);display:none;
+}
+body.light .pk{box-shadow:0 8px 32px rgba(0,0,0,.12)}
+.pk.open{display:block}
+.pk-hdr{font-family:'Geist Mono',monospace;font-size:8px;color:var(--tx3);
+  letter-spacing:.12em;text-transform:uppercase;padding:4px 8px 8px;
+  border-bottom:1px solid var(--bd-s);margin-bottom:4px}
+.pk-item{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;
+  cursor:pointer;transition:background .1s}
+.pk-item:hover{background:var(--bg-h)}
+.pk-item.active{background:var(--bg-act)}
+.pk-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.pk-name{font-family:'Geist Mono',monospace;font-size:10px;color:var(--tx);
+  letter-spacing:.05em;flex:1}
+.pk-item.active .pk-name{color:var(--acc)}
+
+/* ── HINT BAR ── */
+.gh{
+  position:fixed;bottom:12px;left:50%;transform:translateX(-50%);
+  font-family:'Geist Mono',monospace;font-size:9px;color:var(--tx4);
+  letter-spacing:.06em;text-align:center;line-height:1.8;
+  pointer-events:none;white-space:nowrap;z-index:5;transition:opacity .3s;
+}
+.gh kbd{display:inline-block;padding:1px 6px;border:1px solid var(--bd);border-radius:3px;
+  background:var(--bg-p);font-family:inherit;font-size:inherit;color:var(--tx3)}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:48px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--bg-p);color:var(--tx2);border:1px solid var(--bd-h);
+  border-radius:8px;padding:8px 16px;font-family:'Geist Mono',monospace;
+  font-size:11px;letter-spacing:.03em;opacity:0;pointer-events:none;
+  transition:opacity .3s,transform .3s;z-index:200;
+}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── MODALS ── */
+.mov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+  z-index:300;justify-content:center;align-items:center}
+body.light .mov{background:rgba(0,0,0,.25)}
+.mov.open{display:flex}
+.mcard{background:var(--bg-p);border:1px solid var(--bd-h);border-radius:14px;
+  padding:24px;width:340px;box-shadow:0 16px 48px rgba(0,0,0,.5)}
+body.light .mcard{box-shadow:0 16px 48px rgba(0,0,0,.12)}
+.mt{font-family:'Lora',serif;font-size:16px;font-weight:600;color:var(--tx);margin-bottom:6px}
+.ms{font-family:'Geist Mono',monospace;font-size:10px;color:var(--tx3);
+  letter-spacing:.04em;margin-bottom:18px}
+.mb{
+  width:100%;height:46px;border-radius:9px;border:1px solid var(--bd-h);
+  background:var(--bg-h);color:var(--tx);cursor:pointer;
+  font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.04em;
+  margin-bottom:8px;transition:background .15s;
+}
+.mb:hover{background:var(--bg-act)}
+.mb.pri{background:var(--acc3);border-color:var(--acc2);color:var(--acc)}
+.mb.pri:hover{background:var(--acc2);color:var(--tx)}
+.mb.dan{border-color:#5a2020;color:#c06060}
+.mb.dan:hover{background:#2a1010}
+body.light .mb.dan:hover{background:#f8e0e0}
+.mc{
+  width:100%;height:36px;border-radius:7px;border:none;background:transparent;
+  color:var(--tx3);cursor:pointer;font-family:'Geist Mono',monospace;
+  font-size:10px;letter-spacing:.04em;margin-top:4px;
+}
+.mc:hover{color:var(--tx2)}
+
+/* ── AUTOCOMPLETE DROPDOWN ── */
+.ac-drop{
+  position:fixed;z-index:150;
+  background:var(--bg-p);border:1px solid var(--bd-h);
+  border-radius:8px;padding:4px;
+  min-width:160px;max-width:260px;
+  box-shadow:0 6px 24px rgba(0,0,0,.4);
+  display:none;
+}
+body.light .ac-drop{box-shadow:0 6px 24px rgba(0,0,0,.1)}
+.ac-drop.open{display:block}
+.ac-hdr{
+  font-family:'Geist Mono',monospace;font-size:8px;color:var(--tx3);
+  letter-spacing:.12em;text-transform:uppercase;padding:4px 8px 6px;
+  border-bottom:1px solid var(--bd-s);margin-bottom:2px;
+}
+.ac-item{
+  padding:6px 10px;border-radius:6px;cursor:pointer;
+  font-family:'Courier Prime',monospace;font-size:12px;font-weight:700;
+  color:var(--tx);letter-spacing:.04em;text-transform:uppercase;
+  transition:background .1s;
+}
+.ac-item:hover,.ac-item.sel{background:var(--bg-act);color:var(--acc)}
+.ac-hint{
+  font-family:'Geist Mono',monospace;font-size:8px;color:var(--tx4);
+  padding:4px 10px 2px;letter-spacing:.04em;
+}
+
+/* ── SCREENS ── */
+.screen{display:none;flex-direction:column;flex:1;overflow:hidden}
+.screen.active{display:flex}
+
+/* ── HOME SCREEN ── */
+.hbody{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:28px 20px 60px;display:flex;flex-direction:column;align-items:center}
+.hinner{width:100%;max-width:560px}
+.hsec{font-family:'Geist Mono',monospace;font-size:9px;color:var(--tx3);
+  letter-spacing:.14em;text-transform:uppercase;margin-bottom:12px}
+.newbtn{width:100%;height:54px;border-radius:12px;border:1.5px dashed var(--bd-h);
+  background:transparent;display:flex;align-items:center;justify-content:center;
+  gap:10px;cursor:pointer;margin-bottom:24px;color:var(--tx3);
+  font-family:'Geist Mono',monospace;font-size:12px;letter-spacing:.06em;
+  transition:background .15s,border-color .15s}
+.newbtn:hover{background:var(--bg-h);border-color:var(--acc2)}
+.newbtn:active{background:var(--bg-act);border-color:var(--acc)}
+.dcard{background:var(--bg-s);border:1px solid var(--bd);border-radius:12px;
+  padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:12px;
+  transition:background .15s}
+.dcard:hover{background:var(--bg-h)}
+.dcard:active{background:var(--bg-act)}
+.dcbody{flex:1;min-width:0}
+.dctitle{font-family:'Lora',serif;font-size:15px;font-weight:500;color:var(--tx);
+  margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dcmeta{font-family:'Geist Mono',monospace;font-size:10px;color:var(--tx3);letter-spacing:.04em}
+.dcpip{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--tx4)}
+.dcarr{color:var(--tx3);font-size:18px;flex-shrink:0;line-height:1}
+.dcactions{display:flex;gap:6px;flex-shrink:0}
+.dcdel{
+  width:28px;height:28px;border-radius:7px;border:1px solid var(--bd);
+  background:transparent;color:var(--tx3);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .15s,color .15s;
+}
+.dcdel:hover{background:#2a1010;color:#c06060;border-color:#5a2020}
+body.light .dcdel:hover{background:#f8e0e0;color:#c06060;border-color:#e0a0a0}
+.dcdel svg{width:14px;height:14px;pointer-events:none}
+.hempty{text-align:center;padding:60px 20px;color:var(--tx3);
+  font-family:'Geist Mono',monospace;font-size:12px;letter-spacing:.05em;line-height:2}
+/* Modal input field */
+.minp{
+  width:100%;height:42px;border-radius:8px;border:1px solid var(--bd-h);
+  background:var(--bg-h);color:var(--tx);padding:0 12px;
+  font-family:'Geist',sans-serif;font-size:14px;outline:none;
+  margin-bottom:16px;
+}
+.minp:focus{border-color:var(--acc2)}
+.minp::placeholder{color:var(--tx4)}
+
+/* ── PRINT STYLES ── */
+@media print{
+  .topbar,.etb,.gh,.toast,.mov,.pk,.pk-bd,.pg-gap,.screen:not(.active){display:none!important}
+  body,body.light{background:white!important;
+    --tx:#000!important;--tx2:#333!important;--tx3:#666!important;
+    --acc:#444!important;--acc2:#888!important;--acc3:#f4f4f4!important;
+    --bd:#ccc!important;--bd-s:#ddd!important;--bg-editor:white!important}
+  .ss{overflow:visible!important;padding:0!important}
+  .sp-page{page-break-after:always;padding:.5in!important;width:100%!important}
+  .sp-page:last-child{page-break-after:auto}
+  input::placeholder,textarea::placeholder{color:transparent!important}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════
+     HOME SCREEN — list of scripts
+     ═══════════════════════════════════ -->
+<div id="screen-home" class="screen active">
+  <div class="topbar">
+    <div class="tb-wm">PanelSync</div>
+    <div class="tb-bc"><span class="tb-c on">Scripts</span></div>
+    <div class="tb-r">
+      <button class="tb-btn" onclick="toggleTheme()" title="Toggle theme">
+        <svg id="ticon-home" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="hbody">
+    <div class="hinner">
+      <div class="hsec">Your Scripts</div>
+      <button class="newbtn" onclick="openNewModal()">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>
+        </svg>
+        New Script
+      </button>
+      <div id="draft-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     EDITOR SCREEN
+     ═══════════════════════════════════ -->
+<div id="screen-editor" class="screen">
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="tb-wm" onclick="goHome()" style="cursor:pointer">PanelSync</div>
+  <div class="tb-bc"><span class="tb-c on" id="ecrumb">Untitled</span></div>
+  <div class="tb-r">
+    <div class="sav"><div class="sdot" id="sdot"></div><span id="slbl">Ready</span></div>
+    <div class="tb-div"></div>
+    <button class="tb-btn" onclick="toggleTheme()" title="Toggle theme">
+      <svg id="ticon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/></svg>
+    </button>
+    <button class="tb-btn" onclick="addNewPage()" title="New page (⌘+Enter)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="1" width="10" height="14" rx="1"/><line x1="6" y1="8" x2="10" y2="8"/><line x1="8" y1="6" x2="8" y2="10"/></svg>
+      New Page
+    </button>
+    <button class="tb-btn" onclick="confirmClear()" title="Clear current page">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4h10M6 4V3h4v1M5 4v9h6V4"/></svg>
+      Clear
+    </button>
+    <button class="tb-btn" onclick="openExp()" title="Export">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 2h6l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z"/><polyline points="9,2 9,5 12,5"/></svg>
+      Export
+    </button>
+  </div>
+</div>
+
+<!-- EDITOR TOOLBAR -->
+<div class="etb" id="etb">
+  <div class="bti" id="bti">
+    <div class="btd" id="btd"></div>
+    <span class="btn-name" id="btn-name">Scene</span>
+    <span class="btn-hint">Tab to cycle</span>
+  </div>
+  <div class="sp"></div>
+  <div class="sts">
+    <div class="st-i"><span>Pg</span>&nbsp;<span class="st-v" id="stPg">1</span></div>
+    <div style="width:1px;height:12px;background:var(--bd)"></div>
+    <div class="st-i"><span class="st-v" id="stPn">0</span>&nbsp;<span>panels</span></div>
+    <div style="width:1px;height:12px;background:var(--bd)"></div>
+    <div class="st-i"><span class="st-v" id="stW">0</span>&nbsp;<span>words</span></div>
+  </div>
+</div>
+
+<!-- SCROLL AREA -->
+<div class="ss" id="ss"></div>
+
+<!-- HINTS -->
+<div class="gh" id="gh">
+  <kbd>Enter</kbd> commit &nbsp;
+  <kbd>Tab</kbd> cycle type &nbsp;
+  <kbd>⌘Enter</kbd> new page &nbsp;
+  <kbd>⌫</kbd> delete empty
+</div>
+
+<!-- PICKER -->
+<div class="pk-bd" id="pkbd"></div>
+<div class="pk" id="pk"></div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- AUTOCOMPLETE DROPDOWN -->
+<div class="ac-drop" id="acDrop"></div>
+
+<!-- EXPORT MODAL -->
+<div class="mov" id="mexp" onclick="if(event.target===this)closeExp()">
+  <div class="mcard">
+    <div class="mt">Export Script</div>
+    <div class="ms">Choose a format.</div>
+    <button class="mb pri" onclick="expPDF()">PDF — Open print dialog</button>
+    <button class="mb" onclick="expTXT()">Plain Text — .txt download</button>
+    <button class="mc" onclick="closeExp()">Cancel</button>
+  </div>
+</div>
+
+<!-- CLEAR MODAL -->
+<div class="mov" id="mclr" onclick="if(event.target===this)closeClr()">
+  <div class="mcard">
+    <div class="mt">Clear Page?</div>
+    <div class="ms">This removes all blocks on the current page.</div>
+    <button class="mb dan" onclick="doClear()">Clear this page</button>
+    <button class="mc" onclick="closeClr()">Cancel</button>
+  </div>
+</div>
+
+</div><!-- /screen-editor -->
+
+<!-- NEW SCRIPT MODAL -->
+<div class="mov" id="mnew" onclick="if(event.target===this)closeNewModal()">
+  <div class="mcard">
+    <div class="mt">New Script</div>
+    <div class="ms">Give it a working title. You can change it later.</div>
+    <input id="newTitle" class="minp" type="text" placeholder="e.g. The Adequates — Issue 01"
+      onkeydown="if(event.key==='Enter')createScript()">
+    <div style="display:flex;gap:8px">
+      <button class="mc" onclick="closeNewModal()" style="flex:1">Cancel</button>
+      <button class="mb pri" onclick="createScript()" style="flex:1;margin:0">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE SCRIPT MODAL -->
+<div class="mov" id="mdel" onclick="if(event.target===this)closeDelModal()">
+  <div class="mcard">
+    <div class="mt">Delete Script?</div>
+    <div class="ms" id="mdelMsg">This will permanently delete this script.</div>
+    <button class="mb dan" id="mdelBtn" onclick="doDeleteScript()">Delete</button>
+    <button class="mc" onclick="closeDelModal()">Cancel</button>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   PANELSYNC SCRIPT EDITOR — Core Engine
+   ═══════════════════════════════════════════════════════════════
+   
+   DATA MODEL:
+   pages[] → each has { id, title, blocks[] }
+   blocks[] → each has { id, type, text, character }
+   
+   Block types: panel, scene, desc, dialogue, caption, sfx
+   
+   Panel numbering resets to 1 on each page.
+   Any block type can go anywhere — maximum flexibility.
+   Smart defaults just make common flows faster.
+   ═══════════════════════════════════════════════════════════════ */
+
+// ── TYPE DEFINITIONS ──
+const T=[
+  {key:'panel',   name:'Panel',      color:'#c8a768'},
+  {key:'scene',   name:'Scene',      color:'#8898c0'},
+  {key:'desc',    name:'Description',color:'#888878'},
+  {key:'dialogue',name:'Dialogue',   color:'#7a9e8a'},
+  {key:'caption', name:'Caption',    color:'#a07858'},
+  {key:'sfx',     name:'SFX',        color:'#c87858'},
+];
+
+// ── AUTO-ADVANCE: what comes after each type on Enter ──
+const ADV={
+  panel:'scene', scene:'desc', desc:'dialogue',
+  dialogue:'dialogue', caption:'desc', sfx:'desc'
+};
+
+// ── STATE ──
+/*
+  NEW DATA MODEL:
+  drafts[] → each draft is a full script with:
+    { id, title, pages[], createdAt, updatedAt }
+  
+  currentId → which draft is currently open in the editor
+  pages → shortcut reference to the current draft's pages
+*/
+const KEY='panelsync_v4';
+let drafts=[];
+let currentId=null;  // ID of the currently open draft
+let pages=[];        // Reference to current draft's pages
+let aPI=0,aBID=null,nxId=1,isLt=false,saveT=null;
+let deleteTargetId=null; // For delete confirmation modal
+
+// ── DOM ──
+const ss=document.getElementById('ss');
+const btd=document.getElementById('btd');
+const bname=document.getElementById('btn-name');
+const pk=document.getElementById('pk');
+const pkbd=document.getElementById('pkbd');
+
+// ── UTILS ──
+function uid(){return 'b'+(nxId++)}
+function mkB(type){return{id:uid(),type,text:'',character:''}}
+function mkP(t='scene'){return{id:uid(),title:'',blocks:[mkB(t)]}}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function escA(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+function cntPn(p){return p.blocks.filter(b=>b.type==='panel').length}
+function cntW(){
+  let n=0;
+  pages.forEach(p=>p.blocks.forEach(b=>{
+    const t=((b.character||'')+' '+(b.text||'')).trim();
+    if(t)n+=t.split(/\s+/).filter(w=>w).length;
+  }));
+  return n;
+}
+function findPI(bid){
+  for(let i=0;i<pages.length;i++)if(pages[i].blocks.find(b=>b.id===bid))return i;
+  return -1;
+}
+
+/* ═══════════════════════════════════
+   RENDERING
+   ═══════════════════════════════════ */
+
+function renderAll(){
+  ss.innerHTML='';
+  pages.forEach((pg,pi)=>{
+    // Page gap between pages
+    if(pi>0){
+      const g=document.createElement('div');g.className='pg-gap';
+      g.innerHTML=`<span class="pg-gap-lbl">Page ${pi+1}</span>`;
+      ss.appendChild(g);
+    }
+    // Page container
+    const pe=document.createElement('div');
+    pe.className='sp-page';pe.dataset.pi=pi;
+    // Header
+    const hd=document.createElement('div');hd.className='sp-hdr';
+    hd.innerHTML=`<span class="sp-num">Page ${String(pi+1).padStart(2,'0')}</span>
+      <input type="text" class="sp-title" placeholder="Page title (optional)"
+        spellcheck="false" value="${escA(pg.title)}" data-pi="${pi}">`;
+    const ti=hd.querySelector('.sp-title');
+    ti.addEventListener('input',()=>{pg.title=ti.value;dirty()});
+    ti.addEventListener('keydown',e=>{
+      if(e.key==='Enter'){e.preventDefault();const fb=pg.blocks[0];if(fb)focB(fb.id)}
+    });
+    pe.appendChild(hd);
+    // Blocks
+    const bc=document.createElement('div');bc.dataset.pi=pi;
+    let pn=0;
+    pg.blocks.forEach(b=>{if(b.type==='panel')pn++;renderB(bc,b,pi,b.type==='panel'?pn:0)});
+    pe.appendChild(bc);
+    ss.appendChild(pe);
+  });
+  upSt();
+  // After DOM is painted, auto-size all textareas so placeholders
+  // and existing content display at full height
+  requestAnimationFrame(()=>{
+    ss.querySelectorAll('textarea').forEach(autoG);
+  });
+}
+
+function renderB(cont,b,pi,pn){
+  const w=document.createElement('div');
+  w.dataset.bid=b.id;w.dataset.pi=pi;
+
+  switch(b.type){
+    case 'panel':
+      w.className='b-panel';w.tabIndex=0;
+      w.innerHTML=`<div class="p-rule"></div><div class="p-lbl">
+        <span class="p-num">PANEL ${pn}</span></div><div class="p-rule"></div>`;
+      w.addEventListener('focus',()=>{clrAct();w.classList.add('b-active');
+        aBID=b.id;aPI=pi;upTB('panel')});
+      w.addEventListener('keydown',e=>onPanelKey(e,b,w,pi));
+      break;
+    case 'scene':
+      w.className='b-scene';
+      w.innerHTML=`<textarea class="bi" style="font-family:'Courier Prime',monospace;
+        font-size:13px;font-weight:700;color:var(--tx);letter-spacing:.04em;
+        text-transform:uppercase;line-height:1.5" rows="1"
+        placeholder="INT./EXT. LOCATION — TIME" spellcheck="false">${esc(b.text)}</textarea>`;
+      break;
+    case 'desc':
+      w.className='b-desc';
+      w.innerHTML=`<textarea class="bi" style="font-family:'Courier Prime',monospace;
+        font-size:13px;color:var(--tx2);line-height:1.7" rows="1"
+        placeholder="Describe the action..." spellcheck="false">${esc(b.text)}</textarea>`;
+      break;
+    case 'dialogue':
+      w.className='b-dlg';
+      w.innerHTML=`<input type="text" class="dlg-ci" placeholder="Character name"
+          spellcheck="false" data-field="character" value="${escA(b.character)}">
+        <textarea class="bi dlg-ti" rows="1" placeholder="Dialogue..."
+          spellcheck="false" data-field="text">${esc(b.text)}</textarea>`;
+      break;
+    case 'caption':
+      w.className='b-cap';
+      w.innerHTML=`<textarea class="bi cap-i" rows="1" placeholder="Narration text..."
+        spellcheck="false">${esc(b.text)}</textarea>`;
+      break;
+    case 'sfx':
+      w.className='b-sfx';
+      w.innerHTML=`<input type="text" class="sfx-i" placeholder="KRAAKOOOM"
+        spellcheck="false" value="${escA(b.text)}">`;
+      break;
+  }
+  cont.appendChild(w);
+  if(b.type!=='panel')setupEv(w,b,pi);
+  w.querySelectorAll('textarea').forEach(autoG);
+}
+
+/* ═══════════════════════════════════
+   CHARACTER REGISTRY & AUTOCOMPLETE
+   ═══════════════════════════════════
+   
+   How it works:
+   - Every time you finish typing a character name in a dialogue
+     block (Enter or focus leaves the field), the name gets added
+     to the current draft's characters[] array.
+   - When typing in a dialogue character field, if you press Tab
+     and there's a matching character name, it autocompletes.
+   - A dropdown shows matching names as you type.
+   - In scene headings and descriptions, known character names
+     are automatically uppercased when you finish typing a word
+     that matches a known character.
+*/
+
+/** Get the current draft's character registry */
+function getChars(){
+  const d=curDraft();
+  return d&&d.characters?d.characters:[];
+}
+
+/** Register a character name if it's new */
+function learnChar(name){
+  if(!name)return;
+  const upper=name.trim().toUpperCase();
+  if(upper.length<2)return; // Don't learn single letters
+  const d=curDraft();
+  if(!d)return;
+  if(!d.characters)d.characters=[];
+  if(!d.characters.includes(upper)){
+    d.characters.push(upper);
+    dirty();
+  }
+}
+
+/** Find character names matching a prefix */
+function matchChars(prefix){
+  if(!prefix||prefix.length<1)return[];
+  const up=prefix.toUpperCase();
+  return getChars().filter(c=>c.startsWith(up)&&c!==up);
+}
+
+/** Show autocomplete dropdown near an input element */
+function showAC(matches,inputEl){
+  const ac=document.getElementById('acDrop');
+  if(!matches.length){hideAC();return}
+  ac.innerHTML='<div class="ac-hdr">Characters</div>';
+  matches.slice(0,5).forEach((name,i)=>{
+    const item=document.createElement('div');
+    item.className='ac-item'+(i===0?' sel':'');
+    item.textContent=name;
+    item.addEventListener('mousedown',e=>{
+      e.preventDefault();
+      acceptAC(name,inputEl);
+    });
+    ac.appendChild(item);
+  });
+  ac.innerHTML+='<div class="ac-hint">Tab to accept</div>';
+  // Position below the input
+  const r=inputEl.getBoundingClientRect();
+  ac.style.left=r.left+'px';
+  ac.style.top=(r.bottom+4)+'px';
+  ac.classList.add('open');
+}
+
+/** Hide the autocomplete dropdown */
+function hideAC(){document.getElementById('acDrop').classList.remove('open')}
+
+/** Accept an autocomplete suggestion */
+function acceptAC(name,inputEl){
+  inputEl.value=name;
+  inputEl.dispatchEvent(new Event('input',{bubbles:true}));
+  hideAC();
+}
+
+/**
+ * Auto-capitalize known character names in scene/desc text.
+ * Called on input events for these block types.
+ * Scans the text for words matching known characters and
+ * uppercases them in place.
+ */
+function autoCapNames(inputEl){
+  const chars=getChars();
+  if(!chars.length)return;
+  const val=inputEl.value;
+  const cursor=inputEl.selectionStart;
+  
+  // Only check after a space or punctuation (word boundary)
+  // to avoid interfering while the user is mid-word
+  if(cursor>0&&val[cursor-1]!==' '&&val[cursor-1]!=='.'&&
+     val[cursor-1]!==','&&val[cursor-1]!=='\n')return;
+  
+  let newVal=val;
+  let changed=false;
+  
+  chars.forEach(charName=>{
+    // Build a regex that matches the character name as a whole word,
+    // case-insensitive, but only if it's not already uppercase
+    const escaped=charName.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const regex=new RegExp('\\b'+escaped+'\\b','gi');
+    newVal=newVal.replace(regex,(match)=>{
+      if(match!==charName){changed=true;return charName}
+      return match;
+    });
+  });
+  
+  if(changed){
+    inputEl.value=newVal;
+    inputEl.selectionStart=cursor;
+    inputEl.selectionEnd=cursor;
+  }
+}
+
+/* ═══════════════════════════════════
+   EVENT WIRING
+   ═══════════════════════════════════ */
+
+function setupEv(w,b,pi){
+  const inputs=getAll(w);
+  inputs.forEach(inp=>{
+    inp.addEventListener('keydown',e=>{
+      // ⌘+Enter → new page
+      if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();sync(w,b);addNewPage();return}
+
+      // Arrow keys between dialogue character name ↔ text fields
+      if(b.type==='dialogue'){
+        if(e.key==='ArrowDown'&&inp.dataset.field==='character'){
+          e.preventDefault();hideAC();
+          const ti=w.querySelector('[data-field="text"]');
+          if(ti){ti.focus();ti.selectionStart=0;ti.selectionEnd=0}
+          return;
+        }
+        if(e.key==='ArrowUp'&&inp.dataset.field==='text'){
+          if(inp.selectionStart===0&&inp.selectionEnd===0){
+            e.preventDefault();
+            const ci=w.querySelector('[data-field="character"]');
+            if(ci){ci.focus();ci.selectionStart=ci.value.length}
+            return;
+          }
+        }
+      }
+
+      // Tab → autocomplete character name OR cycle block type
+      if(e.key==='Tab'){
+        e.preventDefault();
+        
+        // Special: Tab in dialogue character field with partial text → autocomplete
+        if(b.type==='dialogue'&&inp.dataset.field==='character'){
+          const val=inp.value.trim();
+          if(val.length>0){
+            const matches=matchChars(val);
+            if(matches.length>0){
+              // Accept the first match
+              inp.value=matches[0];
+              inp.dispatchEvent(new Event('input',{bubbles:true}));
+              hideAC();
+              return;
+            }
+          }
+        }
+        
+        // Otherwise: normal tab behavior (cycle type on empty blocks)
+        onTab(b,w,pi,inp);
+        return;
+      }
+
+      // Enter → commit
+      if(e.key==='Enter'){
+        if(b.type==='dialogue'&&inp.dataset.field==='character'){
+          e.preventDefault();hideAC();
+          // Learn this character name
+          learnChar(inp.value);
+          const ti=w.querySelector('[data-field="text"]');if(ti)ti.focus();
+          return;
+        }
+        if(e.shiftKey&&['desc','caption','dialogue'].includes(b.type))return;
+        e.preventDefault();onEnter(b,w,pi,inp);return;
+      }
+      // Backspace → delete empty
+      if(e.key==='Backspace')onBksp(e,b,w,pi,inp);
+    });
+
+    // Input handler — sync data, auto-grow, show autocomplete, auto-cap
+    inp.addEventListener('input',()=>{
+      sync(w,b);autoG(inp);upSt();dirty();
+      
+      // Show autocomplete dropdown for dialogue character field
+      if(b.type==='dialogue'&&inp.dataset.field==='character'){
+        const val=inp.value.trim();
+        if(val.length>0){
+          showAC(matchChars(val),inp);
+        }else{
+          hideAC();
+        }
+      }
+      
+      // Auto-capitalize known character names in scene/desc/caption
+      if(['scene','desc','caption'].includes(b.type)){
+        autoCapNames(inp);
+      }
+    });
+
+    // Focus handler
+    inp.addEventListener('focus',()=>{
+      clrAct();w.classList.add('b-active');
+      aBID=b.id;aPI=pi;upTB(b.type);
+    });
+
+    // Blur handler — learn character names, hide autocomplete
+    inp.addEventListener('blur',()=>{
+      if(b.type==='dialogue'&&inp.dataset.field==='character'){
+        learnChar(inp.value);
+      }
+      setTimeout(hideAC,200); // Delay so click on dropdown works
+    });
+  });
+}
+
+/* ── ENTER ── */
+function onEnter(b,w,pi,inp){
+  sync(w,b);w.classList.remove('b-active');
+  const pg=pages[pi],idx=pg.blocks.findIndex(x=>x.id===b.id);
+
+  /*
+    FINAL DRAFT LOOP:
+    Empty dialogue (no character typed) + Enter →
+    Assume conversation is over. Insert Panel + Description.
+    This is the "new visual beat" pattern.
+  */
+  if(b.type==='dialogue'){
+    const ce=!(b.character||'').trim(),te=!(b.text||'').trim();
+    if(ce&&te){
+      // Replace empty dialogue with Panel + Desc
+      pg.blocks.splice(idx,1);
+      const pb=mkB('panel'),db=mkB('desc');
+      pg.blocks.splice(idx,0,pb,db);
+      dirty();renderAll();focB(db.id);return;
+    }
+  }
+
+  const nt=ADV[b.type]||'desc';
+  const nb=mkB(nt);
+  pg.blocks.splice(idx+1,0,nb);
+  dirty();renderAll();focB(nb.id);
+}
+
+/* ── TAB ── */
+function onTab(b,w,pi){
+  const has=(b.text||'').trim()||(b.character||'').trim();
+  if(!has){
+    const ci=T.findIndex(t=>t.key===b.type);
+    const ni=(ci+1)%T.length;
+    b.type=T[ni].key;b.text='';b.character='';
+    dirty();renderAll();focB(b.id);showPk(b.type);
+  }
+}
+
+/* ── BACKSPACE ── */
+function onBksp(e,b,w,pi,inp){
+  if(b.type==='dialogue'){
+    const ci=w.querySelector('[data-field="character"]');
+    const ti=w.querySelector('[data-field="text"]');
+    const ce=!(ci&&ci.value.trim()),te=!(ti&&ti.value.trim());
+    if(inp.dataset.field==='text'&&!inp.value){
+      e.preventDefault();if(ci){ci.focus();ci.selectionStart=ci.value.length}return;
+    }
+    if(inp.dataset.field==='character'&&ce&&te){
+      e.preventDefault();delBack(b,pi);return;
+    }
+    return;
+  }
+  // Allow deleting ANY empty block — even the last one on a page
+  if(inp.value===''){e.preventDefault();delBack(b,pi)}
+}
+
+/* ── PANEL KEYDOWN ── */
+function onPanelKey(e,b,w,pi){
+  if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();delBack(b,pi);return}
+  if(e.key==='Enter'){
+    if(e.metaKey||e.ctrlKey){e.preventDefault();addNewPage();return}
+    e.preventDefault();
+    const pg=pages[pi],idx=pg.blocks.findIndex(x=>x.id===b.id);
+    const nb=mkB('scene');pg.blocks.splice(idx+1,0,nb);
+    dirty();renderAll();focB(nb.id);return;
+  }
+  if(e.key==='Tab'){
+    e.preventDefault();
+    const ci=T.findIndex(t=>t.key==='panel');
+    b.type=T[(ci+1)%T.length].key;
+    dirty();renderAll();focB(b.id);showPk(b.type);
+  }
+}
+
+/* ── DELETE BLOCK ── */
+function delBack(b,pi){
+  const pg=pages[pi],idx=pg.blocks.findIndex(x=>x.id===b.id);
+
+  /*
+    CASE 1: Last block on the ONLY page.
+    Can't delete the page itself, but we clear the block
+    so the user gets a fresh empty state.
+  */
+  if(pages.length===1&&pg.blocks.length<=1){
+    // Reset this block to an empty scene
+    b.type='scene';b.text='';b.character='';
+    dirty();renderAll();focB(b.id);
+    return;
+  }
+
+  /*
+    CASE 2: First block on a non-first page AND it's the only block.
+    Delete the entire page and focus the last block of the previous page.
+  */
+  if(pg.blocks.length<=1&&pi>0){
+    const ppi=pi-1;
+    const ppg=pages[ppi];
+    const tb=ppg.blocks[ppg.blocks.length-1];
+    pages.splice(pi,1);aPI=ppi;
+    dirty();renderAll();if(tb)focB(tb.id,true);
+    return;
+  }
+
+  /*
+    CASE 3: First block on a non-first page BUT page has more blocks.
+    Merge: move this page's remaining blocks into the previous page,
+    then delete this page. Like pressing backspace at the top of a
+    page in a word processor.
+  */
+  if(idx===0&&pi>0){
+    const ppi=pi-1;
+    const ppg=pages[ppi];
+    const tb=ppg.blocks[ppg.blocks.length-1];
+    // Remove this block, move the rest to previous page
+    pg.blocks.splice(0,1);
+    ppg.blocks=ppg.blocks.concat(pg.blocks);
+    pages.splice(pi,1);aPI=ppi;
+    dirty();renderAll();if(tb)focB(tb.id,true);
+    return;
+  }
+
+  /*
+    CASE 4: First block on the FIRST page with multiple blocks.
+    Just delete it and focus the next block.
+  */
+  if(idx===0&&pi===0){
+    pg.blocks.splice(0,1);
+    const tb=pg.blocks[0];
+    dirty();renderAll();if(tb)focB(tb.id);
+    return;
+  }
+
+  /*
+    CASE 5: Normal case — block in the middle or end of a page.
+    Delete it and focus the previous block.
+  */
+  pg.blocks.splice(idx,1);
+  const ti=Math.max(0,idx-1);const tb=pg.blocks[ti];
+  dirty();renderAll();if(tb)focB(tb.id,true);
+}
+
+/* ═══════════════════════════════════
+   FOCUS MANAGEMENT
+   ═══════════════════════════════════ */
+
+function focB(bid,end=false){
+  requestAnimationFrame(()=>{
+    // Always clear ALL active highlights first
+    clrAct();
+    const w=document.querySelector(`[data-bid="${bid}"]`);
+    if(!w)return;
+    w.classList.add('b-active');
+    aBID=bid;
+    aPI=findPI(bid);
+    if(w.classList.contains('b-panel')){
+      w.focus();
+      upTB('panel');
+      w.scrollIntoView({behavior:'smooth',block:'center'});
+      return;
+    }
+    /*
+      For dialogue blocks: if end=true we want to land at the END
+      of the block, which means the dialogue text field — not the
+      character name. If end=false (normal forward focus), we land
+      on the character name as usual.
+    */
+    let inp;
+    if(end){
+      // Prefer the last field: dialogue text > caption > desc > sfx > char name
+      inp=w.querySelector('.dlg-ti')||w.querySelector('.bi')||w.querySelector('.sfx-i')||w.querySelector('.dlg-ci');
+    }else{
+      // Prefer the first field: character name > textarea > sfx
+      inp=w.querySelector('.dlg-ci')||w.querySelector('.bi')||w.querySelector('.sfx-i');
+    }
+    if(inp){
+      inp.focus();
+      if(end){const l=inp.value?inp.value.length:0;inp.selectionStart=l;inp.selectionEnd=l}
+      w.scrollIntoView({behavior:'smooth',block:'center'});
+    }
+  });
+}
+
+function getAll(w){
+  const r=[];
+  const a=w.querySelector('.dlg-ci');if(a)r.push(a);
+  const b=w.querySelector('.bi');if(b)r.push(b);
+  const c=w.querySelector('.sfx-i');if(c)r.push(c);
+  return r;
+}
+
+function clrAct(){document.querySelectorAll('.b-active').forEach(e=>e.classList.remove('b-active'))}
+
+function sync(w,b){
+  if(b.type==='dialogue'){
+    const ci=w.querySelector('[data-field="character"]');
+    const ti=w.querySelector('[data-field="text"]');
+    if(ci)b.character=ci.value;if(ti)b.text=ti.value;
+  }else if(b.type!=='panel'){
+    const inp=w.querySelector('.bi')||w.querySelector('.sfx-i');
+    if(inp)b.text=inp.value;
+  }
+}
+
+function autoG(el){if(el&&el.tagName==='TEXTAREA'){el.style.height='auto';el.style.height=el.scrollHeight+'px'}}
+
+/* ═══════════════════════════════════
+   TOOLBAR & STATS
+   ═══════════════════════════════════ */
+
+function upTB(type){
+  const info=T.find(t=>t.key===type);
+  if(info){btd.style.background=info.color;bname.textContent=info.name}
+}
+function upSt(){
+  document.getElementById('stPg').textContent=pages.length;
+  const cp=pages[aPI];
+  document.getElementById('stPn').textContent=cp?cntPn(cp):0;
+  document.getElementById('stW').textContent=cntW();
+}
+
+/* ═══════════════════════════════════
+   PAGES
+   ═══════════════════════════════════ */
+
+function addNewPage(){
+  const np=mkP('scene');
+  pages.splice(aPI+1,0,np);aPI++;
+  dirty();renderAll();focB(np.blocks[0].id);toast('New page added');
+}
+function confirmClear(){document.getElementById('mclr').classList.add('open')}
+function closeClr(){document.getElementById('mclr').classList.remove('open')}
+function doClear(){
+  closeClr();const pg=pages[aPI];if(!pg)return;
+  pg.blocks=[mkB('scene')];pg.title='';
+  dirty();renderAll();focB(pg.blocks[0].id);toast('Page cleared');
+}
+
+/* ═══════════════════════════════════
+   TYPE PICKER
+   ═══════════════════════════════════ */
+let pkT=null;
+function showPk(at){
+  pk.innerHTML='<div class="pk-hdr">Block type — Tab to cycle</div>';
+  T.forEach(t=>{
+    const d=document.createElement('div');
+    d.className='pk-item'+(t.key===at?' active':'');
+    d.innerHTML=`<div class="pk-dot" style="background:${t.color}"></div>
+      <span class="pk-name">${t.name}</span>`;
+    d.addEventListener('mousedown',e=>{e.preventDefault();selPk(t.key)});
+    pk.appendChild(d);
+  });
+  const r=document.getElementById('etb').getBoundingClientRect();
+  pk.style.top=(r.bottom+4)+'px';pk.style.left=(r.left+16)+'px';
+  pk.classList.add('open');pkbd.classList.add('open');
+  clearTimeout(pkT);pkT=setTimeout(()=>{pk.classList.remove('open');pkbd.classList.remove('open')},1500);
+}
+function selPk(key){
+  if(!aBID)return;
+  const pi=findPI(aBID);if(pi<0)return;
+  const b=pages[pi].blocks.find(x=>x.id===aBID);if(!b)return;
+  if((b.text||'').trim()||(b.character||'').trim())return;
+  b.type=key;b.text='';b.character='';
+  dirty();renderAll();focB(b.id);
+  pk.classList.remove('open');pkbd.classList.remove('open');clearTimeout(pkT);
+}
+pkbd.addEventListener('click',()=>{pk.classList.remove('open');pkbd.classList.remove('open')});
+
+/* ═══════════════════════════════════
+   SAVE / LOAD — multi-draft
+   ═══════════════════════════════════ */
+
+function dirty(){
+  setSS('go');clearTimeout(saveT);saveT=setTimeout(doSave,1500);
+}
+function doSave(){
+  // Sync pages back to the current draft before saving
+  const d=curDraft();
+  if(d){d.pages=pages;d.updatedAt=Date.now()}
+  try{
+    localStorage.setItem(KEY,JSON.stringify({
+      drafts,currentId,nextId:nxId,theme:isLt?'light':'dark'
+    }));
+    setSS('ok');
+  }catch(e){console.error('Save failed:',e);setSS('err')}
+}
+function loadS(){
+  try{
+    const r=localStorage.getItem(KEY);if(!r)return false;
+    const d=JSON.parse(r);
+    if(d.drafts){
+      drafts=d.drafts;currentId=d.currentId||null;
+      nxId=d.nextId||drafts.length*100+100;
+      isLt=d.theme==='light';
+      return true;
+    }
+  }catch(e){console.error('Load failed:',e)}
+  return false;
+}
+function setSS(s){
+  const dot=document.getElementById('sdot'),lbl=document.getElementById('slbl');
+  if(!dot)return;
+  dot.className='sdot';
+  if(s==='ok'){dot.classList.add('ok');lbl.textContent='Saved'}
+  else if(s==='go'){dot.classList.add('go');lbl.textContent='Saving…'}
+  else lbl.textContent='Ready';
+}
+
+/** Get the current draft object */
+function curDraft(){return drafts.find(d=>d.id===currentId)}
+
+/** Relative time display for "last edited" */
+function relTime(ts){
+  const d=Date.now()-ts;
+  if(d<60000)return'just now';
+  if(d<3600000)return Math.floor(d/60000)+'m ago';
+  if(d<86400000)return Math.floor(d/3600000)+'h ago';
+  return Math.floor(d/86400000)+'d ago';
+}
+
+/* ═══════════════════════════════════
+   SCREEN SWITCHING
+   ═══════════════════════════════════ */
+
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const s=document.getElementById('screen-'+name);
+  if(s)s.classList.add('active');
+  // Show/hide editor-only elements
+  const gh=document.getElementById('gh');
+  if(gh)gh.style.display=name==='editor'?'':'none';
+}
+
+function goHome(){
+  doSave();
+  showScreen('home');
+  renderHome();
+}
+
+/* ═══════════════════════════════════
+   HOME SCREEN
+   ═══════════════════════════════════ */
+
+function renderHome(){
+  const list=document.getElementById('draft-list');
+  if(!list)return;
+  if(!drafts.length){
+    list.innerHTML='<div class="hempty">No scripts yet.<br>Tap New Script to start writing.</div>';
+    return;
+  }
+  list.innerHTML='';
+  // Sort by most recently updated
+  [...drafts].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).forEach(draft=>{
+    const pgCount=draft.pages?draft.pages.length:0;
+    const panelCount=draft.pages?draft.pages.reduce((n,p)=>n+p.blocks.filter(b=>b.type==='panel').length,0):0;
+    const card=document.createElement('div');card.className='dcard';
+    card.innerHTML=`
+      <div class="dcpip"></div>
+      <div class="dcbody">
+        <div class="dctitle">${esc(draft.title||'Untitled')}</div>
+        <div class="dcmeta">${pgCount} page${pgCount!==1?'s':''} · ${panelCount} panel${panelCount!==1?'s':''} · ${relTime(draft.updatedAt||draft.createdAt)}</div>
+      </div>
+      <div class="dcactions">
+        <button class="dcdel" title="Delete script" data-did="${draft.id}">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4h10M6 4V3h4v1M5 4v9h6V4"/></svg>
+        </button>
+      </div>
+      <div class="dcarr">›</div>
+    `;
+    // Click card → open draft
+    card.addEventListener('click',(e)=>{
+      // Don't open if they clicked the delete button
+      if(e.target.closest('.dcdel'))return;
+      openDraft(draft.id);
+    });
+    // Delete button
+    const delBtn=card.querySelector('.dcdel');
+    delBtn.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      confirmDeleteScript(draft.id,draft.title);
+    });
+    list.appendChild(card);
+  });
+}
+
+/* ═══════════════════════════════════
+   DRAFT CRUD
+   ═══════════════════════════════════ */
+
+function openNewModal(){
+  document.getElementById('newTitle').value='';
+  document.getElementById('mnew').classList.add('open');
+  setTimeout(()=>document.getElementById('newTitle').focus(),100);
+}
+function closeNewModal(){document.getElementById('mnew').classList.remove('open')}
+
+function createScript(){
+  const title=document.getElementById('newTitle').value.trim()||'Untitled Script';
+  const draft={
+    id:uid(),
+    title:title,
+    pages:[mkP('scene')],
+    characters:[],  // Learned character names for autocomplete
+    createdAt:Date.now(),
+    updatedAt:Date.now()
+  };
+  drafts.unshift(draft);
+  doSave();
+  closeNewModal();
+  openDraft(draft.id);
+}
+
+function openDraft(id){
+  const d=drafts.find(x=>x.id===id);
+  if(!d)return;
+  currentId=id;
+  pages=d.pages;
+  aPI=0;aBID=null;
+  // Update breadcrumb
+  document.getElementById('ecrumb').textContent=d.title||'Untitled';
+  showScreen('editor');
+  renderAll();
+  setSS('ok');
+  // Focus first block
+  if(pages.length&&pages[0].blocks.length){
+    focB(pages[0].blocks[0].id);
+  }
+}
+
+function confirmDeleteScript(id,title){
+  deleteTargetId=id;
+  document.getElementById('mdelMsg').textContent=
+    'Permanently delete "'+( title||'Untitled')+'"? This can\'t be undone.';
+  document.getElementById('mdel').classList.add('open');
+}
+function closeDelModal(){
+  document.getElementById('mdel').classList.remove('open');
+  deleteTargetId=null;
+}
+function doDeleteScript(){
+  if(!deleteTargetId)return;
+  drafts=drafts.filter(d=>d.id!==deleteTargetId);
+  // If we deleted the currently open draft, clear it
+  if(currentId===deleteTargetId){currentId=null;pages=[]}
+  doSave();
+  closeDelModal();
+  renderHome();
+  toast('Script deleted');
+}
+
+/* ═══════════════════════════════════
+   EXPORT
+   ═══════════════════════════════════ */
+
+function openExp(){document.getElementById('mexp').classList.add('open')}
+function closeExp(){document.getElementById('mexp').classList.remove('open')}
+function expPDF(){closeExp();toast('Opening print dialog…');setTimeout(()=>window.print(),400)}
+function expTXT(){
+  closeExp();
+  const L=[];
+  pages.forEach((pg,pi)=>{
+    L.push('','═'.repeat(50));
+    L.push(`PAGE ${pi+1}${pg.title?' — '+pg.title:''}`);
+    L.push('═'.repeat(50),'');
+    let pn=0;
+    pg.blocks.forEach(b=>{
+      switch(b.type){
+        case 'panel':pn++;L.push('','─'.repeat(20)+` PANEL ${pn} `+'─'.repeat(20));break;
+        case 'scene':L.push('',(b.text||'').toUpperCase());break;
+        case 'desc':L.push('',b.text||'');break;
+        case 'dialogue':
+          L.push('','                      '+(b.character||'').toUpperCase());
+          if(b.text)(b.text||'').split('\n').forEach(l=>L.push('          '+l));
+          break;
+        case 'caption':L.push('',`[CAPTION: ${b.text||''}]`);break;
+        case 'sfx':L.push('',`**${(b.text||'').toUpperCase()}**`);break;
+      }
+    });
+  });
+  const blob=new Blob([L.join('\n')],{type:'text/plain'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='panelsync_script.txt';a.click();
+  URL.revokeObjectURL(url);toast('Script downloaded as .txt');
+}
+
+/* ═══════════════════════════════════
+   THEME
+   ═══════════════════════════════════ */
+
+function toggleTheme(){
+  isLt=!isLt;document.body.classList.toggle('light',isLt);dirty();
+  // Update both theme icons (home + editor)
+  const sun='<circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/>';
+  const moon='<path d="M8 12a4 4 0 100-8 4 4 0 000 8z"/><path d="M12 8a4 4 0 01-4 4"/>';
+  const svg=isLt?moon:sun;
+  ['ticon','ticon-home'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.innerHTML=svg;
+  });
+}
+
+/* ═══════════════════════════════════
+   TOAST
+   ═══════════════════════════════════ */
+let _tt;
+function toast(m){
+  const e=document.getElementById('toast');e.textContent=m;e.classList.add('on');
+  clearTimeout(_tt);_tt=setTimeout(()=>e.classList.remove('on'),2500);
+}
+
+/* ═══════════════════════════════════
+   CLIPBOARD — Copy, Cut, Paste blocks
+   ═══════════════════════════════════
+   
+   How this works:
+   - ⌘C / Ctrl+C on a focused block copies its content as 
+     plain text AND stores the block data in a JS variable
+     so we can paste it back as a structured block.
+   - ⌘V / Ctrl+V pastes. If we have a stored block, it inserts
+     a new block with that data. Otherwise, it pastes plain text
+     into the current input normally.
+   - ⌘X / Ctrl+X copies then deletes the block.
+   - ⌘A / Ctrl+A selects all text in the current input field.
+     (Default browser behavior handles this, but we make sure
+     it doesn't accidentally select the whole page.)
+   - Native text selection within inputs works normally — you can
+     select text, copy it, paste it, etc. just like any text field.
+*/
+
+let clipBlock=null; // Stores a copied block for structured paste
+
+/**
+ * Convert a block to plain text for the system clipboard.
+ * This way if you paste into another app, you get readable text.
+ */
+function blockToText(b){
+  switch(b.type){
+    case 'panel': return '--- PANEL ---';
+    case 'scene': return (b.text||'').toUpperCase();
+    case 'desc': return b.text||'';
+    case 'dialogue': return (b.character||'').toUpperCase()+'\n'+(b.text||'');
+    case 'caption': return '['+( b.text||'')+']';
+    case 'sfx': return '**'+(b.text||'').toUpperCase()+'**';
+    default: return b.text||'';
+  }
+}
+
+/**
+ * Handle copy event at the document level.
+ * If the user has text selected within an input, let the browser
+ * handle it normally. If nothing is selected, copy the whole block.
+ */
+document.addEventListener('copy',e=>{
+  // If there's a text selection inside an input, let browser handle it
+  const sel=window.getSelection();
+  if(sel&&sel.toString().length>0)return;
+  
+  // Otherwise copy the entire active block
+  if(!aBID)return;
+  const pi=findPI(aBID);if(pi<0)return;
+  const b=pages[pi].blocks.find(x=>x.id===aBID);
+  if(!b)return;
+  
+  // Store structured copy
+  clipBlock=JSON.parse(JSON.stringify(b));
+  clipBlock.id=uid(); // Give it a new ID for pasting
+  
+  // Put plain text on system clipboard
+  e.clipboardData.setData('text/plain',blockToText(b));
+  e.preventDefault();
+  toast('Block copied');
+});
+
+/**
+ * Handle cut = copy + delete
+ */
+document.addEventListener('cut',e=>{
+  const sel=window.getSelection();
+  if(sel&&sel.toString().length>0)return;
+  
+  if(!aBID)return;
+  const pi=findPI(aBID);if(pi<0)return;
+  const b=pages[pi].blocks.find(x=>x.id===aBID);
+  if(!b)return;
+  
+  clipBlock=JSON.parse(JSON.stringify(b));
+  clipBlock.id=uid();
+  
+  e.clipboardData.setData('text/plain',blockToText(b));
+  e.preventDefault();
+  
+  // Delete the block
+  delBack(b,pi);
+  toast('Block cut');
+});
+
+/**
+ * Handle paste. If we have a structured block in our internal
+ * clipboard, insert it as a new block. Otherwise, let the browser
+ * paste text into the current input normally.
+ */
+document.addEventListener('paste',e=>{
+  // If we're focused inside an input field, let normal paste work
+  // (user is pasting text into their scene description, dialogue, etc.)
+  const ae=document.activeElement;
+  const inInput=ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA');
+  
+  // If there's selected text in an input, just let browser paste
+  if(inInput){
+    // Let browser handle — plain text paste into the field
+    // But strip formatting (paste as plain text only)
+    const text=e.clipboardData.getData('text/plain');
+    if(text){
+      e.preventDefault();
+      // Insert at cursor position
+      const start=ae.selectionStart;
+      const end=ae.selectionEnd;
+      const val=ae.value;
+      ae.value=val.slice(0,start)+text+val.slice(end);
+      ae.selectionStart=ae.selectionEnd=start+text.length;
+      // Trigger input event so data syncs
+      ae.dispatchEvent(new Event('input',{bubbles:true}));
+    }
+    return;
+  }
+  
+  // If we're focused on a panel block or the page, and we have
+  // a stored block, insert it after the current position
+  if(clipBlock&&aBID){
+    e.preventDefault();
+    const pi=findPI(aBID);if(pi<0)return;
+    const pg=pages[pi];
+    const idx=pg.blocks.findIndex(x=>x.id===aBID);
+    
+    // Clone the block with a fresh ID
+    const nb=JSON.parse(JSON.stringify(clipBlock));
+    nb.id=uid();
+    pg.blocks.splice(idx+1,0,nb);
+    
+    dirty();renderAll();focB(nb.id);
+    toast('Block pasted');
+  }
+});
+
+/* ═══════════════════════════════════
+   GLOBAL KEYS
+   ═══════════════════════════════════ */
+
+document.addEventListener('keydown',e=>{
+  if(document.querySelector('.mov.open'))return;
+  if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){
+    if(!document.activeElement.closest('[data-bid]')){e.preventDefault();addNewPage()}
+    return;
+  }
+  const ae=document.activeElement;
+  if(ae===document.body||ae===ss){
+    if(e.key.length===1&&!e.ctrlKey&&!e.metaKey&&aBID)focB(aBID);
+  }
+});
+
+/* ═══════════════════════════════════
+   INIT
+   ═══════════════════════════════════ */
+
+function init(){
+  const ok=loadS();
+  document.body.classList.toggle('light',isLt);
+
+  if(ok&&drafts.length>0){
+    // We have saved drafts — show home screen
+    renderHome();
+    showScreen('home');
+    // Hide hints until editor is open
+    const gh=document.getElementById('gh');if(gh)gh.style.display='none';
+  }else{
+    // First time — show home screen with no drafts
+    drafts=[];
+    renderHome();
+    showScreen('home');
+    const gh=document.getElementById('gh');if(gh)gh.style.display='none';
+  }
+}
+init();
+</script>
+</body>
+</html>
