@@ -9,16 +9,17 @@
 3. [Navigation System](#3-navigation-system)
 4. [Universes Dashboard](#4-universes-dashboard)
 5. [Universe Home](#5-universe-home)
-6. [Script Editor](#6-script-editor)
-7. [Storyboard Canvas](#7-storyboard-canvas)
-8. [Universe Bible](#8-universe-bible)
-9. [Timeline Tool](#9-timeline-tool)
-10. [Notes System](#10-notes-system)
-11. [Collaboration](#11-collaboration)
-12. [Export & Sharing](#12-export--sharing)
-13. [MVP Feature Status](#13-mvp-feature-status)
-14. [Deferred (v2+)](#14-deferred-v2)
-15. [Open Questions](#15-open-questions)
+6. [Series / Issue View](#6-series--issue-view)
+7. [Script Editor](#7-script-editor)
+8. [Storyboard Canvas](#8-storyboard-canvas)
+9. [Universe Bible](#9-universe-bible)
+10. [Timeline Tool](#10-timeline-tool)
+11. [Notes System](#11-notes-system)
+12. [Collaboration](#12-collaboration)
+13. [Export & Sharing](#13-export--sharing)
+14. [MVP Feature Status](#14-mvp-feature-status)
+15. [Deferred (v2+)](#15-deferred-v2)
+16. [Open Questions](#16-open-questions)
 
 ---
 
@@ -84,12 +85,7 @@ Universes Dashboard → Universe → Series → Issue → Page
 - Universe switching always happens from this screen — you never switch universes mid-session
 
 ### The Binder (Persistent Sidebar)
-The binder is the primary navigation and content tree for the open universe. Modeled on Scrivener's binder. It shows everything that exists in the universe — series, issues, pages, characters, locations, timelines, notes — all in one place, always accessible while working.
-
-**Layout:**
-- **Header**: search bar only (sort and view mode moved to global View button)
-- **Body**: full content tree of the universe
-- **Footer**: row of type-tag icons
+The binder is the default home for all navigation panels in the universe. It is composed of discrete sections — each section can live inside the binder or be torn off and docked as its own column anywhere in the workspace.
 
 **Collapse behavior:**
 - Persistent and visible by default
@@ -98,26 +94,41 @@ The binder is the primary navigation and content tree for the open universe. Mod
 - No icon rail in collapsed state — fully hidden, content expands to fill
 
 **Search bar:**
-- Always at the top of the binder header
+- Pinned at the top of the binder, above all sections
 - Hides on scroll up, reappears on scroll down
 - Searches all content within the universe
 
-**Body — content tree:**
-- Contains all universe content: series/issue/page hierarchy, characters, locations, timelines, notes, and any user-created bins
-- Entity types (Character, Location, etc.) are tags, not rigid containers — an item can carry multiple type tags (e.g. Ego the Living Planet tagged as both Character and Location)
-- Items can be organized into user-created folders/bins
-- The series/issue/page hierarchy is the primary structural spine
+**Binder sections — default:**
+
+| Section | Contents |
+|---------|----------|
+| **Series/Issue/Page** | Expandable hierarchy accordion. Issues expand to show pages; each page row has Script and Storyboard quick-open icons. |
+| **Arc Notes** | Series-level notes and context for the current series. |
+| **Characters** | Universe characters, filterable to those relevant to the current series. |
+| **Timeline** | Quick reference view of the universe timeline. |
+| **Notes** | Universe, series, and issue-level notes. |
+
+**Binder sections — custom:**
+- Users can create their own sections containing any combination of items from the universe
+- Custom sections behave identically to default sections — they can be reordered within the binder or torn off as columns
+- Name, contents, and icon are user-defined
+
+**Section tear-off:**
+- Long press a section header + drag → detaches the section from the binder
+- Detached sections snap to fixed column positions in the workspace (left edge, right edge, between binder and editor)
+- Drag a detached column back onto the binder → re-docks it
+- Layout persists per-universe per-user
+
+**Item interactions:**
+- **Tap** → opens the item in the main content area
+- **Long press** → context menu (items include: Open, Open in Split, Rename, Delete, Select, Pin)
+- **"Select" from context menu** → enters selection mode. Single taps accumulate selection. Bulk action toolbar appears at the bottom of the binder.
+- Selection mode exited by tapping Done or deselecting all items
 
 **Footer — type-tag icons:**
-- A single compact row of icons for each default type: Character, Location, Timeline, Notes
-- Tapping an icon opens a filtered view of all items in the universe carrying that tag
-- Lives at the bottom of the binder, always visible
-
-**Interactions:**
-- **Tap** → opens the item in the main content area
-- **Long press** → context menu (items include: Open, Open in Split, Rename, Delete, Select)
-- **"Select" from context menu** → enters selection mode. Single taps now accumulate selection. A bulk action toolbar appears at the bottom of the binder.
-- Selection mode exited by tapping Done or deselecting all items
+- A compact row of icons for each default type: Character, Location, Timeline, Notes
+- Tapping an icon opens a filtered view of all items in the universe with that tag
+- Always visible at the bottom of the binder, even when sections are scrolled
 
 ### Global Chrome (Top Bar)
 A minimal persistent top bar present on every screen inside a universe.
@@ -199,7 +210,7 @@ Triggered by tapping "+" or the ghost card. A tabbed modal with a persistent Cre
 
 | Tab | Fields |
 |-----|--------|
-| **Basics** | Universe name (required), cover image (optional) |
+| **Basics** | Universe name (required), cover image (optional), Series label (default: "Series"), Issue label (default: "Issue") |
 | **Timeline** | Timescale setting: Pure Sequence / Standard Earth Time / Custom |
 | **Collaborators** | Invite by email, assign role (Editor / Viewer) |
 
@@ -239,7 +250,51 @@ The Universe Home is composed of toggleable, reorderable sections. All four are 
 
 ---
 
-## 6. Script Editor
+## 6. Series / Issue View
+
+### Hierarchy Label Customization
+The two structural levels below Universe are user-labeled. Defaults are "Series" and "Issue." Examples: Volume/Chapter, Season/Episode, Arc/Issue. Labels are set in the Create Universe modal and editable in Universe Settings. All UI copy throughout the universe respects the custom labels.
+
+### Series/Issue/Page Accordion (Binder Section)
+The primary navigation structure for story content. Lives in the binder by default; can be torn off as a standalone column.
+
+```
+Series 1 — Title                    [status]
+  Issue 1 — Title         [Script] [Storyboard]  [status]
+    Page 1                [Script] [Storyboard]
+    Page 2                [Script] [Storyboard]
+  Issue 2 — Title         [Script] [Storyboard]  [status]
+    (collapsed)
+Series 2 — Title                    [status]
+  (collapsed)
+```
+
+- Tap a series row → expands to show issues
+- Tap an issue row → expands to show pages
+- Tap a Script or Storyboard icon on any row → opens that editor in the main content area
+- Long press any row → context menu (Open, Rename, Delete, Add Issue, Add Page, etc.)
+- "+" at the bottom of each level → creates a new series, issue, or page
+
+### Arc Notes Section
+- Series-level notes and context
+- Lives in the binder by default; can be torn off as a column
+- Editable rich text
+
+### Characters Section
+- Shows universe characters
+- Can be filtered to show only characters relevant to the current series (via series overlays)
+- Lives in the binder by default; can be torn off as a column
+
+### Working Layout Examples
+Default (everything in binder):
+> **Binder** | Script editor
+
+Power user (arc notes and hierarchy torn off):
+> **Binder** | **Arc Notes column** | **Series/Issue/Page column** | Script editor
+
+---
+
+## 7. Script Editor
 
 > Single shared component. Runs identically on iPad and web.
 
