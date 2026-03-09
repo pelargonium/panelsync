@@ -120,10 +120,30 @@ The binder is the default home for all navigation panels in the universe. It is 
 - Layout persists per-universe per-user
 
 **Item interactions:**
-- **Tap** → opens the item in the main content area
 - **Long press** → context menu (items include: Open, Open in Split, Rename, Delete, Select, Pin)
 - **"Select" from context menu** → enters selection mode. Single taps accumulate selection. Bulk action toolbar appears at the bottom of the binder.
 - Selection mode exited by tapping Done or deselecting all items
+
+**Binder tap behavior by item type:**
+
+| Item | Tap target | Result |
+|------|-----------|--------|
+| Series row | Triangle/chevron | Expands/collapses accordion in place |
+| Series row | Name | Opens Series Map in main content area |
+| Issue row | Triangle/chevron | Expands/collapses accordion in place |
+| Issue row | Name | Opens Issue Map in main content area |
+| Page row | Script icon | Opens Script editor |
+| Page row | Storyboard icon | Opens Storyboard canvas |
+| Character | Name | Opens Character detail view |
+| Location | Name | Opens Location detail view |
+| Timeline | Name | Opens Timeline editor |
+| Note | Name | Opens Note editor |
+| Type-tag icon (footer) | Icon | Opens filtered list of all items with that tag |
+
+**Series Map / Issue Map** *(earmarked for expansion in v2+)*
+- Series Map: a grid/overview of all issues in the series — issue number, title, page count, status. Starting point for future arc planning tools.
+- Issue Map: a grid/overview of all pages in the issue — page thumbnail or status tile. Starting point for future pacing and layout tools.
+- In v1 these are read-only overview screens. Future: annotations, arc overlays, drag-to-reorder.
 
 **Footer — type-tag icons:**
 - A compact row of icons for each default type: Character, Location, Timeline, Notes
@@ -269,9 +289,11 @@ Series 2 — Title                    [status]
   (collapsed)
 ```
 
-- Tap a series row → expands to show issues
-- Tap an issue row → expands to show pages
-- Tap a Script or Storyboard icon on any row → opens that editor in the main content area
+- Tap the **triangle/chevron** on a series row → expands/collapses to show issues
+- Tap the **series name** → opens the Series Map in the main content area
+- Tap the **triangle/chevron** on an issue row → expands/collapses to show pages
+- Tap the **issue name** → opens the Issue Map in the main content area
+- Tap a **Script or Storyboard icon** on any row → opens that editor in the main content area
 - Long press any row → context menu (Open, Rename, Delete, Add Issue, Add Page, etc.)
 - "+" at the bottom of each level → creates a new series, issue, or page
 
@@ -298,44 +320,75 @@ Power user (arc notes and hierarchy torn off):
 
 > Single shared component. Runs identically on iPad and web.
 
+### Document Model
+- One script editor session = all pages of an issue in a single continuously scrollable document
+- Pages are visually delimited by a "Page N" header/divider but there is no pagination — it scrolls like a word processor
+- Quick navigation: tapping a page row in the binder accordion scrolls the editor to that page instantly
+- Opening the script from a specific page row in the binder opens the editor scrolled to that page
+
+### Block Selector Bar
+The block selector bar is the script editor's persistent toolbar. It is not floating or repositionable — its position is determined by keyboard state:
+- **On-screen keyboard active**: bar appears as a keyboard accessory (fixed strip above the keyboard)
+- **Physical keyboard connected**: bar is pinned to the bottom edge of the editor pane
+
+**Bar contents (left to right):**
+
+| Group | Items |
+|-------|-------|
+| Block types | Panel · Scene · Description · Dialogue · Caption · SFX |
+| Inline formatting | Bold · Italic |
+| Overflow | `···` |
+
+- Tapping a block type button converts the current block to that type
+- Bold and Italic apply to selected text within Description, Dialogue, and Caption blocks only
+- `···` overflow contains: Find/Replace, and future editor-specific options
+- All actions also have keyboard shortcuts (see below)
+
 ### Block Types
 
-| Block | Trigger | Behavior |
-|-------|---------|----------|
-| **Panel** | Cmd/Ctrl+Enter | Auto-numbered. Renumbers on delete. |
-| **Scene Heading** | Tab from Panel | INT./EXT., location, time of day. Keywords: INT., EXT., WIDE, CLOSEUP, MEDIUM, HORIZON, BIRD'S EYE, WORM'S EYE |
-| **Description** | Enter from Scene | Action lines. Size tags: `[page-width]` `[half]` `[1/3]` `[remainder]` |
-| **Dialogue** | Tab from Description | Character name (with Universe Bible autocomplete) + dialogue text |
-| **Caption** | — | Narration or caption box text |
-| **SFX** | — | Sound effect. Rendered large and stylized in storyboard preview |
+| Block | Behavior |
+|-------|----------|
+| **Panel** | Auto-numbered. Renumbers on delete. |
+| **Scene Heading** | INT./EXT., location, time of day. Keywords: INT., EXT., WIDE, CLOSEUP, MEDIUM, HORIZON, BIRD'S EYE, WORM'S EYE |
+| **Description** | Action lines. Size tags: `[page-width]` `[half]` `[1/3]` `[remainder]`. Supports bold/italic. |
+| **Dialogue** | Character name (with Universe Bible autocomplete) + dialogue text. Supports bold/italic. |
+| **Caption** | Narration or caption box text. Supports bold/italic. |
+| **SFX** | Sound effect. Rendered large and stylized in storyboard preview. |
 
 ### Keyboard Flow
 
 | Current Block | Enter → | Tab → |
 |--------------|---------|-------|
-| Scene | Action | Panel |
-| Action | Action | Character |
-| Character | Dialogue | — (empty+Enter → new Panel+Description) |
-| Dialogue | Dialogue | New Character (Double-Tab → escape to Action) |
 | Panel | Scene | — |
-| SFX/Caption | Action | — |
+| Scene | Description | Panel |
+| Description | Description | Character name |
+| Character name | Dialogue | — (empty + Enter → new Panel + Scene) |
+| Dialogue | Dialogue | New character name (Double-Tab → escape to Description) |
+| Caption | Description | — |
+| SFX | Description | — |
 
-Backspace on empty block → delete + focus previous. Shift+Enter → newline within description/caption/dialogue.
+- Backspace on empty block → delete + focus previous block
+- Shift+Enter → newline within Description, Caption, or Dialogue
+- Cmd/Ctrl+B → Bold. Cmd/Ctrl+I → Italic.
 
-### Editor Modes
-- **Standard** — script (60%) + storyboard preview (40%). iPad right panel is live Skia canvas.
-- **Distraction-free** — Cmd/Ctrl+Shift+F. Full screen.
-- **Outline** — collapsed to panel headings only.
+### Distraction-Free Mode
+- **Enter/exit**: 4-finger tap (toggle). Same gesture exits.
+- Also exits if the user swipes from the left edge to reveal the binder, or otherwise reveals global chrome.
+- In distraction-free: binder hidden, global chrome hidden, block selector bar remains visible (it's the only way to change blocks on touch).
+- Full pane width used for the script.
+
+### Outline Mode
+Deferred — spec after v1 script editor ships.
 
 ### Auto-save
-Debounced 1.5s after last keystroke. Animated save indicator in toolbar.
+Debounced 1.5s after last keystroke. Save state reflected in the global chrome save/sync indicator.
 
 ### References
 `panelsync-script-editor.html`, `panelsync-mockup.html`
 
 ---
 
-## 6. Storyboard Canvas
+## 8. Storyboard Canvas
 
 Every Page has a permanently paired storyboard canvas. Script page and storyboard are always created together.
 
@@ -358,7 +411,7 @@ Every Page has a permanently paired storyboard canvas. Script page and storyboar
 
 ---
 
-## 7. Universe Bible
+## 9. Universe Bible
 
 ### Characters
 - Fields: name, role, appearance, backstory, series appearances, color
@@ -383,7 +436,7 @@ Reference: `panelsync-universe-home.html`
 
 ---
 
-## 8. Timeline Tool
+## 10. Timeline Tool
 
 > PanelSync's most distinctive feature. No other comic tool provides this.
 
@@ -422,7 +475,7 @@ Reference: `panelsync-timeline.html`, `panelsync-tick-explore.html`
 
 ---
 
-## 9. Notes System
+## 11. Notes System
 
 - Notes at Universe, Series, or Issue level
 - Folder organization with drag-and-drop
@@ -433,7 +486,7 @@ Reference: `panelsync-timeline.html`, `panelsync-tick-explore.html`
 
 ---
 
-## 10. Collaboration
+## 12. Collaboration
 
 ### MVP (Async)
 - Invite by email → link to create account + join Universe
@@ -451,7 +504,7 @@ Reference: `panelsync-timeline.html`, `panelsync-tick-explore.html`
 
 ---
 
-## 11. Export & Sharing
+## 13. Export & Sharing
 
 ### MVP
 - Script PDF — industry-standard comic script format. Background job, download notification.
@@ -466,7 +519,7 @@ Reference: `panelsync-timeline.html`, `panelsync-tick-explore.html`
 
 ---
 
-## 12. MVP Feature Status
+## 14. MVP Feature Status
 
 | Feature | Status |
 |---------|--------|
@@ -498,7 +551,7 @@ Reference: `panelsync-timeline.html`, `panelsync-tick-explore.html`
 
 ---
 
-## 13. Deferred (v2+)
+## 15. Deferred (v2+)
 
 ### First Wave (after MVP validation)
 - Storyboard auto-generation from script parser
@@ -522,7 +575,7 @@ Reference: `panelsync-timeline.html`, `panelsync-tick-explore.html`
 
 ---
 
-## 14. Open Questions
+## 16. Open Questions
 
 *Decisions deferred pending implementation experience*
 
