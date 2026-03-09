@@ -348,12 +348,28 @@ The block selector bar is the script editor's persistent toolbar. It is not floa
 
 | Block | Behavior |
 |-------|----------|
-| **Panel** | Auto-numbered. Renumbers on delete. |
+| **Panel** | Auto-numbered. Renumbers on delete. Carries an optional size tag (see Panel Size Tags below). |
 | **Scene Heading** | INT./EXT., location, time of day. Keywords: INT., EXT., WIDE, CLOSEUP, MEDIUM, HORIZON, BIRD'S EYE, WORM'S EYE |
-| **Description** | Action lines. Size tags: `[page-width]` `[half]` `[1/3]` `[remainder]`. Supports bold/italic. |
+| **Description** | Action lines. Supports bold/italic. |
 | **Dialogue** | Character name (with Universe Bible autocomplete) + dialogue text. Supports bold/italic. |
 | **Caption** | Narration or caption box text. Supports bold/italic. |
 | **SFX** | Sound effect. Rendered large and stylized in storyboard preview. |
+
+### Panel Size Tags
+Each Panel block carries an optional size tag controlling its vertical height on the page. The tag is displayed inline to the right of the panel label (e.g., `Panel 1  [½]`). Tapping the tag (or the empty space where it would appear) opens a small picker.
+
+| Tag | Meaning |
+|-----|---------|
+| **Full** | Panel takes the full page height (splash) |
+| **½** | Half the page height |
+| **⅓** | One third |
+| **⅙** | One sixth |
+| **⅛** | One eighth |
+| **Remainder** | Takes whatever vertical space is left after other panels are sized |
+
+- Default: no tag. Untagged panels share remaining space equally.
+- The storyboard canvas panel grid overlay re-generates whenever tags are added, changed, or removed.
+- Horizontal panel arrangement (side-by-side panels) is not encoded in size tags in v1 — the overlay only reflects vertical sizing. Horizontal layout is drawn freehand by the artist.
 
 ### Keyboard Flow
 
@@ -390,24 +406,68 @@ Debounced 1.5s after last keystroke. Save state reflected in the global chrome s
 
 ## 8. Storyboard Canvas
 
-Every Page has a permanently paired storyboard canvas. Script page and storyboard are always created together.
+Every Page has a permanently paired storyboard canvas. Script page and storyboard are always created together. The storyboard is iPad-only for drawing in v1; web gets a read-only preview.
 
-### iPad Features
-- Blank Skia canvas per page
-- Panel grid guides (toggleable overlay)
-- Collapsible script reference panel
-- Apple Pencil pressure sensitivity → stroke width
-- Pencil, eraser, stroke weight slider, colors: black / dark grey / red
-- 2-finger tap: undo. 3-finger tap: redo.
-- Pinch to zoom. Double-tap panel area → focused mode.
-- Toolbar auto-hides after 3s of drawing.
-- Page strip at bottom for thumbnail navigation.
-- Reference image import — set opacity, sketch over.
-- Auto-save every 30s and on navigation away.
+### Document Model
+- One page at a time — not continuous scroll
+- Page strip at the bottom always shows thumbnails of all pages in the issue
+- Tap a thumbnail → jump to that page
+- 4-finger swipe (any direction) → next or previous page
+
+### Panel Grid Overlay
+- Auto-generated from the Panel block size tags in the script for this page
+- Visual reference only — it does not constrain where the artist can draw
+- Toggled on/off via the drawing toolbar
+- Reflects vertical panel sizing only (Full · ½ · ⅓ · ⅙ · ⅛ · Remainder)
+- Horizontal panel divisions are drawn freehand — the grid does not encode them in v1
+- Overlay updates live when size tags change in the script
+
+### Drawing Toolbar (iPad)
+- Snaps to the edges of the canvas pane. Default position: left edge (keeps Pencil hand clear).
+- Auto-hides 3 seconds after the last drawing stroke. Reappears on any tap that is not a drawing stroke.
+
+| Group | Items |
+|-------|-------|
+| Tools | Pencil · Eraser |
+| Stroke | Weight slider |
+| Color | Black · Dark grey · Red |
+| Actions | Redo · Script reference panel toggle · Grid overlay toggle · Reference image import |
+
+### Script Reference Panel
+- Shows the full script text for the current page, read-only and scrollable
+- Slides in from the right as a half-width overlay; the canvas dims behind it but remains visible
+- Toggled by the script reference button on the drawing toolbar
+
+### Gestures (iPad)
+| Gesture | Action |
+|---------|--------|
+| Pencil / finger stroke | Draw |
+| 2-finger tap | Undo |
+| Redo button (toolbar) | Redo |
+| 2-finger drag | Pan canvas |
+| Pinch | Free zoom |
+| 3-finger tap on a panel | Snap-zoom: panel fills screen |
+| 3-finger tap (when zoomed) | Snap back to full page |
+| 3-finger swipe (when zoomed) | Jump to next panel in swipe direction |
+| 4-finger swipe | Next / previous page |
+
+### Reference Image Import
+- Import any image from the photo library or files
+- Set opacity (slider), then sketch over the image
+- Image is non-destructive — it lives on a separate layer below the drawing layer and is not exported as part of the storyboard
+
+### Standard Mode (Script Editor Preview)
+- When the script editor is open in Standard mode, the storyboard appears as a 40% preview pane
+- This is a rendered image in v1 — not a live drawable canvas
+- Tapping the preview pane opens the full storyboard canvas
+
+### Auto-save
+- Every 30 seconds while the canvas is open
+- On navigation away from the page
 
 ### Web (v1)
-- Read-only storyboard preview in split view alongside script.
-- Drawing not available in v1.
+- Read-only rendered preview of the storyboard, shown in split view alongside the script
+- Drawing is not available on web in v1
 
 ---
 
