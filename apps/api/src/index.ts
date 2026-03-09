@@ -5,6 +5,7 @@ import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
 import { worldsRoutes } from './routes/worlds.js';
 import { charactersRoutes } from './routes/characters.js';
+import { seriesRoutes } from './routes/series.js';
 
 const server = Fastify({ logger: true });
 
@@ -15,6 +16,7 @@ server.register(healthRoutes);
 server.register(authRoutes, { prefix: '/api/auth' });
 server.register(worldsRoutes, { prefix: '/api/worlds' });
 server.register(charactersRoutes, { prefix: '/api/characters' });
+server.register(seriesRoutes, { prefix: '/api/series' });
 
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? '0.0.0.0';

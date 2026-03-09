@@ -2,8 +2,10 @@
 
 ## Current Build State
 - Expo Router + NativeWind wired up. App runs on web and iPad. Navigation: `/` (Universes Dashboard) → `/world/[id]`.
-- Backend skeleton: Fastify + Drizzle, stub routes for `/api/worlds` and `/api/characters`. No schema yet.
-- Auth middleware: `@fastify/jwt` plugin + `server.authenticate` decorator. Login/register stubs return 501.
+- Full Drizzle schema written: users, universes, universe_members, member_series_access, series, issues, pages, script_blocks, panels, storyboard_pages, bible_entries, bible_entry_images, bible_entry_series_overlays, note_folders, timelines, timeline_events, timeline_ranges, asset_timeline_tags, comments, pinned_items. Matches SPEC.md §2 data model.
+- Real auth: `POST /api/auth/register` and `POST /api/auth/login` implemented with scrypt password hashing (Node crypto, no deps). JWT issued on both.
+- Worlds routes (`/api/worlds`) wired to real DB. Auth-protected. Owner membership row auto-created on universe creation.
+- Series/Issue/Page CRUD routes added at `/api/series`. Access-gated by universe membership.
 - Mobile API client: `apps/mobile/lib/api.ts` — typed fetch wrapper for auth, worlds, characters.
 - npm workspaces enabled. `apps/api` and `apps/mobile` are workspace members.
 - UX concepting complete. §3–12 fully specced. §12 Export & Sharing: export modal (whole issue or single page), script PDF (PanelSync or Final Draft style), plain text, storyboard PDF (one full page per PDF page at 300dpi, 1:1, imports into drawing software). Share Center deferred to v2.
@@ -12,14 +14,13 @@
 - Binder/sidebar mockup complete: `apps/mobile/app/mockups/binder.tsx`. Interactive accordion (Series/Issue/Page), binder collapse, global chrome top bar, script stub. Reviewed and approved.
 
 ## Next Step
-Begin Sprint 4–5: write the full Drizzle schema (worlds, series, issues, pages, characters, locations, timeline events, bible entries, users) and wire up real auth (login/register endpoints hitting the DB).
+Run `drizzle-kit generate` + `drizzle-kit migrate` against a local Postgres instance to verify the schema creates cleanly, then spin up the API and smoke-test register/login/create-universe end-to-end.
 
 ---
 
 ## Deferred
 - `packages/types` shared package — wait until schema is written, then extract shared interfaces
-- Drizzle `drizzle.config.ts` migration tooling — set up when schema is ready
-- Real auth implementation (login/register hitting DB) — after schema + users table exists
+- Drizzle migration not yet run — needs a live Postgres instance
 - Rename "Universe" → "World" in codebase — spec uses "Universe" now confirmed; codebase matches
 - `theme.ts` uses red accent (`#C41E1E`); spec uses gold (`#c8a768`) — reconcile when UI work begins
 ---
