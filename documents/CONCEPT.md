@@ -1,10 +1,11 @@
 # PanelSync — Session Guide
 
 ## Current Build State
-- Expo Router + NativeWind wired up. App runs on web and iPad. Navigation: `/` (Universes Dashboard) → `/world/[id]`.
+- Expo Router + NativeWind wired up. App runs on web and iPad. Navigation: `/` (Universes Dashboard) → `/universe/[id]` (renamed from `/world/[id]`). All API routes renamed `/api/worlds` → `/api/universes`.
 - Full Drizzle schema written: users, universes, universe_members, member_series_access, series, issues, pages, script_blocks, panels, storyboard_pages, bible_entries, bible_entry_images, bible_entry_series_overlays, note_folders, timelines, timeline_events, timeline_ranges, asset_timeline_tags, comments, pinned_items. Matches SPEC.md §2 data model.
 - Real auth: `POST /api/auth/register` and `POST /api/auth/login` implemented with scrypt password hashing (Node crypto, no deps). JWT issued on both.
-- Worlds routes (`/api/worlds`) wired to real DB. Auth-protected. Owner membership row auto-created on universe creation.
+- Universe routes (`/api/universes`) wired to real DB. Auth-protected. Owner membership row auto-created on universe creation.
+- Universe screen (`/universe/[id]`) wired to real API: loads series from `GET /api/series?universeId=`, expand series to load issues, create new series via modal.
 - Series/Issue/Page CRUD routes added at `/api/series`. Access-gated by universe membership.
 - Mobile API client: `apps/mobile/lib/api.ts` — typed wrapper with SecureStore token persistence, full typed response interfaces (ApiUniverse, ApiSeries, ApiIssue, ApiPage), and endpoints for auth/universes/series/issues/pages.
 - Auth screen: `apps/mobile/app/auth.tsx` — login/register UI, writes JWT to SecureStore on success.
@@ -17,7 +18,7 @@
 - Binder/sidebar mockup complete: `apps/mobile/app/mockups/binder.tsx`. Interactive accordion (Series/Issue/Page), binder collapse, global chrome top bar, script stub. Reviewed and approved.
 
 ## Next Step
-Wire `/world/[id]` to the real API: load series list from `GET /api/series?universeId=`, show real series/issue/page hierarchy in the world screen sidebar, and support creating a new series.
+Add issue creation to the universe screen (New Issue modal on each series row), then add page creation and wire the Script icon to open a stub script editor at `/universe/[id]/series/[sid]/issue/[iid]/page/[pid]`.
 
 ---
 
