@@ -11,7 +11,7 @@
 - §11 Notes System removed — Notes are Bible entries with Note type tag (§9).
 
 ## Next Step
-UX concepting is complete through §12. Review §13 MVP Feature Status and §14 Deferred for accuracy, then decide whether to begin Sprints 3–4 (Drizzle schema, Series/Issue/Page CRUD, sidebar navigation) or continue with any remaining open UX questions.
+UX concepting is complete. Begin Sprints 3–4: write the Drizzle schema, implement Series/Issue/Page CRUD endpoints, and build the sidebar navigation binder.
 
 ---
 

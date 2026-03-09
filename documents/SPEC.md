@@ -813,25 +813,35 @@ Full export studio: search and filter content to export, reorder pages, configur
 |---------|--------|
 | Universes Dashboard | MVP |
 | Universe/Series/Issue/Page hierarchy | MVP |
-| Script editor — all 6 block types | MVP |
-| Script editor — distraction-free, outline, auto-save | MVP |
-| Storyboard — blank drawable canvas (iPad) | MVP |
-| Storyboard — drawing tools, Apple Pencil | MVP |
+| Page size configuration per universe (US Comic, Manga, BD, Letter, A4, Custom) | MVP |
+| Default issue length per universe | MVP |
+| Script editor — all 6 block types, panel size tags, auto-save, distraction-free | MVP |
+| Script editor — outline mode | v2 |
+| Storyboard — drawable canvas, drawing tools, Apple Pencil (iPad) | MVP |
 | Storyboard — reference image import | MVP |
-| Storyboard — script breakdown grid | MVP |
-| Universe Bible — Characters + Locations | MVP |
+| Storyboard — panel grid overlay auto-generated from script size tags | MVP |
+| Universe Bible — unified type-tag database (Character, Location, Note, Timeline), custom fields with universe registry, images & sketches, series overlays | MVP |
+| Universe Bible — Factions, Objects, Lore type tags | v2 |
+| Universe Bible — typed custom fields (date, number, boolean) | v2 |
 | Timeline — events, ranges, named ranges, zoom, color | MVP |
-| Notes — rich text, quick-capture, search (Bible entries with Note type tag — see §9) | MVP |
-| Async collaboration — roles, status, comments | MVP |
-| Script PDF export | MVP |
-| Storyboard PDF export | MVP (partial — no layer control) |
-| Universe Bible — Factions, Objects, Lore | v2 |
 | Timeline lenses | v2 |
-| Storyboard auto-generation | v2 |
+| Async collaboration — Owner/Editor/Viewer roles, universe/series/bible-only access scope | MVP |
+| Page status workflow (draft / in review / locked / complete) | MVP |
+| Private workspace (My Drafts) per user — hidden from all collaborators until published | MVP |
+| Comments — inline block indicators + sidebar panel, storyboard pins | MVP |
+| Share links — scoped (universe/series/issue/page/bible), optional password + expiry | MVP |
+| Script PDF export — PanelSync style and Final Draft style | MVP |
+| Script plain text export | MVP |
+| Storyboard PDF export — 300dpi, 1:1 full-page, drawing template | MVP |
+| Real-time sync (Yjs CRDT), live presence, named cursors | v2 |
+| Granular per-role permission matrix | v2 |
+| Share Center (full export studio) | v2 |
+| Storyboard auto-generation from script | v2 |
 | Chalkboard | v2 |
 | Relationship Map | v2 |
-| Real-time sync (Yjs) | v2 |
 | Continuity Tracker | v2 |
+| Webtoon document model | v2 |
+| Script Breakdown Grid | v2 |
 
 **Sprint 6 Gate:** If the script editor does not feel as good as a purpose-built comic writing tool by Sprint 6, stop and redesign before proceeding.
 
@@ -845,8 +855,14 @@ Full export studio: search and filter content to export, reorder pages, configur
 - Storyboard auto-generation from script parser
 - Real-time collaborative sync (Yjs CRDT)
 - Universe Bible — Factions, Objects/Artifacts, Lore/Concepts
-- The Chalkboard — freeform notecard canvas, keyboard + Apple Pencil card modes
+- Universe Bible — typed custom fields (date, number, boolean)
+- **The Chalkboard** — an interactive flowchart/corkboard for thinking through story beats and events. Cards can be created by keyboard or Apple Pencil, connected with arrows to map story flow, and rearranged freely on an infinite canvas. Intended as a spatial brainstorming tool for plotting: lay out scenes, link causes to effects, map character arcs. Cards can reference Bible entries and timeline events. Not a script editor — no block types, no formatting. Think: digital corkboard with string.
 - Timeline lenses — reader knowledge, character knowledge, story order, reference
+- Script Breakdown Grid — panel-by-panel production grid view at the Issue level
+- Share Center — full export studio (script + storyboard combined PDF, bulk export, image sequence, layer control)
+- Granular per-role permission matrix
+- Webtoon document model (continuous vertical scroll)
+- Script editor outline mode
 
 ### Second Wave
 - Relationship Map
