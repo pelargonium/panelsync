@@ -6,11 +6,12 @@
 - Auth middleware: `@fastify/jwt` plugin + `server.authenticate` decorator. Login/register stubs return 501.
 - Mobile API client: `apps/mobile/lib/api.ts` — typed fetch wrapper for auth, worlds, characters.
 - npm workspaces enabled. `apps/api` and `apps/mobile` are workspace members.
-- UX concepting in progress. §3–11 fully specced: Script Editor, Storyboard Canvas, Universe Bible, Collaboration (roles, access scope, private workspace, page lock, comments, share links). §11 Notes System removed — Notes are Bible entries (see §9). No coding until UX is complete.
-- §4 Create Universe Modal updated: Page Setup tab added (default page size + issue length). Page size options: US Comic, US Full Bleed, Manga Tankōbon, European BD, Letter, A4, Custom. Webtoon deferred to v2.
+- UX concepting in progress. §3–12 fully specced. §12 Export & Sharing: export modal (whole issue or single page), script PDF (PanelSync or Final Draft style), plain text, storyboard PDF (one full page per PDF page at 300dpi, 1:1, imports into drawing software). Share Center deferred to v2. No coding until UX is complete.
+- §4 Create Universe Modal: Page Setup tab added (default page size + issue length). Page size options: US Comic, US Full Bleed, Manga Tankōbon, European BD, Letter, A4, Custom. Webtoon deferred to v2.
+- §11 Notes System removed — Notes are Bible entries with Note type tag (§9).
 
 ## Next Step
-Spec §12 Export & Sharing — flesh out the Share Center UI, script PDF format details, storyboard PDF export flow, and the read-only web view that share link recipients see.
+UX concepting is complete through §12. Review §13 MVP Feature Status and §14 Deferred for accuracy, then decide whether to begin Sprints 3–4 (Drizzle schema, Series/Issue/Page CRUD, sidebar navigation) or continue with any remaining open UX questions.
 
 ---
 

@@ -750,16 +750,60 @@ Read-only links require no account to view.
 
 ## 12. Export & Sharing
 
-### MVP
-- Script PDF — industry-standard comic script format. Background job, download notification.
-- Storyboard PDF — basic server-side render (Puppeteer). No layer control.
+Export is triggered from the Share button in the global chrome, or from the long-press context menu on any item in the binder.
 
-### v2
-- Series Bible PDF, Storyboard PDF (300dpi, layer compositor), image sequence per page
-- Chalkboard export, Relationship Map export
+### Export Modal (v1)
 
-### Read-Only Sharing
-- Live link to any section. Password-protected or expiring. No account required.
+A focused modal — not a full studio. Grows into the Share Center in v2.
+
+**Step 1 — Choose what to export:**
+- Entire issue (all pages)
+- Single page (pre-selected if one page is currently open)
+
+**Step 2 — Choose format:**
+
+| Format | Description |
+|--------|-------------|
+| **Script PDF** | Formatted comic script. Choose: PanelSync style or Final Draft style (see below). |
+| **Script Text** | Plain text export of the script. Clean, no styling. |
+| **Storyboard PDF** | Thumbnail grid layout, high resolution. Intended as a drawing template (see below). |
+
+- Only one format per export. Combining script + storyboard into a single PDF is a v2 feature.
+- Export runs as a background job. A notification appears when the file is ready to download or share.
+
+### Script PDF
+
+Two layout options selectable in the export modal:
+
+| Style | Description |
+|-------|-------------|
+| **PanelSync** | PanelSync's own clean format. Panel headers prominent, blocks visually distinct by type, readable on screen and in print. |
+| **Final Draft** | Standard US comic script format — panel descriptions left-aligned, dialogue centered, character names all-caps, similar to Hollywood screenplay conventions. |
+
+- Both styles respect the universe's Series/Issue label customization (e.g., "Chapter" instead of "Issue")
+- Page breaks: one script page per PDF page
+- Header on each page: universe name, series name, issue number, page number
+- Font: Courier (Final Draft style) or PanelSync's body font (PanelSync style)
+
+### Storyboard PDF
+
+The storyboard page is the full-page panel layout — a rough of what the finished comic page will look like. Each exported PDF page is one storyboard page at full size.
+
+- One storyboard page per PDF page, 1:1
+- Rendered at 300dpi, uncompressed
+- Panel grid overlay included (panel divisions from script size tags)
+- All sketch content included at full fidelity
+- Output matches the universe's configured page size (e.g., US Comic 6.625" × 10.25")
+
+**Use case:** Artist imports the PDF into Procreate, Clip Studio, Photoshop, etc. and draws finished linework directly on top of the rough panel layout.
+
+### Read-Only Share Links
+
+Covered in §11 (Collaboration). Share links are generated from the same Share button and lead to a read-only web view — no account required, no export format selection.
+
+### Share Center (v2)
+
+Full export studio: search and filter content to export, reorder pages, configure output resolution and layer visibility, combine script + storyboard in one PDF, bulk export, image sequence per page, Series Bible PDF.
 
 ---
 
