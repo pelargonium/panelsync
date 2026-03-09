@@ -7,6 +7,7 @@
 - Worlds routes (`/api/worlds`) wired to real DB. Auth-protected. Owner membership row auto-created on universe creation.
 - Series/Issue/Page CRUD routes added at `/api/series`. Access-gated by universe membership.
 - Mobile API client: `apps/mobile/lib/api.ts` — typed fetch wrapper for auth, worlds, characters.
+- Drizzle migration run against Neon Postgres. All 20 tables created cleanly. Smoke-tested: register, login, create universe, list universes, create series — all working end-to-end.
 - npm workspaces enabled. `apps/api` and `apps/mobile` are workspace members.
 - UX concepting complete. §3–12 fully specced. §12 Export & Sharing: export modal (whole issue or single page), script PDF (PanelSync or Final Draft style), plain text, storyboard PDF (one full page per PDF page at 300dpi, 1:1, imports into drawing software). Share Center deferred to v2.
 - §4 Create Universe Modal: Page Setup tab added (default page size + issue length). Page size options: US Comic, US Full Bleed, Manga Tankōbon, European BD, Letter, A4, Custom. Webtoon deferred to v2.
@@ -14,13 +15,13 @@
 - Binder/sidebar mockup complete: `apps/mobile/app/mockups/binder.tsx`. Interactive accordion (Series/Issue/Page), binder collapse, global chrome top bar, script stub. Reviewed and approved.
 
 ## Next Step
-Run `drizzle-kit generate` + `drizzle-kit migrate` against a local Postgres instance to verify the schema creates cleanly, then spin up the API and smoke-test register/login/create-universe end-to-end.
+Wire the mobile app to the real API: replace in-memory universe state in `apps/mobile/app/index.tsx` with live `GET /api/worlds` + `POST /api/worlds` calls via `apps/mobile/lib/api.ts`, and store JWT in `expo-secure-store`.
 
 ---
 
 ## Deferred
 - `packages/types` shared package — wait until schema is written, then extract shared interfaces
-- Drizzle migration not yet run — needs a live Postgres instance
+- `apps/api/.env` is gitignored — Neon DATABASE_URL must be re-entered if repo is cloned fresh
 - Rename "Universe" → "World" in codebase — spec uses "Universe" now confirmed; codebase matches
 - `theme.ts` uses red accent (`#C41E1E`); spec uses gold (`#c8a768`) — reconcile when UI work begins
 ---
