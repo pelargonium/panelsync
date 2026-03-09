@@ -6,10 +6,19 @@
 - Auth middleware: `@fastify/jwt` plugin + `server.authenticate` decorator. Login/register stubs return 501.
 - Mobile API client: `apps/mobile/lib/api.ts` — typed fetch wrapper for auth, worlds, characters.
 - npm workspaces enabled. `apps/api` and `apps/mobile` are workspace members.
-- UX concepting in progress. §3–8 fully specced: Script Editor (block selector bar, panel size tags, keyboard flow, distraction-free), Storyboard Canvas (panel grid overlay from script tags, drawing toolbar, gestures, script reference panel, page navigation). No coding until UX is complete.
+- UX concepting in progress. §3–9 fully specced: Script Editor, Storyboard Canvas, Universe Bible (unified content database, type tags, scrapbook overview, custom fields with universe registry, images & sketches, series overlays). No coding until UX is complete.
+- §11 Notes System still has old standalone spec — needs to be updated to reflect Notes are now Bible entries (type tag = Note).
 
 ## Next Step
-Continue UX concepting: spec the Universe Bible (§9) — Character and Location detail view layout, entry creation flow, series overlays in the UI, and type-tag filtering.
+Spec §12 Collaboration — resolve open questions first: comment UI pattern (inline indicator vs sidebar panel), page status lock semantics, collaboration panel contents, Editor role permissions, and read-only share link scope (whole universe vs individual issue/page).
+
+## §12 Collaboration — Open Questions (answer at session start)
+- **Comments UI**: inline block indicator + tap to expand thread, OR Google Docs-style sidebar panel, OR both?
+- **Page lock**: does "locked" block all editors, or only the owner can edit a locked page?
+- **Status changes**: can any Editor change page status, or only the Owner?
+- **Collaboration panel** (tap avatars in top bar): beyond role management and activity feed, anything else?
+- **Editor permissions**: can Editors invite new collaborators? Can they delete content?
+- **Share link scope**: link to whole universe, or can you scope it to a single series/issue/page?
 
 ---
 

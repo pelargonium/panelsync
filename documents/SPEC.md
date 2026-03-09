@@ -473,26 +473,113 @@ Every Page has a permanently paired storyboard canvas. Script page and storyboar
 
 ## 9. Universe Bible
 
-### Characters
-- Fields: name, role, appearance, backstory, series appearances, color
-- Rich text notes, reference images, sketch layer (iPad)
-- Series overlays (per-series notes that don't overwrite universe-level entry)
-- Knowledge gap tags (JSON, read by v2 Continuity Tracker)
+The Bible is the unified content database for the universe. Everything that isn't a script page or storyboard canvas lives here: characters, locations, notes, timelines, and (in v2) objects, factions, lore, and more. All content is a **Bible entry** with one or more type tags. The Notes binder section and Characters binder section are filtered views of this same database.
 
-### Locations
-- Fields: name, description, time period, series appearances, color
-- Same rich text notes, reference images, sketch layer, series overlays as Characters
+### Type Tags (v1)
 
-### Navigation
-- Browse by entry type
-- Global search — any entry, note, or tagged asset
-- Filter by series or timeline range
+Type tags are non-exclusive labels on entries. An entry can have more than one.
 
-### Autocomplete
-- Dialogue blocks: character name autocomplete from the series character registry
-- Timeline events: entity detection from Universe Bible (exact matches + aliases)
+| Tag | Default fields | Opens as |
+|-----|---------------|----------|
+| **Character** | Name, Role, Birthday, Gender, Sex, Species, Sexual Orientation, Birthplace, Blood Type, Height, Appearance, Backstory | Detail view |
+| **Location** | Name, Description, Time Period | Detail view |
+| **Note** | Title only — body is freeform rich text | Rich text editor |
+| **Timeline** | Name — no editable fields at Bible level | Timeline editor (§10) |
 
-Reference: `panelsync-universe-home.html`
+- An entry can carry multiple tags (e.g., Ego the Living Planet = Character + Location)
+- Tags are chosen at creation and editable afterward
+- Object, Vehicle, Faction, Lore type tags with default fields — deferred to v2; users can create these as untyped entries now using custom fields
+
+### Bible Overview (The Scrapbook)
+
+The Bible is accessed by tapping the universe name in the binder header or navigating to `/universe/[id]/bible`. It opens in the main content area.
+
+**Layout:**
+- Grid of cards, default grouping by type (Characters first, then Locations, then Notes, then Timelines)
+- Within each group: sorted by most recently modified
+- Each card shows: name, type-tag color swatch, one-line snippet (role for Characters, description for Locations, first line for Notes, name for Timelines), portrait/cover image if one exists
+
+**Search and filter:**
+- Search bar pinned to the top — spotlight-style, filters as you type
+- Text search: matches name, field values, rich text body
+- Filter commands: typing "Issue 3" or "Series 2" filters to entries associated with that issue or series via series overlays
+- Filter by type: type "Character" or tap the type chip in results
+
+**View modes** (controlled by the global View button when Bible is open):
+
+| Mode | Behavior |
+|------|----------|
+| By type | Grouped by type tag, sorted by last modified (default) |
+| By recently modified | Flat list, most recent first |
+| By series | Grouped by series association |
+| By issue | Filter to entries associated with a specific issue |
+
+### Entry Creation
+
+- "+" button in the Bible header
+- Tapping "+" opens a type picker: Character · Location · Note · Timeline
+- Multiple types can be selected (non-exclusive)
+- After confirming type(s) → navigates directly to the detail page (no intermediate modal)
+- The entry is created immediately with an empty name; the name field is focused on arrival
+
+### Entry Detail View
+
+A single scrolling page. All entry types share the same structure.
+
+**Header:**
+- Name (large, editable inline)
+- Color swatch (tap to change — used as the card accent color in the overview)
+- Type tag chips (editable — tap to add or remove type tags)
+
+**Images & Sketches:**
+- Any entry can have images and sketches attached, regardless of type
+- Import: photo library, files, or any external app (e.g., Procreate export)
+- Draw directly using the same Skia engine as the storyboard canvas (iPad only)
+  - Tools: Pencil · Eraser · stroke weight slider · colors (black / dark grey / red)
+  - 2-finger tap = undo
+  - Sketch layer is non-destructive and separate from imported images
+- Web: images are viewable; drawing not available in v1
+- Multiple images/sketches can be added; they appear as a horizontal scroll strip in the entry
+
+**Default fields** (determined by type tags, shown even when empty):
+- Displayed as labeled rows: `Field Name    [value or placeholder]`
+- Tap a row to edit the value inline
+- Empty fields show a subtle placeholder ("Add a value")
+
+**Custom fields:**
+- "+" button at the bottom of the fields section
+- Tapping "+" shows a text input for the field label, with suggestions drawn from the **universe field registry** (all custom field labels ever used in this universe, across all entries)
+- Typing a new label and confirming creates the field and adds its label to the registry
+- Custom fields are text-only in v1 (typed fields — date, number, boolean — deferred to v2)
+- Custom fields added to one entry are available as suggestions on any other entry in the universe
+
+**Rich text notes:**
+- Freeform section below all fields
+- Supports: bold, italic, headings, bullet lists, inline code
+- For Note-typed entries, this is the primary content area (fields section is minimal)
+
+**Series overlays:**
+- A collapsible "Series Notes" section at the bottom of the detail view
+- Shows a list of series in the universe; each has an expandable text area for per-series notes
+- Series overlay notes are additive — they do not overwrite universe-level field values
+- Used to track series-specific context: "In Series 2, this character knows about X"
+
+### Autocomplete Integration
+
+- **Dialogue blocks in the script editor**: character name autocomplete pulls from Bible entries with the Character type tag, filtered to the current series
+- **Timeline event entity detection**: Bible entry names and aliases are matched against event descriptions (exact match in v1)
+
+### Binder Integration
+
+The binder's content sections are filtered views of the Bible:
+- Characters binder section = Bible filtered to Character type
+- Notes binder section = Bible filtered to Note type
+- Timeline binder section = Bible filtered to Timeline type (shows entry names; tap opens Timeline editor)
+
+Quick-capture (floating button on iPad, Cmd/Ctrl+Shift+N on web) creates a new Note-type entry and opens it immediately.
+
+### Auto-save
+Debounced 1.5s after last field edit or keystroke. Save state reflected in the global chrome save/sync indicator.
 
 ---
 
