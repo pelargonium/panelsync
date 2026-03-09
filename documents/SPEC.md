@@ -14,12 +14,11 @@
 8. [Storyboard Canvas](#8-storyboard-canvas)
 9. [Universe Bible](#9-universe-bible)
 10. [Timeline Tool](#10-timeline-tool)
-11. [Notes System](#11-notes-system)
-12. [Collaboration](#12-collaboration)
-13. [Export & Sharing](#13-export--sharing)
-14. [MVP Feature Status](#14-mvp-feature-status)
-15. [Deferred (v2+)](#15-deferred-v2)
-16. [Open Questions](#16-open-questions)
+11. [Collaboration](#11-collaboration)
+12. [Export & Sharing](#12-export--sharing)
+13. [MVP Feature Status](#13-mvp-feature-status)
+14. [Deferred (v2+)](#14-deferred-v2)
+15. [Open Questions](#15-open-questions)
 
 ---
 
@@ -231,11 +230,29 @@ Triggered by tapping "+" or the ghost card. A tabbed modal with a persistent Cre
 | Tab | Fields |
 |-----|--------|
 | **Basics** | Universe name (required), cover image (optional), Series label (default: "Series"), Issue label (default: "Issue") |
+| **Page Setup** | Default page size, default issue length |
 | **Timeline** | Timescale setting: Pure Sequence / Standard Earth Time / Custom |
 | **Collaborators** | Invite by email, assign role (Editor / Viewer) |
 
 - Only the name is required. All other tabs are optional.
 - On Create → modal dismisses, universe is created and opened automatically.
+- Page size and issue length can be changed later in Universe Settings. Changing them does not reformat existing pages.
+
+### Page Size Options
+
+| Format | Dimensions | Notes |
+|--------|-----------|-------|
+| **US Comic** | 6.625" × 10.25" | Default |
+| **US Full Bleed** | 6.875" × 10.5" | |
+| **Manga Tankōbon** | 5.0" × 7.5" | |
+| **European BD** | 8.27" × 11.69" | A4 landscape |
+| **Letter** | 8.5" × 11" | |
+| **A4** | 8.27" × 11.69" | |
+| **Custom** | User-defined width × height | |
+
+- The selected page size controls the storyboard canvas aspect ratio and the PDF export page dimensions.
+- Webtoon (continuous vertical scroll) — deferred to v2; it requires a fundamentally different document model.
+- Default issue length: number of pages pre-populated when creating a new issue (default: 22). Pages can always be added or removed manually.
 
 ### First Open of a New Universe
 - Binder opens on the left, empty.
@@ -622,36 +639,116 @@ Reference: `panelsync-timeline.html`, `panelsync-tick-explore.html`
 
 ---
 
-## 11. Notes System
+## 11. Collaboration
 
-- Notes at Universe, Series, or Issue level
-- Folder organization with drag-and-drop
-- Rich text: bold, italic, headings, bullet lists, inline code
-- Quick-capture: floating button (iPad), Cmd/Ctrl+Shift+N (web)
-- Full-text search across all notes in a Universe
-- Private notes — visible only to creator
+### Roles (v1)
 
----
+Three roles. Granular per-role permission configuration is deferred to v2.
 
-## 12. Collaboration
+| Role | Abilities |
+|------|-----------|
+| **Owner** | Full control. Can invite/remove collaborators, change roles, lock/unlock pages, delete anything. |
+| **Editor** | Can create and edit content within their access scope. Can change page status. Cannot invite others. Cannot delete content created by others. |
+| **Viewer** | Read-only. Can leave comments. Cannot edit any content or change status. |
 
-### MVP (Async)
-- Invite by email → link to create account + join Universe
-- Roles: Owner, Editor, Viewer
-- Last-write-wins with 'last edited by [name] [time]' on every page
-- Update banner when page edited since last open
-- Page status: draft / in review / locked / complete
-- Threaded comments on any script block
-- Read-only share link (no account required to view)
+### Access Scope (Invite Level)
+
+An invitation is scoped at invite time:
+
+| Scope | Access |
+|-------|--------|
+| **Universe-wide** | All series, all pages, and the Bible |
+| **Series-level** | One or more specific series + read access to the Bible. Cannot see series they were not invited to. |
+| **Bible-only** | Read (or edit) access to the Bible only — no series content |
+
+Two writers working on separate series in the same universe can each be invited at the series level. They share the Bible but cannot see each other's series content.
+
+### Private Workspace
+
+Every user in a universe has a **personal private workspace** — a collection of private drafts visible only to them, even from the Owner.
+
+- Private workspace appears in the binder as a collapsible "My Drafts" section (visible only to the user)
+- Any Bible entry, note, script page, or storyboard page can be created in private workspace
+- Private content does not appear in search, the Bible overview, recent activity, or any other collaborator's view
+- **Publishing**: a "Publish" action (long-press context menu, or button in the detail view) moves an item out of private workspace and into the universe, making it visible to collaborators with appropriate access
+- Unpublishing (returning an item to private) is available as long as no other collaborator has edited it
+
+### Page Lock
+
+Page status options: **draft → in review → locked → complete**
+
+- Any Editor or Owner can move a page between draft / in review / complete
+- **Locked** is a special state: the page is canonized and cannot be edited by anyone, including the Owner, while locked
+- Only the Owner can lock or unlock a page
+- Locked pages are visually distinguished (lock icon on the page row in the binder, subtle banner in the editor)
+- Locked is intended for content that is finished and should not change accidentally — canonical events, published issues, etc.
+- All other status transitions can be made by any Editor; who can transition to specific statuses is configurable in v2
+
+### Last-Write-Wins & Change Awareness
+
+- Sync: REST polling, last-write-wins. Conflict resolution and real-time sync (Yjs CRDT) deferred to v2.
+- Each page records `updated_at` and `updated_by`
+- **Update banner**: when a user opens a page that has been edited since they last viewed it, a subtle banner appears at the top: "Updated by [Name] · [time ago]". Tap to dismiss.
+- "Last edited by [Name] · [time]" shown as a footer on every script and storyboard page
+
+### Comments
+
+Both inline indicators and a sidebar panel are present simultaneously.
+
+**Inline indicator:**
+- A small dot appears on the left edge of any script block that has at least one unresolved comment thread
+- Amber dot = unresolved thread; grey dot = all threads resolved
+- Tapping the dot opens the sidebar panel scrolled to that block's thread
+
+**Sidebar comment panel:**
+- Slides in from the right edge of the editor pane (does not replace the editor — overlays at ~40% width)
+- Shows all comment threads for the current page, grouped by block, in reading order
+- Each thread: avatar + name, comment text, timestamp, reply input, Resolve button
+- Resolved threads are collapsed; a "Show resolved" toggle expands them
+- New thread: tap any script block → inline "+ Comment" affordance appears → opens thread in sidebar
+- Storyboard comments: tap anywhere on the canvas → pin is placed + thread opens in sidebar. Pin is visible on the canvas and moves with the drawing if the canvas is panned.
+- Comment panel toggled via a button in the global chrome (right side, adjacent to collaborator avatars)
+
+### Collaboration Panel
+
+Accessed by tapping the collaborator avatars in the global chrome top bar.
+
+**Contents (v1):**
+- List of all collaborators with role and access scope
+- Invite button: enter email → assigns role and scope → sends invite email
+- Recent activity feed: "Alex edited Page 3 · 2h ago", "Maya added Character 'Jin' · yesterday"
+- Tap an activity item → navigates to that item (does not show a diff in v1)
+
+**v2:**
+- Activity items expandable to show exact changes: "Added 2 pages", "Changed dialogue on Panel 4", "Drew 5 panels"
+- Diff view for text content
+
+### Share Links
+
+Read-only links require no account to view.
+
+| Link scope | What the recipient sees |
+|-----------|------------------------|
+| **Universe** | Full universe — Bible, all series, all pages (read-only) |
+| **Series** | All issues and pages in one series + relevant Bible entries |
+| **Issue** | All pages in one issue (script + storyboard preview) |
+| **Page** | Single script page + storyboard preview |
+| **Bible (scoped)** | Bible filtered to a specific type, series, or selection |
+
+- Links are generated from the Share button in the global chrome or from the long-press context menu on any item in the binder
+- Optional: password-protect a link, or set an expiry date
+- Link recipient sees a read-only web view — no account required
+- Private workspace content is never included in share links
 
 ### v2 (Real-time)
 - Yjs CRDT sync
-- Live presence indicators, named cursors
-- Commenter role
+- Live presence indicators, named cursors in the script editor and Bible
+- Commenter role (read + comment, no edit)
+- Granular per-role permission matrix (per content area: Bible / Scripts / Storyboard / Status changes / Invite)
 
 ---
 
-## 13. Export & Sharing
+## 12. Export & Sharing
 
 ### MVP
 - Script PDF — industry-standard comic script format. Background job, download notification.
@@ -666,7 +763,7 @@ Reference: `panelsync-timeline.html`, `panelsync-tick-explore.html`
 
 ---
 
-## 14. MVP Feature Status
+## 13. MVP Feature Status
 
 | Feature | Status |
 |---------|--------|
@@ -680,7 +777,7 @@ Reference: `panelsync-timeline.html`, `panelsync-tick-explore.html`
 | Storyboard — script breakdown grid | MVP |
 | Universe Bible — Characters + Locations | MVP |
 | Timeline — events, ranges, named ranges, zoom, color | MVP |
-| Notes — folders, rich text, quick-capture, search | MVP |
+| Notes — rich text, quick-capture, search (Bible entries with Note type tag — see §9) | MVP |
 | Async collaboration — roles, status, comments | MVP |
 | Script PDF export | MVP |
 | Storyboard PDF export | MVP (partial — no layer control) |
@@ -698,7 +795,7 @@ Reference: `panelsync-timeline.html`, `panelsync-tick-explore.html`
 
 ---
 
-## 15. Deferred (v2+)
+## 14. Deferred (v2+)
 
 ### First Wave (after MVP validation)
 - Storyboard auto-generation from script parser
@@ -722,7 +819,7 @@ Reference: `panelsync-timeline.html`, `panelsync-tick-explore.html`
 
 ---
 
-## 16. Open Questions
+## 15. Open Questions
 
 *Decisions deferred pending implementation experience*
 

@@ -6,19 +6,11 @@
 - Auth middleware: `@fastify/jwt` plugin + `server.authenticate` decorator. Login/register stubs return 501.
 - Mobile API client: `apps/mobile/lib/api.ts` — typed fetch wrapper for auth, worlds, characters.
 - npm workspaces enabled. `apps/api` and `apps/mobile` are workspace members.
-- UX concepting in progress. §3–9 fully specced: Script Editor, Storyboard Canvas, Universe Bible (unified content database, type tags, scrapbook overview, custom fields with universe registry, images & sketches, series overlays). No coding until UX is complete.
-- §11 Notes System still has old standalone spec — needs to be updated to reflect Notes are now Bible entries (type tag = Note).
+- UX concepting in progress. §3–11 fully specced: Script Editor, Storyboard Canvas, Universe Bible, Collaboration (roles, access scope, private workspace, page lock, comments, share links). §11 Notes System removed — Notes are Bible entries (see §9). No coding until UX is complete.
+- §4 Create Universe Modal updated: Page Setup tab added (default page size + issue length). Page size options: US Comic, US Full Bleed, Manga Tankōbon, European BD, Letter, A4, Custom. Webtoon deferred to v2.
 
 ## Next Step
-Spec §12 Collaboration — resolve open questions first: comment UI pattern (inline indicator vs sidebar panel), page status lock semantics, collaboration panel contents, Editor role permissions, and read-only share link scope (whole universe vs individual issue/page).
-
-## §12 Collaboration — Open Questions (answer at session start)
-- **Comments UI**: inline block indicator + tap to expand thread, OR Google Docs-style sidebar panel, OR both?
-- **Page lock**: does "locked" block all editors, or only the owner can edit a locked page?
-- **Status changes**: can any Editor change page status, or only the Owner?
-- **Collaboration panel** (tap avatars in top bar): beyond role management and activity feed, anything else?
-- **Editor permissions**: can Editors invite new collaborators? Can they delete content?
-- **Share link scope**: link to whole universe, or can you scope it to a single series/issue/page?
+Spec §12 Export & Sharing — flesh out the Share Center UI, script PDF format details, storyboard PDF export flow, and the read-only web view that share link recipients see.
 
 ---
 
