@@ -6,7 +6,9 @@
 - Real auth: `POST /api/auth/register` and `POST /api/auth/login` implemented with scrypt password hashing (Node crypto, no deps). JWT issued on both.
 - Worlds routes (`/api/worlds`) wired to real DB. Auth-protected. Owner membership row auto-created on universe creation.
 - Series/Issue/Page CRUD routes added at `/api/series`. Access-gated by universe membership.
-- Mobile API client: `apps/mobile/lib/api.ts` — typed fetch wrapper for auth, worlds, characters.
+- Mobile API client: `apps/mobile/lib/api.ts` — typed wrapper with SecureStore token persistence, full typed response interfaces (ApiUniverse, ApiSeries, ApiIssue, ApiPage), and endpoints for auth/universes/series/issues/pages.
+- Auth screen: `apps/mobile/app/auth.tsx` — login/register UI, writes JWT to SecureStore on success.
+- Dashboard (`apps/mobile/app/index.tsx`) wired to real API: auth gate, live universe list, create universe, sign out, pull-to-refresh.
 - Drizzle migration run against Neon Postgres. All 20 tables created cleanly. Smoke-tested: register, login, create universe, list universes, create series — all working end-to-end.
 - npm workspaces enabled. `apps/api` and `apps/mobile` are workspace members.
 - UX concepting complete. §3–12 fully specced. §12 Export & Sharing: export modal (whole issue or single page), script PDF (PanelSync or Final Draft style), plain text, storyboard PDF (one full page per PDF page at 300dpi, 1:1, imports into drawing software). Share Center deferred to v2.
@@ -15,7 +17,7 @@
 - Binder/sidebar mockup complete: `apps/mobile/app/mockups/binder.tsx`. Interactive accordion (Series/Issue/Page), binder collapse, global chrome top bar, script stub. Reviewed and approved.
 
 ## Next Step
-Wire the mobile app to the real API: replace in-memory universe state in `apps/mobile/app/index.tsx` with live `GET /api/worlds` + `POST /api/worlds` calls via `apps/mobile/lib/api.ts`, and store JWT in `expo-secure-store`.
+Wire `/world/[id]` to the real API: load series list from `GET /api/series?universeId=`, show real series/issue/page hierarchy in the world screen sidebar, and support creating a new series.
 
 ---
 
