@@ -34,7 +34,7 @@ function ActiveEntity({ section, universe }: { section: SectionKey | null; unive
   }
 }
 
-export default function WorldScreen() {
+export default function UniverseScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name: string }>();
   const router = useRouter();
   const [activeSection, setActiveSection] = useState<SectionKey | null>(null);

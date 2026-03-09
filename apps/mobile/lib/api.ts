@@ -118,8 +118,8 @@ export const api = {
   },
 
   universes: {
-    list: () => request<{ data: ApiUniverse[] }>('/api/worlds'),
-    get: (id: string) => request<{ data: ApiUniverse }>(`/api/worlds/${id}`),
+    list: () => request<{ data: ApiUniverse[] }>('/api/universes'),
+    get: (id: string) => request<{ data: ApiUniverse }>(`/api/universes/${id}`),
     create: (body: {
       name: string;
       pageSize?: string;
@@ -127,10 +127,10 @@ export const api = {
       seriesLabel?: string;
       issueLabel?: string;
       timelineTimescale?: string;
-    }) => request<{ data: ApiUniverse }>('/api/worlds', { method: 'POST', body: JSON.stringify(body) }),
+    }) => request<{ data: ApiUniverse }>('/api/universes', { method: 'POST', body: JSON.stringify(body) }),
     update: (id: string, body: Partial<ApiUniverse>) =>
-      request<{ data: ApiUniverse }>(`/api/worlds/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
-    delete: (id: string) => request<void>(`/api/worlds/${id}`, { method: 'DELETE' }),
+      request<{ data: ApiUniverse }>(`/api/universes/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    delete: (id: string) => request<void>(`/api/universes/${id}`, { method: 'DELETE' }),
   },
 
   series: {

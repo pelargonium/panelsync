@@ -24,7 +24,7 @@ interface UpdateUniverseBody {
   issueLabel?: string;
 }
 
-export async function worldsRoutes(server: FastifyInstance) {
+export async function universesRoutes(server: FastifyInstance) {
   // All routes require authentication
   server.addHook('onRequest', server.authenticate);
 

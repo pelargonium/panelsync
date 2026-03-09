@@ -180,7 +180,7 @@ export default function WorldsDashboard() {
             <UniverseCard
               key={u.id}
               universe={u}
-              onPress={() => router.push({ pathname: '/world/[id]', params: { id: u.id, name: u.name } })}
+              onPress={() => router.push({ pathname: '/universe/[id]', params: { id: u.id, name: u.name } })}
             />
           ))
         )}

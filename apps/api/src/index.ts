@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import { authPlugin } from './plugins/auth.js';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
-import { worldsRoutes } from './routes/worlds.js';
+import { universesRoutes } from './routes/universes.js';
 import { charactersRoutes } from './routes/characters.js';
 import { seriesRoutes } from './routes/series.js';
 
@@ -14,7 +14,7 @@ await server.register(authPlugin);
 
 server.register(healthRoutes);
 server.register(authRoutes, { prefix: '/api/auth' });
-server.register(worldsRoutes, { prefix: '/api/worlds' });
+server.register(universesRoutes, { prefix: '/api/universes' });
 server.register(charactersRoutes, { prefix: '/api/characters' });
 server.register(seriesRoutes, { prefix: '/api/series' });
 
