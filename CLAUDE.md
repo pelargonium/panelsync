@@ -4,7 +4,8 @@
 1. This file
 2. `documents/CONCEPT.md` — current build state and next step
 3. `documents/DESIGN.md` — foundational design principles and architecture decisions
-4. `documents/TASK.md` — if present, a task brief is active (Codex handoff in progress or pending review)
+4. `documents/OPEN_QUESTIONS.md` — open design questions to work through before building
+5. `documents/TASK.md` — if present, a task brief is active (Codex handoff in progress or pending review)
 
 ---
 
@@ -49,6 +50,7 @@
 | Current state + next step | `documents/CONCEPT.md` |
 | Active Codex task brief | `documents/TASK.md` |
 | Design principles + architecture | `documents/DESIGN.md` |
+| Open design questions | `documents/OPEN_QUESTIONS.md` |
 | Full product spec | `documents/SPEC.md` |
 | Design system reference | `documents/styles.html` |
 | Screen mockups | `apps/mobile/app/mockups/` (Expo screens) |

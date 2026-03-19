@@ -26,7 +26,7 @@
 - Design session complete: foundational principles, entity model, dossier system, workspace interaction model all documented in `documents/DESIGN.md`.
 
 ## Next Step
-Build the persistent workspace shell: refactor the universe screen so the binder is always present, entities open in the content area without pushing new screens, and shared UniverseContext holds series/issue/page state accessible by all tools.
+Continue the design session: work through the open questions in `documents/OPEN_QUESTIONS.md` starting with question 1 (dossier data structure), then revise the schema before any more code is written.
 
 ---
 
