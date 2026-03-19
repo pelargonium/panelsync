@@ -23,9 +23,10 @@
 - Issue creation: `NewIssueModal` added to each series row, wired to `POST /api/series/:seriesId/issues`.
 - Page creation: `IssueRow` component with lazy page loading and inline `+` page creation wired to `POST /api/series/issues/:issueId/pages`.
 - Stub script editor screen at `/universe/[id]/issue/[iid]/page/[pid]` — route is live, navigates from Script icon on each page row.
+- Design session complete: foundational principles, entity model, dossier system, workspace interaction model all documented in `documents/DESIGN.md`.
 
 ## Next Step
-Build the script editor at `/universe/[id]/issue/[iid]/page/[pid]`: replace the stub screen with a real block-based editor supporting Panel, Scene, Description, Dialogue, Caption, and SFX block types.
+Build the persistent workspace shell: refactor the universe screen so the binder is always present, entities open in the content area without pushing new screens, and shared UniverseContext holds series/issue/page state accessible by all tools.
 
 ---
 

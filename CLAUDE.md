@@ -3,7 +3,8 @@
 ## Read on every session start
 1. This file
 2. `documents/CONCEPT.md` — current build state and next step
-3. `documents/TASK.md` — if present, a task brief is active (Codex handoff in progress or pending review)
+3. `documents/DESIGN.md` — foundational design principles and architecture decisions
+4. `documents/TASK.md` — if present, a task brief is active (Codex handoff in progress or pending review)
 
 ---
 
@@ -47,6 +48,7 @@
 | Session rhythm + rules | `CLAUDE.md` (this file) |
 | Current state + next step | `documents/CONCEPT.md` |
 | Active Codex task brief | `documents/TASK.md` |
+| Design principles + architecture | `documents/DESIGN.md` |
 | Full product spec | `documents/SPEC.md` |
 | Design system reference | `documents/styles.html` |
 | Screen mockups | `apps/mobile/app/mockups/` (Expo screens) |
