@@ -20,9 +20,12 @@
 - `theme.ts` accent updated from red `#C41E1E` to gold `#c8a768` to match approved mockup.
 - Security fixes: page PATCH route now access-gated via universe membership check; JWT plugin fails fast on missing `JWT_SECRET`; characters stub route unregistered from the server.
 - `dotenv/config` added to API entry point so `.env` loads automatically.
+- Issue creation: `NewIssueModal` added to each series row, wired to `POST /api/series/:seriesId/issues`.
+- Page creation: `IssueRow` component with lazy page loading and inline `+` page creation wired to `POST /api/series/issues/:issueId/pages`.
+- Stub script editor screen at `/universe/[id]/issue/[iid]/page/[pid]` — route is live, navigates from Script icon on each page row.
 
 ## Next Step
-Add issue creation to the universe screen (New Issue modal on each series row), add page creation, and wire the Script icon to navigate to a stub script editor at `/universe/[id]/issue/[iid]/page/[pid]`.
+Build the script editor at `/universe/[id]/issue/[iid]/page/[pid]`: replace the stub screen with a real block-based editor supporting Panel, Scene, Description, Dialogue, Caption, and SFX block types.
 
 ---
 
