@@ -18,8 +18,13 @@ declare module '@fastify/jwt' {
 }
 
 export const authPlugin = fp(async (server: FastifyInstance) => {
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+
   server.register(jwt, {
-    secret: process.env.JWT_SECRET ?? 'dev-secret-change-in-production',
+    secret: jwtSecret,
   });
 
   server.decorate(

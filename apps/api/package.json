@@ -11,6 +11,7 @@
   "dependencies": {
     "@fastify/cors": "^10.0.0",
     "@fastify/jwt": "^10.0.0",
+    "dotenv": "^17.3.1",
     "drizzle-orm": "^0.40.0",
     "fastify": "^5.0.0",
     "fastify-plugin": "^5.1.0",

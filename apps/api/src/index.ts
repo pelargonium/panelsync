@@ -1,10 +1,10 @@
+import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { authPlugin } from './plugins/auth.js';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
 import { universesRoutes } from './routes/universes.js';
-import { charactersRoutes } from './routes/characters.js';
 import { seriesRoutes } from './routes/series.js';
 
 const server = Fastify({ logger: true });
@@ -15,7 +15,6 @@ await server.register(authPlugin);
 server.register(healthRoutes);
 server.register(authRoutes, { prefix: '/api/auth' });
 server.register(universesRoutes, { prefix: '/api/universes' });
-server.register(charactersRoutes, { prefix: '/api/characters' });
 server.register(seriesRoutes, { prefix: '/api/series' });
 
 const port = Number(process.env.PORT ?? 3000);

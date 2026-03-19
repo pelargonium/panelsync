@@ -167,6 +167,9 @@ export async function seriesRoutes(server: FastifyInstance) {
 
       const [page] = await db.select().from(pages).where(eq(pages.id, pageId)).limit(1);
       if (!page) { reply.code(404); return { error: 'not found' }; }
+      const [issue] = await db.select().from(issues).where(eq(issues.id, page.issueId)).limit(1);
+      const [s] = await db.select().from(series).where(eq(series.id, issue!.seriesId)).limit(1);
+      if (!await assertUniverseAccess(s!.universeId, userId)) { reply.code(403); return { error: 'forbidden' }; }
 
       // Locked pages cannot be edited
       if (page.status === 'locked') { reply.code(403); return { error: 'page is locked' }; }

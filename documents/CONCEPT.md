@@ -16,9 +16,13 @@
 - §4 Create Universe Modal: Page Setup tab added (default page size + issue length). Page size options: US Comic, US Full Bleed, Manga Tankōbon, European BD, Letter, A4, Custom. Webtoon deferred to v2.
 - §11 Notes System removed — Notes are Bible entries with Note type tag (§9).
 - Binder/sidebar mockup complete: `apps/mobile/app/mockups/binder.tsx`. Interactive accordion (Series/Issue/Page), binder collapse, global chrome top bar, script stub. Reviewed and approved.
+- `universe/[id].tsx` visual design aligned with binder mockup: chrome bar (48px), 264px collapsible binder with universe name header, search bar, section tree (SERIES/ISSUE/PAGE accordion + entity section headers), footer type-tag pills.
+- `theme.ts` accent updated from red `#C41E1E` to gold `#c8a768` to match approved mockup.
+- Security fixes: page PATCH route now access-gated via universe membership check; JWT plugin fails fast on missing `JWT_SECRET`; characters stub route unregistered from the server.
+- `dotenv/config` added to API entry point so `.env` loads automatically.
 
 ## Next Step
-Add issue creation to the universe screen (New Issue modal on each series row), then add page creation and wire the Script icon to open a stub script editor at `/universe/[id]/series/[sid]/issue/[iid]/page/[pid]`.
+Add issue creation to the universe screen (New Issue modal on each series row), add page creation, and wire the Script icon to navigate to a stub script editor at `/universe/[id]/issue/[iid]/page/[pid]`.
 
 ---
 
@@ -26,7 +30,6 @@ Add issue creation to the universe screen (New Issue modal on each series row), 
 - `packages/types` shared package — wait until schema is written, then extract shared interfaces
 - `apps/api/.env` is gitignored — Neon DATABASE_URL must be re-entered if repo is cloned fresh
 - Rename "Universe" → "World" in codebase — spec uses "Universe" now confirmed; codebase matches
-- `theme.ts` uses red accent (`#C41E1E`); spec uses gold (`#c8a768`) — reconcile when UI work begins
 ---
 
 ## Active Decisions
@@ -42,13 +45,13 @@ Add issue creation to the universe screen (New Issue modal on each series row), 
 ---
 
 ## Sprint Position
-Sprints 1–3 complete. Next: **Sprints 4–5** (Schema + Auth).
+Sprints 1–5 complete. Next: **Sprints 6–7** (Script editor).
 
 | Sprints | Deliverable |
 |---------|------------|
 | 1–2 ✅ | Expo monorepo, NativeWind, Expo Router, backend skeleton, auth skeleton |
 | 3 ✅ | Mockup — binder/sidebar (the persistent nav shell, on every screen) |
-| 4–5 | Drizzle schema (full) + real auth + Series/Issue/Page CRUD |
+| 4–5 ✅ | Drizzle schema (full) + real auth + Series/Issue/Page CRUD |
 | 6–7 | Script editor — all block types, panel size tags, keyboard flow, distraction-free |
 | 8–9 | Skia drawing engine — storyboard canvas + Bible images/sketches (shared) |
 | 10–11 | Universe Bible — unified database, type tags, custom fields, series overlays |

@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, Modal, TextInput,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, SafeAreaView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { colors } from '../../theme';
+import { colors, spacing, radius } from '../../theme';
 import { modalStyles as m } from '../../components/modalStyles';
 import { api, type ApiSeries, type ApiIssue } from '../../lib/api';
 import CharactersEntity from '../../entities/CharactersEntity';
@@ -16,12 +16,9 @@ import type { Universe } from '../../types';
 
 type SectionKey = 'characters' | 'locations' | 'timeline' | 'notes';
 
-const BOTTOM_SECTIONS: { key: SectionKey; label: string; color: string }[] = [
-  { key: 'characters', label: 'CHARACTERS', color: colors.bible },
-  { key: 'locations',  label: 'LOCATIONS',  color: colors.bible },
-  { key: 'timeline',   label: 'TIMELINE',   color: colors.timeline },
-  { key: 'notes',      label: 'NOTES',      color: colors.muted },
-];
+const BINDER_W = 264;
+
+// ─── New Series Modal ─────────────────────────────────────────────────────────
 
 function NewSeriesModal({ visible, universeId, onClose, onCreate }: {
   visible: boolean;
@@ -86,6 +83,8 @@ function NewSeriesModal({ visible, universeId, onClose, onCreate }: {
   );
 }
 
+// ─── Series Row ───────────────────────────────────────────────────────────────
+
 function SeriesRow({ series, universeId }: { series: ApiSeries; universeId: string }) {
   const [expanded, setExpanded] = useState(false);
   const [issues, setIssues] = useState<ApiIssue[]>([]);
@@ -105,19 +104,33 @@ function SeriesRow({ series, universeId }: { series: ApiSeries; universeId: stri
 
   return (
     <View>
-      <TouchableOpacity style={s.seriesRow} onPress={toggle}>
-        <Text style={s.chevron}>{expanded ? '▾' : '▸'}</Text>
-        <Text style={s.seriesName} numberOfLines={1}>{series.number}. {series.name}</Text>
-      </TouchableOpacity>
+      <View style={s.row}>
+        <TouchableOpacity onPress={toggle} style={s.chevronHitArea}>
+          <Text style={s.rowChevron}>{expanded ? '▾' : '▸'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={toggle} style={s.rowLabel}>
+          <Text style={s.seriesName} numberOfLines={1}>
+            Series {series.number} — {series.name}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {expanded && (
-        <View style={s.issueList}>
+        <View>
           {loadingIssues
-            ? <ActivityIndicator size="small" color={colors.muted} style={{ paddingVertical: 8 }} />
+            ? <ActivityIndicator size="small" color={colors.muted} style={{ paddingVertical: 8, paddingLeft: 38 }} />
             : issues.length === 0
-              ? <Text style={s.emptyIssues}>No issues yet</Text>
+              ? <Text style={s.emptyRow}>No issues yet</Text>
               : issues.map(issue => (
-                  <View key={issue.id} style={s.issueRow}>
-                    <Text style={s.issueLabel} numberOfLines={1}>#{issue.number} {issue.name}</Text>
+                  <View key={issue.id} style={s.row}>
+                    <TouchableOpacity style={[s.chevronHitArea, s.indentIssue]}>
+                      <Text style={s.rowChevron}>▸</Text>
+                    </TouchableOpacity>
+                    <View style={s.rowLabel}>
+                      <Text style={s.issueName} numberOfLines={1}>
+                        Issue {issue.number} — {issue.name}
+                      </Text>
+                    </View>
                   </View>
                 ))
           }
@@ -127,6 +140,8 @@ function SeriesRow({ series, universeId }: { series: ApiSeries; universeId: stri
   );
 }
 
+// ─── Content Area ─────────────────────────────────────────────────────────────
+
 function MainContent({ section, universe }: { section: SectionKey | null; universe: Universe }) {
   switch (section) {
     case 'characters': return <CharactersEntity universe={universe} />;
@@ -134,12 +149,15 @@ function MainContent({ section, universe }: { section: SectionKey | null; univer
     case 'timeline':   return <TimelineEntity universe={universe} />;
     case 'notes':      return <NotesEntity universe={universe} />;
     default: return (
-      <View style={s.emptyMain}>
-        <Text style={s.emptyMainText}>Select a series or section from the sidebar</Text>
+      <View style={s.contentEmpty}>
+        <Text style={s.contentEmptyTitle}>{universe.name}</Text>
+        <Text style={s.contentEmptyHint}>Select a page from the binder to open the script editor, or choose a section to browse your universe.</Text>
       </View>
     );
   }
 }
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function UniverseScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name: string }>();
@@ -147,10 +165,11 @@ export default function UniverseScreen() {
   const universeId = id as string;
   const universeName = decodeURIComponent(name as string);
 
-  const [seriesList, setSeriesList] = useState<ApiSeries[]>([]);
+  const [seriesList, setSeriesList]       = useState<ApiSeries[]>([]);
   const [loadingSeries, setLoadingSeries] = useState(true);
   const [activeSection, setActiveSection] = useState<SectionKey | null>(null);
   const [newSeriesVisible, setNewSeriesVisible] = useState(false);
+  const [binderOpen, setBinderOpen]       = useState(true);
 
   const universe: Universe = { id: universeId, name: universeName, seriesCount: 0, lastEdited: '' };
 
@@ -166,56 +185,155 @@ export default function UniverseScreen() {
     loadSeries().finally(() => setLoadingSeries(false));
   }, [loadSeries]);
 
+  function toggleSection(key: SectionKey) {
+    setActiveSection(prev => prev === key ? null : key);
+  }
+
   return (
-    <View style={s.container}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backButton}>← Universes</Text>
+    <SafeAreaView style={s.root}>
+
+      {/* ── Chrome ── */}
+      <View style={s.chrome}>
+        <TouchableOpacity onPress={() => router.back()} style={s.chromeBack}>
+          <Text style={s.chromeBackText}>← Universes</Text>
         </TouchableOpacity>
-        <Text style={s.logo}>{universeName.toUpperCase()}</Text>
-        <View style={{ width: 80 }} />
+        <Text style={s.saveStatus}>● Saved</Text>
+        <View style={s.chromeRight} />
       </View>
 
+      {/* ── Workspace ── */}
       <View style={s.workspace}>
-        <View style={s.sidebar}>
-          <View style={s.sidebarSection}>
-            <View style={s.sidebarSectionHeader}>
-              <Text style={s.sidebarSectionLabel}>SERIES</Text>
-              <TouchableOpacity onPress={() => setNewSeriesVisible(true)}>
-                <Text style={s.addBtn}>＋</Text>
+
+        {/* ── Binder ── */}
+        {binderOpen ? (
+          <View style={s.binder}>
+
+            {/* Header */}
+            <View style={s.binderHeader}>
+              <Text style={s.binderUniverseName} numberOfLines={1}>{universeName}</Text>
+              <TouchableOpacity onPress={() => setBinderOpen(false)} style={s.collapseBtn}>
+                <Text style={s.chevronLarge}>‹</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView style={s.seriesScroll} showsVerticalScrollIndicator={false}>
+
+            {/* Search */}
+            <View style={s.searchWrap}>
+              <View style={s.searchBar}>
+                <Text style={s.searchIcon}>⌕</Text>
+                <TextInput
+                  placeholder="Search universe…"
+                  placeholderTextColor={colors.faint}
+                  style={s.searchInput}
+                />
+              </View>
+            </View>
+
+            {/* Sections */}
+            <ScrollView style={s.sections} showsVerticalScrollIndicator={false}>
+
+              {/* Series / Issue / Page */}
+              <View style={s.sectionHeaderRow}>
+                <Text style={s.sectionLabel}>SERIES / ISSUE / PAGE</Text>
+                <TouchableOpacity onPress={() => setNewSeriesVisible(true)}>
+                  <Text style={s.sectionAdd}>＋</Text>
+                </TouchableOpacity>
+              </View>
               {loadingSeries
-                ? <ActivityIndicator size="small" color={colors.muted} style={{ paddingTop: 12 }} />
+                ? <ActivityIndicator size="small" color={colors.muted} style={{ paddingVertical: 12 }} />
                 : seriesList.length === 0
                   ? <TouchableOpacity onPress={() => setNewSeriesVisible(true)}>
-                      <Text style={s.emptySeries}>+ Add a series</Text>
+                      <Text style={s.emptyRow}>+ Add a series</Text>
                     </TouchableOpacity>
                   : seriesList.map(series => (
                       <SeriesRow key={series.id} series={series} universeId={universeId} />
                     ))
               }
-            </ScrollView>
-          </View>
 
-          <View style={s.bottomSections}>
-            {BOTTOM_SECTIONS.map(sec => (
+              {/* Characters */}
               <TouchableOpacity
-                key={sec.key}
-                style={[s.sidebarItem, activeSection === sec.key && s.sidebarItemActive]}
-                onPress={() => setActiveSection(activeSection === sec.key ? null : sec.key)}
+                style={s.sectionHeaderRow}
+                onPress={() => toggleSection('characters')}
               >
-                <View style={[s.sidebarDot, { backgroundColor: sec.color }]} />
-                <Text style={[s.sidebarLabel, activeSection === sec.key && s.sidebarLabelActive]}>
-                  {sec.label}
+                <Text style={[s.sectionLabel, activeSection === 'characters' && { color: colors.accent }]}>
+                  CHARACTERS
                 </Text>
+                <View style={[s.typeDot, { backgroundColor: colors.accent }]} />
               </TouchableOpacity>
-            ))}
-          </View>
-        </View>
 
-        <View style={s.mainContent}>
+              {/* Locations */}
+              <TouchableOpacity
+                style={s.sectionHeaderRow}
+                onPress={() => toggleSection('locations')}
+              >
+                <Text style={[s.sectionLabel, activeSection === 'locations' && { color: colors.bible }]}>
+                  LOCATIONS
+                </Text>
+                <View style={[s.typeDot, { backgroundColor: colors.bible }]} />
+              </TouchableOpacity>
+
+              {/* Timeline */}
+              <TouchableOpacity
+                style={s.sectionHeaderRow}
+                onPress={() => toggleSection('timeline')}
+              >
+                <Text style={[s.sectionLabel, activeSection === 'timeline' && { color: colors.timeline }]}>
+                  TIMELINE
+                </Text>
+                <View style={[s.typeDot, { backgroundColor: colors.timeline }]} />
+              </TouchableOpacity>
+
+              {/* Notes */}
+              <TouchableOpacity
+                style={s.sectionHeaderRow}
+                onPress={() => toggleSection('notes')}
+              >
+                <Text style={[s.sectionLabel, activeSection === 'notes' && { color: colors.muted }]}>
+                  NOTES
+                </Text>
+                <View style={[s.typeDot, { backgroundColor: colors.faint }]} />
+              </TouchableOpacity>
+
+              <View style={{ height: spacing.lg }} />
+            </ScrollView>
+
+            {/* Footer */}
+            <View style={s.binderFooter}>
+              <TouchableOpacity style={s.footerTag} onPress={() => toggleSection('characters')}>
+                <View style={[s.footerPill, { backgroundColor: colors.accent }, activeSection === 'characters' && s.footerPillActive]}>
+                  <Text style={s.footerPillText}>Chr</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.footerTag} onPress={() => toggleSection('locations')}>
+                <View style={[s.footerPill, { backgroundColor: colors.bible }, activeSection === 'locations' && s.footerPillActive]}>
+                  <Text style={s.footerPillText}>Loc</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.footerTag} onPress={() => toggleSection('timeline')}>
+                <View style={[s.footerPill, { backgroundColor: colors.timeline }, activeSection === 'timeline' && s.footerPillActive]}>
+                  <Text style={s.footerPillText}>TL</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.footerTag} onPress={() => toggleSection('notes')}>
+                <View style={[s.footerPill, { backgroundColor: colors.muted }, activeSection === 'notes' && s.footerPillActive]}>
+                  <Text style={s.footerPillText}>Nte</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.footerTag} onPress={() => setNewSeriesVisible(true)}>
+                <View style={[s.footerPill, { backgroundColor: colors.text }]}>
+                  <Text style={s.footerPillText}>+</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          /* Collapsed binder strip */
+          <TouchableOpacity style={s.binderCollapsed} onPress={() => setBinderOpen(true)}>
+            <Text style={s.chevronLarge}>›</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* ── Content ── */}
+        <View style={s.content}>
           <MainContent section={activeSection} universe={universe} />
         </View>
       </View>
@@ -226,38 +344,68 @@ export default function UniverseScreen() {
         onClose={() => setNewSeriesVisible(false)}
         onCreate={series => setSeriesList(prev => [...prev, series])}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const s = StyleSheet.create({
-  container:            { flex: 1, backgroundColor: colors.bg },
-  header:               { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 48, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
-  logo:                 { color: colors.accent, fontSize: 14, fontWeight: '700', letterSpacing: 2 },
-  backButton:           { color: colors.accent, fontSize: 13, fontWeight: '600', width: 80 },
-  workspace:            { flex: 1, flexDirection: 'row', overflow: 'hidden' },
-  sidebar:              { width: 200, backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border, flexDirection: 'column' },
-  sidebarSection:       { flex: 1, paddingTop: 16, paddingHorizontal: 12, minHeight: 0 },
-  sidebarSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  sidebarSectionLabel:  { color: colors.muted, fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
-  addBtn:               { color: colors.accent, fontSize: 16, lineHeight: 18 },
-  seriesScroll:         { flex: 1 },
-  seriesRow:            { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, paddingHorizontal: 4 },
-  chevron:              { color: colors.muted, fontSize: 10, width: 14 },
-  seriesName:           { color: colors.text, fontSize: 13, fontWeight: '600', flex: 1 },
-  issueList:            { paddingLeft: 18 },
-  issueRow:             { paddingVertical: 5, paddingHorizontal: 4 },
-  issueLabel:           { color: colors.muted, fontSize: 12 },
-  emptyIssues:          { color: colors.faint, fontSize: 11, fontStyle: 'italic', paddingVertical: 6 },
-  emptySeries:          { color: colors.faint, fontSize: 12, fontStyle: 'italic', paddingTop: 4 },
-  bottomSections:       { borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: 8, paddingHorizontal: 12 },
-  sidebarItem:          { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 8, borderRadius: 6, marginBottom: 2 },
-  sidebarItemActive:    { backgroundColor: colors.bg },
-  sidebarDot:           { width: 7, height: 7, borderRadius: 4, marginRight: 9 },
-  sidebarLabel:         { color: colors.muted, fontSize: 11, fontWeight: '600', letterSpacing: 1 },
-  sidebarLabelActive:   { color: colors.text },
-  mainContent:          { flex: 1 },
-  emptyMain:            { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 48 },
-  emptyMainText:        { color: colors.faint, fontSize: 13, fontStyle: 'italic' },
-  modalError:           { color: '#e05050', fontSize: 12, marginBottom: 8 },
+  root:               { flex: 1, backgroundColor: colors.bg },
+
+  // Chrome
+  chrome:             { height: 48, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md },
+  chromeBack:         { flex: 1 },
+  chromeBackText:     { fontSize: 13, fontWeight: '600', color: colors.accent },
+  saveStatus:         { fontSize: 10, color: colors.faint, letterSpacing: 0.5 },
+  chromeRight:        { flex: 1 },
+
+  // Workspace
+  workspace:          { flex: 1, flexDirection: 'row' },
+
+  // Binder
+  binder:             { width: BINDER_W, backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border, flexDirection: 'column' },
+  binderHeader:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+  binderUniverseName: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.text },
+  collapseBtn:        { paddingLeft: spacing.sm },
+  chevronLarge:       { fontSize: 20, color: colors.muted },
+  binderCollapsed:    { width: 22, backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+
+  // Search
+  searchWrap:         { padding: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  searchBar:          { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 6, gap: 4 },
+  searchIcon:         { fontSize: 14, color: colors.faint },
+  searchInput:        { flex: 1, fontSize: 13, color: colors.text },
+
+  // Sections
+  sections:           { flex: 1 },
+  sectionHeaderRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 4 },
+  sectionLabel:       { fontSize: 10, fontWeight: '700', letterSpacing: 1.5, color: colors.muted },
+  sectionAdd:         { fontSize: 16, color: colors.accent, lineHeight: 18 },
+  typeDot:            { width: 7, height: 7, borderRadius: 4 },
+
+  // Rows
+  row:                { flexDirection: 'row', alignItems: 'center', minHeight: 32 },
+  rowLabel:           { flex: 1, paddingVertical: 7, paddingRight: spacing.xs },
+  chevronHitArea:     { width: 28, paddingLeft: spacing.md, alignItems: 'center', justifyContent: 'center' },
+  indentIssue:        { paddingLeft: spacing.md + 10 },
+  rowChevron:         { fontSize: 10, color: colors.faint },
+  seriesName:         { fontSize: 13, fontWeight: '600', color: colors.text },
+  issueName:          { fontSize: 12, color: colors.text },
+  emptyRow:           { fontSize: 12, color: colors.faint, fontStyle: 'italic', paddingHorizontal: spacing.md, paddingVertical: 6 },
+
+  // Footer
+  binderFooter:       { height: 44, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: spacing.sm },
+  footerTag:          { alignItems: 'center', justifyContent: 'center' },
+  footerPill:         { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 10, opacity: 0.75 },
+  footerPillActive:   { opacity: 1 },
+  footerPillText:     { fontSize: 10, fontWeight: '700', color: '#fff' },
+
+  // Content
+  content:            { flex: 1, backgroundColor: colors.bg },
+  contentEmpty:       { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  contentEmptyTitle:  { fontSize: 20, fontWeight: '700', color: colors.muted, marginBottom: spacing.sm },
+  contentEmptyHint:   { fontSize: 13, color: colors.faint, textAlign: 'center', lineHeight: 20 },
+
+  modalError:         { color: '#e05050', fontSize: 12, marginBottom: 8 },
 });
