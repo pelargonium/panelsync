@@ -156,6 +156,7 @@ function FieldBlock({
   const [pendingDelete, setPendingDelete] = useState(false);
   const [label, setLabel] = useState(block.label ?? '');
   const [value, setValue] = useState(block.value ?? '');
+  const [labelWidth, setLabelWidth] = useState(80);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevIdRef = useRef(block.id);
@@ -187,6 +188,20 @@ function FieldBlock({
       style={{ borderWidth: 1, borderColor: colors.border }}
     >
       <View className="flex-row items-center">
+        <View
+          style={{ position: 'absolute', opacity: 0, top: 0, left: 0 }}
+          pointerEvents="none"
+        >
+          <Text
+            style={{ fontSize: 11, fontWeight: '700', letterSpacing: 1.5 }}
+            onLayout={(e) => {
+              const measured = e.nativeEvent.layout.width;
+              setLabelWidth(Math.max(60, Math.min(measured + 16, 200)));
+            }}
+          >
+            {label || 'FIELD'}
+          </Text>
+        </View>
         <TextInput
           value={label}
           onChangeText={(nextLabel) => {
@@ -234,7 +249,7 @@ function FieldBlock({
             inputRefs.current[`${block.id}:label`] = ref;
           }}
           style={{
-            width: 110,
+            width: labelWidth,
             color: colors.muted,
             fontSize: 11,
             fontWeight: '700',
@@ -345,6 +360,7 @@ function NoteBlock({
   const [pendingDelete, setPendingDelete] = useState(false);
   const [title, setTitle] = useState(block.title ?? '');
   const [body, setBody] = useState(block.body ?? '');
+  const [isTitleFocused, setIsTitleFocused] = useState(false);
   const prevIdRef = useRef(block.id);
 
   useEffect(() => {
@@ -361,18 +377,41 @@ function NoteBlock({
       style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
     >
       <View className="mb-2 flex-row items-center">
-        <TextInput
-          value={title}
-          onChangeText={(nextTitle) => {
-            setTitle(nextTitle);
-            onUpdate(block.id, { title: nextTitle });
-          }}
-          onFocus={onFocus}
-          ref={(ref) => {
-            inputRefs.current[`${block.id}:title`] = ref;
-          }}
-          style={{ flex: 1, color: colors.text, fontSize: 16, fontWeight: '600', ...(noOutline as object) }}
-        />
+        <View style={{ flex: 1 }}>
+          <TextInput
+            value={title}
+            onChangeText={(nextTitle) => {
+              setTitle(nextTitle);
+              onUpdate(block.id, { title: nextTitle });
+            }}
+            onFocus={() => {
+              onFocus();
+              setIsTitleFocused(true);
+            }}
+            onBlur={() => setIsTitleFocused(false)}
+            placeholder="Note Title"
+            placeholderTextColor={colors.faint}
+            ref={(ref) => {
+              inputRefs.current[`${block.id}:title`] = ref;
+            }}
+            style={{
+              color: colors.text,
+              fontSize: 16,
+              fontWeight: '600',
+              height: title !== '' || isTitleFocused ? undefined : 0,
+              ...(noOutline as object),
+            }}
+          />
+          {!(title !== '' || isTitleFocused) && (
+            <TouchableOpacity
+              onPress={() => {
+                setIsTitleFocused(true);
+                setTimeout(() => inputRefs.current[`${block.id}:title`]?.focus(), 0);
+              }}
+              style={{ height: 20 }}
+            />
+          )}
+        </View>
 
         {pendingDelete ? (
           <View className="ml-3 flex-row items-center">
@@ -544,6 +583,9 @@ export default function CharacterEditor({
         latestNameRef.current = entryRes.data.name;
         savedNameRef.current = entryRes.data.name;
         hydratedRef.current = true;
+        if (autoFocusNameRef.current) {
+          setName('');
+        }
         if (autoFocusNameRef.current) {
           setTimeout(() => {
             nameInputRef.current?.focus();
@@ -751,6 +793,9 @@ export default function CharacterEditor({
             position: notePosition,
           });
           setBlocks((current) => [...current, noteRes.data]);
+          setTimeout(() => {
+            inputRefs.current[`${noteRes.data.id}:title`]?.focus();
+          }, 0);
 
           if (after.trim()) {
             const afterRes = await api.bible.blocks.create(entityId, {
@@ -774,13 +819,16 @@ export default function CharacterEditor({
           });
           await api.bible.blocks.delete(entityId, focusedBlock.id);
           setBlocks((current) => [...current.filter((block) => block.id !== focusedBlock.id), noteRes.data]);
+          setTimeout(() => {
+            inputRefs.current[`${noteRes.data.id}:title`]?.focus();
+          }, 0);
         }).catch(() => {});
       }
 
       return;
     }
 
-    const noteContent = [focusedBlock.title, focusedBlock.body].filter(Boolean).join('\n');
+    const noteContent = focusedBlock.body ?? '';
     await runSave(async () => {
       const textRes = await api.bible.blocks.create(entityId, {
         kind: 'text',
@@ -880,6 +928,7 @@ export default function CharacterEditor({
               {needsZoneBefore ? (
                 <InsertZone
                   onPress={() => createBlock({ kind: 'text', content: '' }, 'content', zonePosition)}
+                  minHeight={32}
                 />
               ) : null}
 
