@@ -1,7 +1,7 @@
 import { eq, and } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/client.js';
-import { universes, universeMembers } from '../db/schema.js';
+import { hierarchyLevels, universes, universeMembers } from '../db/schema.js';
 
 interface CreateUniverseBody {
   name: string;
@@ -22,6 +22,23 @@ interface UpdateUniverseBody {
   defaultIssueLength?: number;
   seriesLabel?: string;
   issueLabel?: string;
+  timelineTimescale?: string;
+}
+
+async function addHierarchyLabels(universe: typeof universes.$inferSelect) {
+  const levels = await db
+    .select({ name: hierarchyLevels.name, position: hierarchyLevels.position })
+    .from(hierarchyLevels)
+    .where(eq(hierarchyLevels.universeId, universe.id));
+
+  const seriesLevel = levels.find((level) => level.position === 1);
+  const issueLevel = levels.find((level) => level.position === 2);
+
+  return {
+    ...universe,
+    seriesLabel: seriesLevel?.name ?? 'Series',
+    issueLabel: issueLevel?.name ?? 'Issue',
+  };
 }
 
 export async function universesRoutes(server: FastifyInstance) {
@@ -55,7 +72,9 @@ export async function universesRoutes(server: FastifyInstance) {
       ).then(rows => rows.filter(Boolean) as (typeof universes.$inferSelect)[]);
     }
 
-    return { data: [...owned, ...memberUniverses] };
+    const all = [...owned, ...memberUniverses];
+    const data = await Promise.all(all.map(addHierarchyLabels));
+    return { data };
   });
 
   // GET /api/worlds/:id
@@ -75,7 +94,7 @@ export async function universesRoutes(server: FastifyInstance) {
       if (!membership) { reply.code(403); return { error: 'forbidden' }; }
     }
 
-    return { data: universe };
+    return { data: await addHierarchyLabels(universe) };
   });
 
   // POST /api/worlds
@@ -94,9 +113,8 @@ export async function universesRoutes(server: FastifyInstance) {
         customPageWidth: customPageWidth ?? null,
         customPageHeight: customPageHeight ?? null,
         defaultIssueLength: defaultIssueLength ?? 22,
-        seriesLabel: seriesLabel ?? 'Series',
-        issueLabel: issueLabel ?? 'Issue',
         timelineTimescale: timelineTimescale ?? 'pure_sequence',
+        updatedBy: userId,
       })
       .returning();
 
@@ -108,8 +126,13 @@ export async function universesRoutes(server: FastifyInstance) {
       accessScope: 'universe',
     });
 
+    await db.insert(hierarchyLevels).values([
+      { universeId: universe.id, name: seriesLabel?.trim() || 'Series', position: 1 },
+      { universeId: universe.id, name: issueLabel?.trim() || 'Issue', position: 2 },
+    ]);
+
     reply.code(201);
-    return { data: universe };
+    return { data: await addHierarchyLabels(universe) };
   });
 
   // PATCH /api/worlds/:id
@@ -128,11 +151,11 @@ export async function universesRoutes(server: FastifyInstance) {
     if (b.customPageWidth !== undefined)    updates.customPageWidth = b.customPageWidth;
     if (b.customPageHeight !== undefined)   updates.customPageHeight = b.customPageHeight;
     if (b.defaultIssueLength !== undefined) updates.defaultIssueLength = b.defaultIssueLength;
-    if (b.seriesLabel !== undefined)        updates.seriesLabel = b.seriesLabel;
-    if (b.issueLabel !== undefined)         updates.issueLabel = b.issueLabel;
+    if (b.timelineTimescale !== undefined)  updates.timelineTimescale = b.timelineTimescale;
+    updates.updatedBy = userId;
 
     const [updated] = await db.update(universes).set(updates).where(eq(universes.id, id)).returning();
-    return { data: updated };
+    return { data: await addHierarchyLabels(updated) };
   });
 
   // DELETE /api/worlds/:id

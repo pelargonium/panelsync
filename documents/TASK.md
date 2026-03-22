@@ -1,6 +1,6 @@
 # Task: Schema Revision — Flexible Hierarchy + Dossier Foundation
 
-**Status:** ready for Codex
+**Status:** needs Claude review
 **Assigned to:** Codex
 **Reference:** `documents/DESIGN.md` (read this in full before starting)
 
@@ -378,8 +378,8 @@ npx tsx src/index.ts
 
 ## Completion Note (Codex fills in before handing back)
 
-**Status:** ___
-**Files changed:** ___
-**Migration file:** ___
-**Verification run:** ___
-**Open risks / assumptions:** ___
+**Status:** needs Claude review
+**Files changed:** `apps/api/src/db/schema.ts`, `apps/api/src/routes/containers.ts`, `apps/api/src/routes/universes.ts`, `apps/api/src/index.ts`, `apps/mobile/lib/api.ts`, `apps/api/drizzle/0000_schema_revision_flexible_hierarchy.sql`, `apps/api/drizzle/meta/0000_snapshot.json`, `apps/api/drizzle/meta/_journal.json`
+**Migration file:** `apps/api/drizzle/0000_schema_revision_flexible_hierarchy.sql`
+**Verification run:** `npm run build --workspace=@panelsync/api`; `npx tsc --noEmit -p apps/mobile/tsconfig.json`; `npx drizzle-kit generate --name schema_revision_flexible_hierarchy`; `npx drizzle-kit migrate` against Neon after resetting the dev schema; `npx tsx src/index.ts`; authenticated local smoke test covering register, create universe, `GET /api/hierarchy`, `POST /api/containers`, `GET /api/containers?universeId=`, and `POST /api/drafts`
+**Open risks / assumptions:** Kept compatibility shims in `apps/mobile/lib/api.ts` for `api.series`, `api.issues`, `ApiSeries`, and `ApiIssue` because the active universe screen still depends on them and that file was out of scope for this task. Also regenerated Drizzle migration history from a fresh baseline and reset the Neon dev schema before applying it, which matches the brief’s destructive-migration allowance.

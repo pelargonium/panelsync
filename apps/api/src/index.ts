@@ -5,7 +5,7 @@ import { authPlugin } from './plugins/auth.js';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
 import { universesRoutes } from './routes/universes.js';
-import { seriesRoutes } from './routes/series.js';
+import { containersRoutes } from './routes/containers.js';
 
 const server = Fastify({ logger: true });
 
@@ -15,7 +15,7 @@ await server.register(authPlugin);
 server.register(healthRoutes);
 server.register(authRoutes, { prefix: '/api/auth' });
 server.register(universesRoutes, { prefix: '/api/universes' });
-server.register(seriesRoutes, { prefix: '/api/series' });
+server.register(containersRoutes);
 
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? '0.0.0.0';
