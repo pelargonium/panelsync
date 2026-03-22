@@ -68,7 +68,13 @@ function compareEntities(left: ApiBibleEntry, right: ApiBibleEntry, sortMode: So
   return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
 }
 
-function PrimaryContent() {
+function PrimaryContent({
+  justCreatedId,
+  onAutoFocusDone,
+}: {
+  justCreatedId: string | null;
+  onAutoFocusDone: () => void;
+}) {
   const { activeEntityType, activeEntityId, universeName, entities } = useUniverse();
 
   if (activeEntityType === 'bible_entry' && activeEntityId) {
@@ -77,7 +83,13 @@ function PrimaryContent() {
       return <GroupEditor entityId={activeEntityId} />;
     }
     if (entity?.type === 'character') {
-      return <CharacterEditor entityId={activeEntityId} />;
+      return (
+        <CharacterEditor
+          entityId={activeEntityId}
+          autoFocusName={justCreatedId === activeEntityId}
+          onAutoFocusDone={onAutoFocusDone}
+        />
+      );
     }
     return <EntityEditor entityId={activeEntityId} />;
   }
@@ -85,7 +97,13 @@ function PrimaryContent() {
   return <EmptyContent universeName={universeName} />;
 }
 
-function ContentArea() {
+function ContentArea({
+  justCreatedId,
+  onAutoFocusDone,
+}: {
+  justCreatedId: string | null;
+  onAutoFocusDone: () => void;
+}) {
   const { depthState } = useUniverse();
 
   if (depthState === 'dossier_only') {
@@ -96,7 +114,7 @@ function ContentArea() {
     return (
       <View className="flex-1 flex-row">
         <View className="flex-1 border-r" style={{ borderColor: colors.border }}>
-          <PrimaryContent />
+          <PrimaryContent justCreatedId={justCreatedId} onAutoFocusDone={onAutoFocusDone} />
         </View>
         <View className="flex-1">
           <DossierPlaceholder />
@@ -105,7 +123,7 @@ function ContentArea() {
     );
   }
 
-  return <PrimaryContent />;
+  return <PrimaryContent justCreatedId={justCreatedId} onAutoFocusDone={onAutoFocusDone} />;
 }
 
 function SortPicker({
@@ -366,6 +384,7 @@ function UniverseWorkspace() {
   const [creatingType, setCreatingType] = useState<ApiBibleEntry['type'] | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
 
   const sortedEntities = useMemo(
     () => [...entities].sort((left, right) => compareEntities(left, right, sortMode)),
@@ -404,6 +423,7 @@ function UniverseWorkspace() {
     try {
       const entry = await createEntity(type);
       activateEntity('bible_entry', entry.id);
+      setJustCreatedId(entry.id);
       setTypePickerOpen(false);
     } finally {
       setCreatingType(null);
@@ -598,7 +618,7 @@ function UniverseWorkspace() {
             setPendingDeleteId(null);
           }}
         >
-          <ContentArea />
+          <ContentArea justCreatedId={justCreatedId} onAutoFocusDone={() => setJustCreatedId(null)} />
         </View>
       </View>
     </SafeAreaView>

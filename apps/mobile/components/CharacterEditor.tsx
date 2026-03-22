@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
-import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  type NativeSyntheticEvent,
+  type TextInputSelectionChangeEventData,
+} from 'react-native';
 import { api, type ApiBibleBlock } from '../lib/api';
 import { useUniverse } from '../context/UniverseContext';
 import { colors } from '../theme';
@@ -18,7 +27,7 @@ const FIELD_SUGGESTIONS = [
 ];
 
 const COLOR_PALETTE = ['#c8a768', '#1E6B3C', '#1B4FD8', '#6B2D8B', '#C41E1E', '#4A4A5A'];
-const noOutline = { outlineWidth: 0 } as object;
+const noOutline = { outlineWidth: 0, outlineStyle: 'none', boxShadow: 'none' } as object;
 
 type SortMode = 'written' | 'type' | 'az';
 type SaveState = 'saved' | 'saving';
@@ -32,7 +41,15 @@ type BlockPatch = {
 
 interface CharacterEditorProps {
   entityId: string;
+  autoFocusName?: boolean;
+  onAutoFocusDone?: () => void;
 }
+
+type TextSelection = {
+  blockId: string;
+  start: number;
+  end: number;
+};
 
 function sortBlocks(blocks: ApiBibleBlock[], sortMode: SortMode) {
   if (sortMode === 'written') {
@@ -90,57 +107,30 @@ function InsertZone({ onPress, minHeight = 20 }: { onPress: () => void; minHeigh
 function TextBlock({
   block,
   onUpdate,
-  onDelete,
   onFocus,
+  onSelectionChange,
   inputRefs,
 }: {
   block: ApiBibleBlock;
   onUpdate: (id: string, patch: BlockPatch) => void;
-  onDelete: (id: string) => void;
   onFocus: () => void;
+  onSelectionChange: (event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => void;
   inputRefs: MutableRefObject<Record<string, TextInput | null>>;
 }) {
-  const [pendingDelete, setPendingDelete] = useState(false);
-
   return (
     <View className="mb-1 px-4 py-1">
-      <View className="flex-row items-start">
-        <TextInput
-          value={block.content ?? ''}
-          onChangeText={(content) => onUpdate(block.id, { content })}
-          onFocus={onFocus}
-          multiline
-          textAlignVertical="top"
-          ref={(ref) => {
-            inputRefs.current[`${block.id}:content`] = ref;
-          }}
-          style={{ flex: 1, color: colors.text, fontSize: 15, lineHeight: 22, ...(noOutline as object) }}
-        />
-
-        {pendingDelete ? (
-          <View className="ml-3 flex-row items-center">
-            <Text className="text-xs" style={{ color: colors.text }}>
-              Delete?
-            </Text>
-            <TouchableOpacity onPress={() => onDelete(block.id)} className="ml-3">
-              <Text className="text-xs font-semibold" style={{ color: '#d14b4b' }}>
-                Yes
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setPendingDelete(false)} className="ml-3">
-              <Text className="text-xs font-semibold" style={{ color: colors.faint }}>
-                No
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity onPress={() => setPendingDelete(true)} className="pl-2 pt-1">
-            <Text style={{ color: colors.faint, fontSize: 14 }}>
-              ×
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      <TextInput
+        value={block.content ?? ''}
+        onChangeText={(content) => onUpdate(block.id, { content })}
+        onFocus={onFocus}
+        onSelectionChange={onSelectionChange}
+        multiline
+        textAlignVertical="top"
+        ref={(ref) => {
+          inputRefs.current[`${block.id}:content`] = ref;
+        }}
+        style={{ color: colors.text, fontSize: 15, lineHeight: 22, ...(noOutline as object) }}
+      />
     </View>
   );
 }
@@ -166,6 +156,7 @@ function FieldBlock({
   const [pendingDelete, setPendingDelete] = useState(false);
   const [label, setLabel] = useState(block.label ?? '');
   const [value, setValue] = useState(block.value ?? '');
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevIdRef = useRef(block.id);
 
@@ -174,6 +165,7 @@ function FieldBlock({
       prevIdRef.current = block.id;
       setLabel(block.label ?? '');
       setValue(block.value ?? '');
+      setSelectedSuggestionIndex(-1);
     }
   }, [block.id, block.label, block.value]);
 
@@ -199,7 +191,16 @@ function FieldBlock({
           value={label}
           onChangeText={(nextLabel) => {
             setLabel(nextLabel);
+            setSelectedSuggestionIndex(-1);
             onUpdate(block.id, { label: nextLabel });
+          }}
+          onKeyPress={(e) => {
+            const key = e.nativeEvent.key;
+            if (key === 'ArrowDown') {
+              setSelectedSuggestionIndex((prev) => Math.min(prev + 1, filteredSuggestions.length - 1));
+            } else if (key === 'ArrowUp') {
+              setSelectedSuggestionIndex((prev) => Math.max(prev - 1, -1));
+            }
           }}
           onFocus={() => {
             onFocus();
@@ -209,6 +210,17 @@ function FieldBlock({
             blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 150);
           }}
           onSubmitEditing={() => {
+            if (selectedSuggestionIndex >= 0 && filteredSuggestions[selectedSuggestionIndex]) {
+              const suggestion = filteredSuggestions[selectedSuggestionIndex];
+              if (blurTimerRef.current) {
+                clearTimeout(blurTimerRef.current);
+              }
+              setLabel(suggestion);
+              onUpdate(block.id, { label: suggestion });
+              setShowSuggestions(false);
+              setSelectedSuggestionIndex(-1);
+              return;
+            }
             if (fieldMode) {
               inputRefs.current[`${block.id}:value`]?.focus();
             }
@@ -296,11 +308,13 @@ function FieldBlock({
                   setLabel(suggestion);
                   onUpdate(block.id, { label: suggestion });
                   setShowSuggestions(false);
+                  setSelectedSuggestionIndex(-1);
                 }}
                 className="px-3 py-2"
                 style={{
                   borderBottomWidth: index === filteredSuggestions.length - 1 ? 0 : 1,
                   borderBottomColor: colors.border,
+                  backgroundColor: index === selectedSuggestionIndex ? colors.surface : 'transparent',
                 }}
               >
                 <Text className="text-[13px]" style={{ color: colors.text }}>
@@ -403,7 +417,11 @@ function NoteBlock({
   );
 }
 
-export default function CharacterEditor({ entityId }: CharacterEditorProps) {
+export default function CharacterEditor({
+  entityId,
+  autoFocusName = false,
+  onAutoFocusDone,
+}: CharacterEditorProps) {
   const { updateEntityName } = useUniverse();
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
@@ -413,17 +431,32 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [fieldMode, setFieldMode] = useState(false);
+  const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
   const hydratedRef = useRef(false);
   const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blockTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const inFlightSavesRef = useRef(0);
   const latestNameRef = useRef('');
   const savedNameRef = useRef('');
+  const nameInputRef = useRef<TextInput | null>(null);
   const inputRefs = useRef<Record<string, TextInput | null>>({});
   const blocksRef = useRef<ApiBibleBlock[]>([]);
   const lastFocusedBlockIdRef = useRef<string | null>(null);
+  const lastSelectionRef = useRef<TextSelection | null>(null);
+  const autoFocusNameRef = useRef(autoFocusName);
+  const onAutoFocusDoneRef = useRef(onAutoFocusDone);
+  useEffect(() => {
+    autoFocusNameRef.current = autoFocusName;
+    onAutoFocusDoneRef.current = onAutoFocusDone;
+  });
 
   const sortedBlocks = useMemo(() => sortBlocks(blocks, sortMode), [blocks, sortMode]);
+  const focusedBlock = useMemo(
+    () => blocks.find((block) => block.id === focusedBlockId) ?? null,
+    [blocks, focusedBlockId],
+  );
+  const canConvert = focusedBlock?.kind === 'text' || focusedBlock?.kind === 'note';
+  const convertLabel = focusedBlock?.kind === 'note' ? '→ Text' : '→ Note';
 
   function clearTimers() {
     if (titleTimerRef.current) {
@@ -492,11 +525,13 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
     let cancelled = false;
     hydratedRef.current = false;
     lastFocusedBlockIdRef.current = null;
+    lastSelectionRef.current = null;
     clearTimers();
     inFlightSavesRef.current = 0;
     setSaveState('saved');
     setColorPickerOpen(false);
     setFieldMode(false);
+    setFocusedBlockId(null);
     setLoading(true);
     setBlocks([]);
 
@@ -509,6 +544,12 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
         latestNameRef.current = entryRes.data.name;
         savedNameRef.current = entryRes.data.name;
         hydratedRef.current = true;
+        if (autoFocusNameRef.current) {
+          setTimeout(() => {
+            nameInputRef.current?.focus();
+            onAutoFocusDoneRef.current?.();
+          }, 150);
+        }
       })
       .finally(() => {
         if (!cancelled) {
@@ -575,15 +616,64 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
     scheduleBlockSave(id);
   }
 
+  function focusBlock(block: ApiBibleBlock) {
+    lastFocusedBlockIdRef.current = block.id;
+    setFocusedBlockId(block.id);
+  }
+
+  function focusFirstBlockInput() {
+    const first = sortBlocks(blocksRef.current, 'written')[0];
+    if (!first) return;
+
+    if (first.kind === 'text') {
+      inputRefs.current[`${first.id}:content`]?.focus();
+      return;
+    }
+
+    if (first.kind === 'field') {
+      inputRefs.current[`${first.id}:label`]?.focus();
+      return;
+    }
+
+    inputRefs.current[`${first.id}:title`]?.focus();
+  }
+
   async function handleBlockDelete(id: string) {
+    const writtenOrder = sortBlocks(blocksRef.current, 'written');
+    const idx = writtenOrder.findIndex((block) => block.id === id);
+    const prev = writtenOrder[idx - 1];
+    const next = writtenOrder[idx + 1];
+    const shouldMerge = !!prev && !!next && prev.kind === 'text' && next.kind === 'text';
+
     setBlocks((current) => current.filter((block) => block.id !== id));
     if (blockTimersRef.current[id]) {
       clearTimeout(blockTimersRef.current[id]);
       delete blockTimersRef.current[id];
     }
+    if (shouldMerge && blockTimersRef.current[next.id]) {
+      clearTimeout(blockTimersRef.current[next.id]);
+      delete blockTimersRef.current[next.id];
+    }
     syncSaveState();
     await runSave(async () => {
       await api.bible.blocks.delete(entityId, id);
+
+      if (shouldMerge) {
+        const latestPrev = blocksRef.current.find((block) => block.id === prev.id);
+        const latestNext = blocksRef.current.find((block) => block.id === next.id);
+        const prevContent = latestPrev?.content ?? prev.content ?? '';
+        const nextContent = latestNext?.content ?? next.content ?? '';
+        const merged = prevContent + (prevContent && nextContent ? '\n' : '') + nextContent;
+
+        await api.bible.blocks.update(entityId, prev.id, { content: merged });
+        await api.bible.blocks.delete(entityId, next.id);
+
+        setBlocks((current) =>
+          current
+            .filter((block) => block.id !== next.id)
+            .map((block) => (block.id === prev.id ? { ...block, content: merged } : block)),
+        );
+      }
     }).catch(() => {});
   }
 
@@ -612,6 +702,7 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
     setBlocks((current) => [...current, res.data]);
 
     setTimeout(() => {
+      focusBlock(res.data);
       inputRefs.current[`${res.data.id}:${focusKey}`]?.focus();
     }, 0);
   }
@@ -626,6 +717,79 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
     const source = available.length > 0 ? available : FIELD_SUGGESTIONS;
     const pickedLabel = source[Math.floor(Math.random() * source.length)];
     await createBlock({ kind: 'field', label: pickedLabel, value: '' }, 'value');
+  }
+
+  async function handleConvert() {
+    if (!focusedBlock || (focusedBlock.kind !== 'text' && focusedBlock.kind !== 'note')) {
+      return;
+    }
+
+    if (focusedBlock.kind === 'text') {
+      const sel = lastSelectionRef.current;
+      const content = focusedBlock.content ?? '';
+      const hasSelection = !!sel && sel.blockId === focusedBlock.id && sel.start !== sel.end;
+
+      if (hasSelection && sel) {
+        const before = content.slice(0, sel.start);
+        const selected = content.slice(sel.start, sel.end);
+        const after = content.slice(sel.end);
+        const notePosition = focusedBlock.position + 0.25;
+        const afterPosition = focusedBlock.position + 0.5;
+
+        await runSave(async () => {
+          if (before.trim()) {
+            await api.bible.blocks.update(entityId, focusedBlock.id, { content: before });
+            setBlocks((current) => updateLocalBlock(current, focusedBlock.id, { content: before }));
+          } else {
+            await api.bible.blocks.delete(entityId, focusedBlock.id);
+            setBlocks((current) => current.filter((block) => block.id !== focusedBlock.id));
+          }
+
+          const noteRes = await api.bible.blocks.create(entityId, {
+            kind: 'note',
+            body: selected,
+            position: notePosition,
+          });
+          setBlocks((current) => [...current, noteRes.data]);
+
+          if (after.trim()) {
+            const afterRes = await api.bible.blocks.create(entityId, {
+              kind: 'text',
+              content: after,
+              position: afterPosition,
+            });
+            setBlocks((current) => [...current, afterRes.data]);
+          }
+        }).catch(() => {});
+      } else {
+        if (!content.trim()) {
+          return;
+        }
+
+        await runSave(async () => {
+          const noteRes = await api.bible.blocks.create(entityId, {
+            kind: 'note',
+            body: content,
+            position: focusedBlock.position,
+          });
+          await api.bible.blocks.delete(entityId, focusedBlock.id);
+          setBlocks((current) => [...current.filter((block) => block.id !== focusedBlock.id), noteRes.data]);
+        }).catch(() => {});
+      }
+
+      return;
+    }
+
+    const noteContent = [focusedBlock.title, focusedBlock.body].filter(Boolean).join('\n');
+    await runSave(async () => {
+      const textRes = await api.bible.blocks.create(entityId, {
+        kind: 'text',
+        content: noteContent,
+        position: focusedBlock.position,
+      });
+      await api.bible.blocks.delete(entityId, focusedBlock.id);
+      setBlocks((current) => [...current.filter((block) => block.id !== focusedBlock.id), textRes.data]);
+    }).catch(() => {});
   }
 
   if (loading) {
@@ -650,8 +814,12 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
 
       <View className="px-8 pb-4 pt-10">
         <TextInput
+          ref={nameInputRef}
           value={name}
           onChangeText={setName}
+          onFocus={() => setFocusedBlockId(null)}
+          onSubmitEditing={focusFirstBlockInput}
+          returnKeyType="next"
           placeholder="Untitled"
           placeholderTextColor={colors.faint}
           style={{ color: colors.text, fontSize: 28, fontWeight: '700', paddingVertical: 0, ...(noOutline as object) }}
@@ -719,9 +887,15 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
                 <TextBlock
                   block={block}
                   onUpdate={handleBlockUpdate}
-                  onDelete={handleBlockDelete}
                   onFocus={() => {
-                    lastFocusedBlockIdRef.current = block.id;
+                    focusBlock(block);
+                  }}
+                  onSelectionChange={(event) => {
+                    lastSelectionRef.current = {
+                      blockId: block.id,
+                      start: event.nativeEvent.selection.start,
+                      end: event.nativeEvent.selection.end,
+                    };
                   }}
                   inputRefs={inputRefs}
                 />
@@ -731,7 +905,7 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
                   onUpdate={handleBlockUpdate}
                   onDelete={handleBlockDelete}
                   onFocus={() => {
-                    lastFocusedBlockIdRef.current = block.id;
+                    focusBlock(block);
                   }}
                   inputRefs={inputRefs}
                   fieldMode={fieldMode}
@@ -745,7 +919,7 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
                   onUpdate={handleBlockUpdate}
                   onDelete={handleBlockDelete}
                   onFocus={() => {
-                    lastFocusedBlockIdRef.current = block.id;
+                    focusBlock(block);
                   }}
                   inputRefs={inputRefs}
                 />
@@ -758,9 +932,11 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
           onPress={() => {
             const last = sortedBlocks[sortedBlocks.length - 1];
             if (last?.kind === 'text') {
+              focusBlock(last);
               inputRefs.current[`${last.id}:content`]?.focus();
             } else {
-              createBlock({ kind: 'text', content: '' }, 'content', undefined);
+              const appendPosition = last ? last.position + 1.0 : 1.0;
+              void createBlock({ kind: 'text', content: '' }, 'content', appendPosition);
             }
           }}
           minHeight={64}
@@ -777,7 +953,7 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
           borderColor: colors.border,
         }}
       >
-        <TouchableOpacity onPress={() => createBlock({ kind: 'field', label: '', value: '' }, 'label')}>
+        <TouchableOpacity onPress={() => void createBlock({ kind: 'field', label: '', value: '' }, 'label')}>
           <Text className="text-sm font-medium" style={{ color: colors.accent }}>
             + Field
           </Text>
@@ -803,9 +979,14 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
             Fields
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => createBlock({ kind: 'note', title: '', body: '' }, 'title')} className="ml-4">
+        <TouchableOpacity onPress={() => void createBlock({ kind: 'note', title: '', body: '' }, 'title')} className="ml-4">
           <Text className="text-sm font-medium" style={{ color: colors.accent }}>
             + Note
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => void handleConvert()} disabled={!canConvert} className="ml-4">
+          <Text className="text-sm font-medium" style={{ color: canConvert ? colors.text : colors.faint }}>
+            {convertLabel}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleRandomField} className="ml-4">
