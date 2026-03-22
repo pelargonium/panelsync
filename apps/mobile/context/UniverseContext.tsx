@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { api, getToken, type ApiBibleEntry, type ApiPage } from '../lib/api';
+import { api, getToken, type ApiBibleEntry, type ApiMembership, type ApiPage } from '../lib/api';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
@@ -30,6 +30,9 @@ interface UniverseContextValue {
   createEntity: (type: ApiBibleEntry['type']) => Promise<ApiBibleEntry>;
   deleteEntity: (id: string) => Promise<void>;
   updateEntityName: (id: string, name: string) => void;
+  memberships: ApiMembership[];
+  addMembership: (characterId: string, groupId: string) => Promise<void>;
+  removeMembership: (characterId: string, groupId: string) => Promise<void>;
   pagesByContainer: Record<string, ApiPage[]>;
   loadPages: (containerId: string) => Promise<void>;
   binderOpen: boolean;
@@ -92,6 +95,7 @@ function cycleDepth(current: DepthState): DepthState {
 function defaultNameForType(type: ApiBibleEntry['type']) {
   if (type === 'character') return 'Untitled Character';
   if (type === 'location') return 'Untitled Location';
+  if (type === 'group') return 'Untitled Group';
   return 'Untitled Note';
 }
 
@@ -105,6 +109,7 @@ export function UniverseProvider({
   children: ReactNode;
 }) {
   const [entities, setEntities] = useState<ApiBibleEntry[]>([]);
+  const [memberships, setMemberships] = useState<ApiMembership[]>([]);
   const [loadingEntities, setLoadingEntities] = useState(true);
   const [pagesByContainer] = useState<Record<string, ApiPage[]>>({});
   const [binderOpenState, setBinderOpenState] = useState(true);
@@ -116,8 +121,12 @@ export function UniverseProvider({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function refreshEntities() {
-    const res = await api.bible.list(universeId);
-    setEntities(res.data);
+    const [entitiesRes, membershipsRes] = await Promise.all([
+      api.bible.list(universeId),
+      api.memberships.list(universeId),
+    ]);
+    setEntities(entitiesRes.data);
+    setMemberships(membershipsRes.data);
   }
 
   useEffect(() => {
@@ -125,14 +134,17 @@ export function UniverseProvider({
     hasHydratedRef.current = false;
     setLoadingEntities(true);
     setEntities([]);
+    setMemberships([]);
 
     Promise.all([
       api.bible.list(universeId),
       requestWorkspaceState<WorkspaceStateResponse>(`/api/workspace-state?universeId=${universeId}`),
+      api.memberships.list(universeId),
     ])
-      .then(([entitiesRes, workspaceRes]) => {
+      .then(([entitiesRes, workspaceRes, membershipsRes]) => {
         if (cancelled) return;
         setEntities(entitiesRes.data);
+        setMemberships(membershipsRes.data);
         setBinderOpenState(workspaceRes.data.binderOpen);
         setActiveEntityType(workspaceRes.data.activeEntityType);
         setActiveEntityId(workspaceRes.data.activeEntityId);
@@ -221,11 +233,28 @@ export function UniverseProvider({
 
     setEntities((current) => current.filter((entry) => entry.id !== id));
     setWarmContexts((current) => current.filter((entry) => entry.entityId !== id));
+    setMemberships((current) => current.filter((item) => item.groupId !== id && item.characterId !== id));
 
     if (activeEntityId === id) {
       setActiveEntityType(null);
       setActiveEntityId(null);
     }
+  }
+
+  async function addMembership(characterId: string, groupId: string) {
+    setMemberships((current) => {
+      const exists = current.some((item) => item.characterId === characterId && item.groupId === groupId);
+      if (exists) return current;
+      return [...current, { characterId, groupId }];
+    });
+    await api.memberships.add(groupId, characterId);
+  }
+
+  async function removeMembership(characterId: string, groupId: string) {
+    setMemberships((current) =>
+      current.filter((item) => !(item.characterId === characterId && item.groupId === groupId)),
+    );
+    await api.memberships.remove(groupId, characterId);
   }
 
   function updateEntityName(id: string, name: string) {
@@ -249,6 +278,9 @@ export function UniverseProvider({
         createEntity,
         deleteEntity,
         updateEntityName,
+        memberships,
+        addMembership,
+        removeMembership,
         pagesByContainer,
         loadPages,
         binderOpen: binderOpenState,

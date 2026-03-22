@@ -10,8 +10,9 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import CharacterEditor from '../../components/CharacterEditor';
 import EntityEditor from '../../components/EntityEditor';
+import GroupEditor from '../../components/GroupEditor';
 import { UniverseProvider, useUniverse } from '../../context/UniverseContext';
-import { type ApiBibleEntry } from '../../lib/api';
+import { type ApiBibleEntry, type ApiMembership } from '../../lib/api';
 import { colors } from '../../theme';
 
 const BINDER_WIDTH = 264;
@@ -44,6 +45,7 @@ function DossierPlaceholder() {
 function entityColor(type: ApiBibleEntry['type']) {
   if (type === 'character') return colors.accent;
   if (type === 'location') return colors.bible;
+  if (type === 'group') return '#9B7FD4';
   return colors.muted;
 }
 
@@ -53,7 +55,12 @@ function compareEntities(left: ApiBibleEntry, right: ApiBibleEntry, sortMode: So
   }
 
   if (sortMode === 'type') {
-    const typeOrder = { character: 0, location: 1, note: 2 };
+    const typeOrder: Record<ApiBibleEntry['type'], number> = {
+      group: 0,
+      character: 1,
+      location: 2,
+      note: 3,
+    };
     const typeComparison = typeOrder[left.type] - typeOrder[right.type];
     if (typeComparison !== 0) return typeComparison;
   }
@@ -66,6 +73,9 @@ function PrimaryContent() {
 
   if (activeEntityType === 'bible_entry' && activeEntityId) {
     const entity = entities.find((item) => item.id === activeEntityId);
+    if (entity?.type === 'group') {
+      return <GroupEditor entityId={activeEntityId} />;
+    }
     if (entity?.type === 'character') {
       return <CharacterEditor entityId={activeEntityId} />;
     }
@@ -141,6 +151,7 @@ function TypePicker({
   onCreate: (type: ApiBibleEntry['type']) => void;
 }) {
   const options: Array<{ type: ApiBibleEntry['type']; label: string }> = [
+    { type: 'group', label: 'Group' },
     { type: 'character', label: 'Character' },
     { type: 'location', label: 'Location' },
     { type: 'note', label: 'Note' },
@@ -214,12 +225,7 @@ function EntityRow({
   }
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      onLongPress={onLongPress}
-      activeOpacity={0.85}
-      delayLongPress={250}
-    >
+    <TouchableOpacity onPress={onPress} onLongPress={onLongPress} activeOpacity={0.85} delayLongPress={250}>
       <View
         className="h-11 flex-row items-center px-4"
         style={{
@@ -241,17 +247,101 @@ function EntityRow({
             }}
           />
         ) : null}
-        <View
-          className="mr-[10px] h-2 w-2 rounded-full"
-          style={{ backgroundColor: entityColor(entity.type) }}
-        />
-        <Text
-          numberOfLines={1}
-          className="flex-1 text-sm"
-          style={{ color: isActive ? colors.accent : colors.text }}
-        >
+        <View className="mr-[10px] h-2 w-2 rounded-full" style={{ backgroundColor: entityColor(entity.type) }} />
+        <Text numberOfLines={1} className="flex-1 text-sm" style={{ color: isActive ? colors.accent : colors.text }}>
           {entity.name}
         </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function GroupRow({
+  group,
+  memberCount,
+  expanded,
+  onToggle,
+  onPress,
+  onLongPress,
+  pendingDelete,
+  onDeleteConfirm,
+  onDeleteCancel,
+}: {
+  group: ApiBibleEntry;
+  memberCount: number;
+  expanded: boolean;
+  onToggle: () => void;
+  onPress: () => void;
+  onLongPress: () => void;
+  pendingDelete: boolean;
+  onDeleteConfirm: () => void;
+  onDeleteCancel: () => void;
+}) {
+  const { activeEntityId } = useUniverse();
+  const isActive = activeEntityId === group.id;
+
+  if (pendingDelete) {
+    return (
+      <View
+        className="h-11 flex-row items-center px-4"
+        style={{ borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.bg }}
+      >
+        <Text className="flex-1 text-[13px]" style={{ color: colors.text }}>
+          Delete {group.name}?
+        </Text>
+        <TouchableOpacity onPress={onDeleteConfirm}>
+          <Text className="text-[13px] font-semibold" style={{ color: '#d14b4b' }}>
+            Yes
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onDeleteCancel} className="ml-4">
+          <Text className="text-[13px] font-semibold" style={{ color: colors.faint }}>
+            No
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <TouchableOpacity onPress={onPress} onLongPress={onLongPress} activeOpacity={0.85} delayLongPress={250}>
+      <View
+        className="h-11 flex-row items-center px-4"
+        style={{
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+          backgroundColor: isActive ? colors.bg : colors.surface,
+          position: 'relative',
+        }}
+      >
+        {isActive ? (
+          <View
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 2,
+              backgroundColor: colors.accent,
+            }}
+          />
+        ) : null}
+
+        <TouchableOpacity onPress={onToggle} hitSlop={8}>
+          <Text className="mr-2 text-[11px]" style={{ color: colors.muted }}>
+            {expanded ? '▾' : '▸'}
+          </Text>
+        </TouchableOpacity>
+
+        <View className="mr-[10px] h-2 w-2 rounded-full" style={{ backgroundColor: entityColor('group') }} />
+        <Text numberOfLines={1} className="flex-1 text-sm" style={{ color: isActive ? colors.accent : colors.text }}>
+          {group.name}
+        </Text>
+        {memberCount > 0 ? (
+          <Text className="text-xs" style={{ color: colors.faint }}>
+            {memberCount}
+          </Text>
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -262,11 +352,10 @@ function UniverseWorkspace() {
   const {
     universeName,
     entities,
+    memberships,
     loadingEntities,
     binderOpen,
     setBinderOpen,
-    activeEntityType,
-    activeEntityId,
     activateEntity,
     createEntity,
     deleteEntity,
@@ -276,11 +365,33 @@ function UniverseWorkspace() {
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [creatingType, setCreatingType] = useState<ApiBibleEntry['type'] | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const sortedEntities = useMemo(
     () => [...entities].sort((left, right) => compareEntities(left, right, sortMode)),
     [entities, sortMode],
   );
+
+  const groupEntities = useMemo(
+    () => entities.filter((entity) => entity.type === 'group').sort((a, b) => a.name.localeCompare(b.name)),
+    [entities],
+  );
+
+  const nonGroupEntities = useMemo(
+    () => sortedEntities.filter((entity) => entity.type !== 'group'),
+    [sortedEntities],
+  );
+
+  const membersByGroup = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    memberships.forEach((membership: ApiMembership) => {
+      if (!map[membership.groupId]) {
+        map[membership.groupId] = [];
+      }
+      map[membership.groupId].push(membership.characterId);
+    });
+    return map;
+  }, [memberships]);
 
   function dismissTransientUi() {
     setSortPickerOpen(false);
@@ -310,7 +421,7 @@ function UniverseWorkspace() {
         className="flex-row items-center px-4"
         style={{ height: 48, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}
       >
-        <TouchableOpacity onPress={() => router.back()} className="flex-1">
+        <TouchableOpacity onPress={() => router.replace('/')} className="flex-1">
           <Text className="text-[13px] font-semibold" style={{ color: colors.accent }}>
             ← Universes
           </Text>
@@ -384,16 +495,12 @@ function UniverseWorkspace() {
             <ScrollView
               className="flex-1"
               showsVerticalScrollIndicator={false}
-              onTouchStart={() => {
-                setSortPickerOpen(false);
-                setTypePickerOpen(false);
-              }}
             >
               {loadingEntities ? (
                 <ActivityIndicator size="small" color={colors.faint} className="py-4" />
               ) : null}
 
-              {!loadingEntities && sortedEntities.length === 0 ? (
+              {!loadingEntities && groupEntities.length === 0 && nonGroupEntities.length === 0 ? (
                 <TouchableOpacity
                   onPress={() => {
                     setSortPickerOpen(false);
@@ -407,7 +514,55 @@ function UniverseWorkspace() {
                 </TouchableOpacity>
               ) : null}
 
-              {!loadingEntities && sortedEntities.map((entity) => (
+              {!loadingEntities && groupEntities.map((group) => {
+                const memberIds = membersByGroup[group.id] ?? [];
+                const memberEntities = memberIds
+                  .map((id) => entities.find((entity) => entity.id === id))
+                  .filter(Boolean) as ApiBibleEntry[];
+                const isExpanded = expandedGroups[group.id] ?? false;
+
+                return (
+                  <View key={group.id}>
+                    <GroupRow
+                      group={group}
+                      memberCount={memberEntities.length}
+                      expanded={isExpanded}
+                      onToggle={() =>
+                        setExpandedGroups((current) => ({ ...current, [group.id]: !current[group.id] }))
+                      }
+                      onPress={() => {
+                        dismissTransientUi();
+                        activateEntity('bible_entry', group.id);
+                      }}
+                      onLongPress={() => setPendingDeleteId(group.id)}
+                      pendingDelete={pendingDeleteId === group.id}
+                      onDeleteConfirm={() => handleDelete(group.id)}
+                      onDeleteCancel={() => setPendingDeleteId(null)}
+                    />
+                    {isExpanded && memberEntities.map((member) => (
+                      <View key={member.id} style={{ paddingLeft: 20 }}>
+                        <EntityRow
+                          entity={member}
+                          pendingDelete={pendingDeleteId === member.id}
+                          onDeleteConfirm={() => handleDelete(member.id)}
+                          onDeleteCancel={() => setPendingDeleteId(null)}
+                          onPress={() => {
+                            dismissTransientUi();
+                            activateEntity('bible_entry', member.id);
+                          }}
+                          onLongPress={() => setPendingDeleteId(member.id)}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                );
+              })}
+
+              {groupEntities.length > 0 && nonGroupEntities.length > 0 ? (
+                <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 4 }} />
+              ) : null}
+
+              {!loadingEntities && nonGroupEntities.map((entity) => (
                 <EntityRow
                   key={entity.id}
                   entity={entity}
@@ -418,11 +573,7 @@ function UniverseWorkspace() {
                     dismissTransientUi();
                     activateEntity('bible_entry', entity.id);
                   }}
-                  onLongPress={() => {
-                    setSortPickerOpen(false);
-                    setTypePickerOpen(false);
-                    setPendingDeleteId(entity.id);
-                  }}
+                  onLongPress={() => setPendingDeleteId(entity.id)}
                 />
               ))}
             </ScrollView>

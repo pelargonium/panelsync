@@ -13,10 +13,12 @@
 - Script editor: `ScriptEditor.tsx` still present. Final Draft-style visual design. Not currently routed to from the new binder (hierarchy removed), but component is intact.
 - Block CRUD API: `GET/POST /api/pages/:pageId/blocks`, `PATCH/DELETE /api/pages/:pageId/blocks/:blockId`.
 - All migrations applied to Neon. No new migrations needed for bible (uses existing tables).
-- CharacterEditor: block-based editor for character bible entries. Fields (labeled, autocomplete from 50-item list) + Notes (title + body). Toolbar: + Field, + Note, ⚄ Random. Sort toggle (Written / Type / A-Z). Color picker (6 swatches). All persists to dossier_attachments. New characters auto-seed with Role, Age, Motivation fields.
+- CharacterEditor: flowing page with three block types — text (plain prose, no card), field (labeled island), note (titled island). Toolbar: + Text, + Field, + Note, ⚄ Random. Blocks insert after the last-focused block. Sort toggle (Written / Type / A-Z). Color picker. Auto-saves 600ms debounced. New characters seed with empty text block + Role/Age/Motivation fields.
+- Groups: bible entries with type='group'. Membership stored in dossier_attachments (kind='group_membership' on the character). Binder shows expandable group rows (▸/▾) with indented members. GroupEditor: name, color, body, members list + add/remove. Tagging from group side. migration 0003 applied to Neon.
+- Back button fixed (router.replace instead of router.back). Binder ScrollView no longer intercepts touch starts (long-press delete now works).
 
 ## Next Step
-Build the groups feature: add 'group' to bibleEntryTypeEnum, implement group membership via dossier_attachments, expandable binder rows, and a GroupEditor component.
+Deploy the API to Railway and run an EAS preview build so the app can be tested on iPad with real persistence.
 
 ---
 

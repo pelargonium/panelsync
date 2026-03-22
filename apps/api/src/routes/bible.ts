@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, max } from 'drizzle-orm';
+import { and, asc, desc, eq, max, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/client.js';
 import { bibleEntries, dossierAttachments, universes, universeMembers } from '../db/schema.js';
@@ -43,7 +43,8 @@ type BibleTextPayload = {
 
 type BlockPayload =
   | { kind: 'field'; label: string; value: string }
-  | { kind: 'note'; title: string; body: string };
+  | { kind: 'note'; title: string; body: string }
+  | { kind: 'text'; content: string };
 
 function serializeBlock(row: typeof dossierAttachments.$inferSelect) {
   const payload = row.payload as BlockPayload;
@@ -52,7 +53,9 @@ function serializeBlock(row: typeof dossierAttachments.$inferSelect) {
     kind: payload.kind,
     ...(payload.kind === 'field'
       ? { label: payload.label ?? '', value: payload.value ?? '' }
-      : { title: payload.title ?? '', body: payload.body ?? '' }),
+      : payload.kind === 'note'
+      ? { title: payload.title ?? '', body: payload.body ?? '' }
+      : { content: payload.content ?? '' }),
     position: row.position,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -68,6 +71,36 @@ async function getEntryForAccess(id: string, userId: string) {
 
 export async function bibleRoutes(server: FastifyInstance) {
   server.addHook('onRequest', server.authenticate);
+
+  server.get<{ Params: { universeId: string } }>(
+    '/universes/:universeId/bible/memberships',
+    async (request, reply) => {
+      const { universeId } = request.params;
+      const userId = request.user.sub;
+
+      if (!await assertUniverseAccess(universeId, userId)) {
+        reply.code(403);
+        return { error: 'forbidden' };
+      }
+
+      const rows = await db
+        .select()
+        .from(dossierAttachments)
+        .where(and(
+          eq(dossierAttachments.universeId, universeId),
+          eq(dossierAttachments.entityType, 'bible_entry'),
+          eq(dossierAttachments.type, 'text'),
+          sql`${dossierAttachments.payload}->>'kind' = 'group_membership'`,
+        ));
+
+      return {
+        data: rows.map((row) => ({
+          characterId: row.entityId,
+          groupId: (row.payload as { kind: string; groupId: string }).groupId,
+        })),
+      };
+    },
+  );
 
   server.get<{ Params: { universeId: string } }>(
     '/universes/:universeId/bible',
@@ -90,7 +123,7 @@ export async function bibleRoutes(server: FastifyInstance) {
     },
   );
 
-  server.post<{ Params: { universeId: string }; Body: { name: string; type: 'character' | 'location' | 'note' } }>(
+  server.post<{ Params: { universeId: string }; Body: { name: string; type: 'character' | 'location' | 'note' | 'group' } }>(
     '/universes/:universeId/bible',
     async (request, reply) => {
       const { universeId } = request.params;
@@ -120,6 +153,16 @@ export async function bibleRoutes(server: FastifyInstance) {
 
       if (type === 'character') {
         await db.insert(dossierAttachments).values([
+          {
+            universeId,
+            entityType: 'bible_entry',
+            entityId: row.id,
+            type: 'text',
+            payload: { kind: 'text', content: '' },
+            position: 0.5,
+            createdBy: userId,
+            updatedBy: userId,
+          },
           {
             universeId,
             entityType: 'bible_entry',
@@ -164,15 +207,10 @@ export async function bibleRoutes(server: FastifyInstance) {
       const { id } = request.params;
       const userId = request.user.sub;
 
-      const [entry] = await db.select().from(bibleEntries).where(eq(bibleEntries.id, id)).limit(1);
-      if (!entry) {
-        reply.code(404);
-        return { error: 'not found' };
-      }
-
-      if (!await assertUniverseAccess(entry.universeId, userId)) {
-        reply.code(403);
-        return { error: 'forbidden' };
+      const result = await getEntryForAccess(id, userId);
+      if ('error' in result) {
+        reply.code(result.error === 'not found' ? 404 : 403);
+        return { error: result.error };
       }
 
       const [attachment] = await db
@@ -190,28 +228,23 @@ export async function bibleRoutes(server: FastifyInstance) {
 
       return {
         data: {
-          ...serializeEntry(entry),
+          ...serializeEntry(result.entry),
           bodyText: payload.text ?? '',
         },
       };
     },
   );
 
-  server.patch<{ Params: { id: string }; Body: { name?: string; type?: 'character' | 'location' | 'note'; color?: string } }>(
+  server.patch<{ Params: { id: string }; Body: { name?: string; type?: 'character' | 'location' | 'note' | 'group'; color?: string } }>(
     '/bible/:id',
     async (request, reply) => {
       const { id } = request.params;
       const userId = request.user.sub;
 
-      const [entry] = await db.select().from(bibleEntries).where(eq(bibleEntries.id, id)).limit(1);
-      if (!entry) {
-        reply.code(404);
-        return { error: 'not found' };
-      }
-
-      if (!await assertUniverseAccess(entry.universeId, userId)) {
-        reply.code(403);
-        return { error: 'forbidden' };
+      const result = await getEntryForAccess(id, userId);
+      if ('error' in result) {
+        reply.code(result.error === 'not found' ? 404 : 403);
+        return { error: result.error };
       }
 
       const updates: Partial<typeof bibleEntries.$inferInsert> = {
@@ -248,15 +281,10 @@ export async function bibleRoutes(server: FastifyInstance) {
       const { text } = request.body;
       const userId = request.user.sub;
 
-      const [entry] = await db.select().from(bibleEntries).where(eq(bibleEntries.id, id)).limit(1);
-      if (!entry) {
-        reply.code(404);
-        return { error: 'not found' };
-      }
-
-      if (!await assertUniverseAccess(entry.universeId, userId)) {
-        reply.code(403);
-        return { error: 'forbidden' };
+      const result = await getEntryForAccess(id, userId);
+      if ('error' in result) {
+        reply.code(result.error === 'not found' ? 404 : 403);
+        return { error: result.error };
       }
 
       const now = new Date();
@@ -282,7 +310,7 @@ export async function bibleRoutes(server: FastifyInstance) {
           .where(eq(dossierAttachments.id, attachment.id));
       } else {
         await db.insert(dossierAttachments).values({
-          universeId: entry.universeId,
+          universeId: result.entry.universeId,
           entityType: 'bible_entry',
           entityId: id,
           type: 'text',
@@ -304,15 +332,10 @@ export async function bibleRoutes(server: FastifyInstance) {
       const { id } = request.params;
       const userId = request.user.sub;
 
-      const [entry] = await db.select().from(bibleEntries).where(eq(bibleEntries.id, id)).limit(1);
-      if (!entry) {
-        reply.code(404);
-        return { error: 'not found' };
-      }
-
-      if (!await assertUniverseAccess(entry.universeId, userId)) {
-        reply.code(403);
-        return { error: 'forbidden' };
+      const result = await getEntryForAccess(id, userId);
+      if ('error' in result) {
+        reply.code(result.error === 'not found' ? 404 : 403);
+        return { error: result.error };
       }
 
       await db
@@ -323,6 +346,82 @@ export async function bibleRoutes(server: FastifyInstance) {
         ));
 
       await db.delete(bibleEntries).where(eq(bibleEntries.id, id));
+      reply.code(204);
+    },
+  );
+
+  server.post<{ Params: { groupId: string }; Body: { characterId: string } }>(
+    '/bible/:groupId/members',
+    async (request, reply) => {
+      const { groupId } = request.params;
+      const { characterId } = request.body;
+      const userId = request.user.sub;
+
+      const groupResult = await getEntryForAccess(groupId, userId);
+      if ('error' in groupResult) {
+        reply.code(groupResult.error === 'not found' ? 404 : 403);
+        return { error: groupResult.error };
+      }
+
+      if (groupResult.entry.type !== 'group') {
+        reply.code(400);
+        return { error: 'group entry required' };
+      }
+
+      const [character] = await db.select().from(bibleEntries).where(eq(bibleEntries.id, characterId)).limit(1);
+      if (!character || character.type !== 'character' || character.universeId !== groupResult.entry.universeId) {
+        reply.code(400);
+        return { error: 'character entry required' };
+      }
+
+      const [existing] = await db
+        .select()
+        .from(dossierAttachments)
+        .where(and(
+          eq(dossierAttachments.entityId, characterId),
+          sql`${dossierAttachments.payload}->>'kind' = 'group_membership'`,
+          sql`${dossierAttachments.payload}->>'groupId' = ${groupId}`,
+        ))
+        .limit(1);
+
+      if (existing) {
+        return { data: { characterId, groupId } };
+      }
+
+      await db.insert(dossierAttachments).values({
+        universeId: groupResult.entry.universeId,
+        entityType: 'bible_entry',
+        entityId: characterId,
+        type: 'text',
+        payload: { kind: 'group_membership', groupId },
+        position: 0,
+        createdBy: userId,
+        updatedBy: userId,
+      });
+
+      reply.code(201);
+      return { data: { characterId, groupId } };
+    },
+  );
+
+  server.delete<{ Params: { groupId: string; characterId: string } }>(
+    '/bible/:groupId/members/:characterId',
+    async (request, reply) => {
+      const { groupId, characterId } = request.params;
+      const userId = request.user.sub;
+
+      const groupResult = await getEntryForAccess(groupId, userId);
+      if ('error' in groupResult) {
+        reply.code(groupResult.error === 'not found' ? 404 : 403);
+        return { error: groupResult.error };
+      }
+
+      await db.delete(dossierAttachments).where(and(
+        eq(dossierAttachments.entityId, characterId),
+        sql`${dossierAttachments.payload}->>'kind' = 'group_membership'`,
+        sql`${dossierAttachments.payload}->>'groupId' = ${groupId}`,
+      ));
+
       reply.code(204);
     },
   );
@@ -350,8 +449,8 @@ export async function bibleRoutes(server: FastifyInstance) {
 
       const data = rows
         .filter((row) => {
-          const payload = row.payload as Partial<BlockPayload>;
-          return payload.kind === 'field' || payload.kind === 'note';
+          const payload = row.payload as BlockPayload;
+          return payload.kind === 'field' || payload.kind === 'note' || payload.kind === 'text';
         })
         .map(serializeBlock);
 
@@ -359,7 +458,7 @@ export async function bibleRoutes(server: FastifyInstance) {
     },
   );
 
-  server.post<{ Params: { id: string }; Body: { kind: 'field' | 'note'; label?: string; value?: string; title?: string; body?: string; position?: number } }>(
+  server.post<{ Params: { id: string }; Body: { kind: 'field' | 'note' | 'text'; label?: string; value?: string; title?: string; body?: string; content?: string; position?: number } }>(
     '/bible/:id/blocks',
     async (request, reply) => {
       const { id } = request.params;
@@ -393,10 +492,15 @@ export async function bibleRoutes(server: FastifyInstance) {
             label: request.body.label ?? '',
             value: request.body.value ?? '',
           }
-        : {
+        : kind === 'note'
+        ? {
             kind,
             title: request.body.title ?? '',
             body: request.body.body ?? '',
+          }
+        : {
+            kind: 'text',
+            content: request.body.content ?? '',
           };
 
       const [row] = await db
@@ -418,7 +522,7 @@ export async function bibleRoutes(server: FastifyInstance) {
     },
   );
 
-  server.patch<{ Params: { id: string; blockId: string }; Body: { label?: string; value?: string; title?: string; body?: string } }>(
+  server.patch<{ Params: { id: string; blockId: string }; Body: { label?: string; value?: string; title?: string; body?: string; content?: string } }>(
     '/bible/:id/blocks/:blockId',
     async (request, reply) => {
       const { id, blockId } = request.params;
@@ -443,10 +547,15 @@ export async function bibleRoutes(server: FastifyInstance) {
             label: request.body.label ?? payload.label ?? '',
             value: request.body.value ?? payload.value ?? '',
           }
-        : {
+        : payload.kind === 'note'
+        ? {
             kind: 'note',
             title: request.body.title ?? payload.title ?? '',
             body: request.body.body ?? payload.body ?? '',
+          }
+        : {
+            kind: 'text',
+            content: request.body.content ?? payload.content ?? '',
           };
 
       const [updatedRow] = await db

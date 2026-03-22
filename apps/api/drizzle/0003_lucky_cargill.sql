@@ -1,0 +1,1 @@
+ALTER TYPE "public"."bible_entry_type" ADD VALUE 'group';

@@ -105,7 +105,7 @@ export interface ApiScriptBlock {
 export interface ApiBibleEntry {
   id: string;
   universeId: string;
-  type: 'character' | 'location' | 'note';
+  type: 'character' | 'location' | 'note' | 'group';
   name: string;
   color: string | null;
   createdAt: string;
@@ -118,14 +118,20 @@ export interface ApiBibleEntryDetail extends ApiBibleEntry {
 
 export interface ApiBibleBlock {
   id: string;
-  kind: 'field' | 'note';
+  kind: 'field' | 'note' | 'text';
   label?: string;
   value?: string;
   title?: string;
   body?: string;
+  content?: string;
   position: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ApiMembership {
+  characterId: string;
+  groupId: string;
 }
 
 export type ApiSeries = ApiContainer;
@@ -207,6 +213,18 @@ export const api = {
         body: JSON.stringify(body),
       }),
     me: () => request<{ user: ApiUser }>('/api/auth/me'),
+  },
+
+  memberships: {
+    list: (universeId: string) =>
+      request<{ data: ApiMembership[] }>(`/api/universes/${universeId}/bible/memberships`),
+    add: (groupId: string, characterId: string) =>
+      request<{ data: ApiMembership }>(`/api/bible/${groupId}/members`, {
+        method: 'POST',
+        body: JSON.stringify({ characterId }),
+      }),
+    remove: (groupId: string, characterId: string) =>
+      request<void>(`/api/bible/${groupId}/members/${characterId}`, { method: 'DELETE' }),
   },
 
   universes: {
@@ -354,11 +372,12 @@ export const api = {
       list: (entryId: string) =>
         request<{ data: ApiBibleBlock[] }>(`/api/bible/${entryId}/blocks`),
       create: (entryId: string, body: {
-        kind: 'field' | 'note';
+        kind: 'field' | 'note' | 'text';
         label?: string;
         value?: string;
         title?: string;
         body?: string;
+        content?: string;
         position?: number;
       }) =>
         request<{ data: ApiBibleBlock }>(`/api/bible/${entryId}/blocks`, {
@@ -370,6 +389,7 @@ export const api = {
         value?: string;
         title?: string;
         body?: string;
+        content?: string;
       }) =>
         request<{ data: ApiBibleBlock }>(`/api/bible/${entryId}/blocks/${blockId}`, {
           method: 'PATCH',

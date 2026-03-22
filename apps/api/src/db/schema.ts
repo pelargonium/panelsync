@@ -47,6 +47,7 @@ export const bibleEntryTypeEnum = pgEnum('bible_entry_type', [
   'character',
   'location',
   'note',
+  'group',
 ]);
 
 export const pageStatusEnum = pgEnum('page_status', [

@@ -21,7 +21,13 @@ const COLOR_PALETTE = ['#c8a768', '#1E6B3C', '#1B4FD8', '#6B2D8B', '#C41E1E', '#
 
 type SortMode = 'written' | 'type' | 'az';
 type SaveState = 'saved' | 'saving';
-type BlockPatch = { label?: string; value?: string; title?: string; body?: string };
+type BlockPatch = {
+  label?: string;
+  value?: string;
+  title?: string;
+  body?: string;
+  content?: string;
+};
 
 interface CharacterEditorProps {
   entityId: string;
@@ -33,17 +39,25 @@ function sortBlocks(blocks: ApiBibleBlock[], sortMode: SortMode) {
   }
 
   if (sortMode === 'type') {
+    const kindOrder = { text: 0, field: 1, note: 2 };
     return [...blocks].sort((left, right) => {
-      if (left.kind !== right.kind) {
-        return left.kind === 'field' ? -1 : 1;
-      }
+      const order = kindOrder[left.kind] - kindOrder[right.kind];
+      if (order !== 0) return order;
       return left.position - right.position;
     });
   }
 
   return [...blocks].sort((left, right) => {
-    const leftLabel = left.kind === 'field' ? left.label ?? '' : left.title ?? '';
-    const rightLabel = right.kind === 'field' ? right.label ?? '' : right.title ?? '';
+    const leftLabel = left.kind === 'field'
+      ? left.label ?? ''
+      : left.kind === 'note'
+      ? left.title ?? ''
+      : (left.content ?? '').slice(0, 30);
+    const rightLabel = right.kind === 'field'
+      ? right.label ?? ''
+      : right.kind === 'note'
+      ? right.title ?? ''
+      : (right.content ?? '').slice(0, 30);
     return leftLabel.localeCompare(rightLabel, undefined, { sensitivity: 'base' });
   });
 }
@@ -64,15 +78,77 @@ function updateLocalBlock(blocks: ApiBibleBlock[], id: string, patch: Partial<Ap
   return blocks.map((block) => (block.id === id ? { ...block, ...patch } : block));
 }
 
-function FieldBlock({
+function TextBlock({
   block,
   onUpdate,
   onDelete,
+  onFocus,
   inputRefs,
 }: {
   block: ApiBibleBlock;
   onUpdate: (id: string, patch: BlockPatch) => void;
   onDelete: (id: string) => void;
+  onFocus: () => void;
+  inputRefs: MutableRefObject<Record<string, TextInput | null>>;
+}) {
+  const [pendingDelete, setPendingDelete] = useState(false);
+
+  return (
+    <View className="mb-1 px-4 py-1">
+      <View className="flex-row">
+        <TextInput
+          value={block.content ?? ''}
+          onChangeText={(content) => onUpdate(block.id, { content })}
+          onFocus={onFocus}
+          multiline
+          textAlignVertical="top"
+          placeholder="Write…"
+          placeholderTextColor={colors.faint}
+          ref={(ref) => {
+            inputRefs.current[`${block.id}:content`] = ref;
+          }}
+          style={{ flex: 1, color: colors.text, fontSize: 15, lineHeight: 22 }}
+        />
+
+        <TouchableOpacity onPress={() => setPendingDelete(true)} className="pl-2 pt-1">
+          <Text style={{ color: colors.faint, fontSize: 14 }}>
+            ×
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {pendingDelete ? (
+        <View className="mt-1 flex-row items-center">
+          <Text className="text-xs" style={{ color: colors.faint }}>
+            Delete?
+          </Text>
+          <TouchableOpacity onPress={() => onDelete(block.id)} className="ml-2">
+            <Text className="text-xs" style={{ color: '#d14b4b' }}>
+              Yes
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setPendingDelete(false)} className="ml-2">
+            <Text className="text-xs" style={{ color: colors.faint }}>
+              No
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function FieldBlock({
+  block,
+  onUpdate,
+  onDelete,
+  onFocus,
+  inputRefs,
+}: {
+  block: ApiBibleBlock;
+  onUpdate: (id: string, patch: BlockPatch) => void;
+  onDelete: (id: string) => void;
+  onFocus: () => void;
   inputRefs: MutableRefObject<Record<string, TextInput | null>>;
 }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -97,7 +173,10 @@ function FieldBlock({
         <TextInput
           value={block.label ?? ''}
           onChangeText={(label) => onUpdate(block.id, { label })}
-          onFocus={() => setShowSuggestions(true)}
+          onFocus={() => {
+            onFocus();
+            setShowSuggestions(true);
+          }}
           onBlur={() => {
             blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 150);
           }}
@@ -176,6 +255,7 @@ function FieldBlock({
       <TextInput
         value={block.value ?? ''}
         onChangeText={(value) => onUpdate(block.id, { value })}
+        onFocus={onFocus}
         maxLength={280}
         placeholder="—"
         placeholderTextColor={colors.faint}
@@ -193,11 +273,13 @@ function NoteBlock({
   block,
   onUpdate,
   onDelete,
+  onFocus,
   inputRefs,
 }: {
   block: ApiBibleBlock;
   onUpdate: (id: string, patch: BlockPatch) => void;
   onDelete: (id: string) => void;
+  onFocus: () => void;
   inputRefs: MutableRefObject<Record<string, TextInput | null>>;
 }) {
   const [pendingDelete, setPendingDelete] = useState(false);
@@ -208,6 +290,7 @@ function NoteBlock({
         <TextInput
           value={block.title ?? ''}
           onChangeText={(title) => onUpdate(block.id, { title })}
+          onFocus={onFocus}
           placeholder="Note title…"
           placeholderTextColor={colors.faint}
           ref={(ref) => {
@@ -244,6 +327,7 @@ function NoteBlock({
       <TextInput
         value={block.body ?? ''}
         onChangeText={(body) => onUpdate(block.id, { body })}
+        onFocus={onFocus}
         multiline
         textAlignVertical="top"
         placeholder="Write something…"
@@ -273,6 +357,8 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
   const latestNameRef = useRef('');
   const savedNameRef = useRef('');
   const inputRefs = useRef<Record<string, TextInput | null>>({});
+  const blocksRef = useRef<ApiBibleBlock[]>([]);
+  const lastFocusedBlockIdRef = useRef<string | null>(null);
 
   const sortedBlocks = useMemo(() => sortBlocks(blocks, sortMode), [blocks, sortMode]);
 
@@ -311,7 +397,6 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
     }
 
     blockTimersRef.current[blockId] = setTimeout(() => {
-      blockTimersRef.current[blockId] = undefined as never;
       delete blockTimersRef.current[blockId];
 
       const block = blocksRef.current.find((item) => item.id === blockId);
@@ -320,9 +405,12 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
         return;
       }
 
-      const body: BlockPatch = block.kind === 'field'
-        ? { label: block.label ?? '', value: block.value ?? '' }
-        : { title: block.title ?? '', body: block.body ?? '' };
+      const body: BlockPatch =
+        block.kind === 'field'
+          ? { label: block.label ?? '', value: block.value ?? '' }
+          : block.kind === 'note'
+          ? { title: block.title ?? '', body: block.body ?? '' }
+          : { content: block.content ?? '' };
 
       runSave(async () => {
         const res = await api.bible.blocks.update(entityId, blockId, body);
@@ -333,7 +421,6 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
     syncSaveState();
   }
 
-  const blocksRef = useRef<ApiBibleBlock[]>([]);
   useEffect(() => {
     blocksRef.current = blocks;
   }, [blocks]);
@@ -341,6 +428,7 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
   useEffect(() => {
     let cancelled = false;
     hydratedRef.current = false;
+    lastFocusedBlockIdRef.current = null;
     clearTimers();
     inFlightSavesRef.current = 0;
     setSaveState('saved');
@@ -436,18 +524,25 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
   }
 
   async function createBlock(
-    body: {
-      kind: 'field' | 'note';
-      label?: string;
-      value?: string;
-      title?: string;
-      body?: string;
-      position?: number;
-    },
+    body: { kind: 'field' | 'note' | 'text'; label?: string; value?: string; title?: string; body?: string; content?: string },
     focusKey: string,
   ) {
-    const res = await api.bible.blocks.create(entityId, body);
+    let position: number | undefined;
+    const lastId = lastFocusedBlockIdRef.current;
+    if (lastId) {
+      const sorted = sortBlocks(blocksRef.current, 'written');
+      const idx = sorted.findIndex((block) => block.id === lastId);
+      if (idx !== -1) {
+        const after = sorted[idx + 1];
+        position = after
+          ? (sorted[idx].position + after.position) / 2
+          : sorted[idx].position + 1.0;
+      }
+    }
+
+    const res = await api.bible.blocks.create(entityId, { ...body, position });
     setBlocks((current) => [...current, res.data]);
+
     setTimeout(() => {
       inputRefs.current[`${res.data.id}:${focusKey}`]?.focus();
     }, 0);
@@ -475,118 +570,146 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.bg }}>
-      <View className="flex-1" style={{ backgroundColor: colors.bg }}>
-        <View className="flex-row items-center" style={{ position: 'absolute', top: 16, right: 16, zIndex: 10 }}>
-          <View
-            className="mr-2 h-[6px] w-[6px] rounded-full"
-            style={{ backgroundColor: saveState === 'saved' ? colors.bible : colors.accent }}
-          />
-          <Text className="text-xs font-medium" style={{ color: colors.faint }}>
-            {saveState === 'saved' ? 'Saved' : 'Saving…'}
-          </Text>
-        </View>
-
-        <View className="px-8 pb-4 pt-10">
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="Untitled"
-            placeholderTextColor={colors.faint}
-            style={{ color: colors.text, fontSize: 28, fontWeight: '700', paddingVertical: 0 }}
-          />
-
-          <View className="mt-2 flex-row items-center">
-            <TouchableOpacity onPress={() => setColorPickerOpen((current) => !current)}>
-              <View
-                className="h-[14px] w-[14px] rounded-full"
-                style={{ backgroundColor: color ?? colors.muted }}
-              />
-            </TouchableOpacity>
-            <View className="ml-3 rounded-full border px-2 py-1" style={{ borderColor: colors.border }}>
-              <Text className="text-[11px]" style={{ color: colors.muted }}>
-                Character
-              </Text>
-            </View>
-          </View>
-
-          {colorPickerOpen ? (
-            <View className="mt-2 flex-row items-center justify-between">
-              {COLOR_PALETTE.map((swatch) => {
-                const active = swatch === color;
-                return (
-                  <TouchableOpacity key={swatch} onPress={() => handleColorChange(swatch)}>
-                    <View
-                      className="h-[22px] w-[22px] items-center justify-center rounded-full"
-                      style={{
-                        backgroundColor: active ? colors.pageWhite : 'transparent',
-                        borderWidth: active ? 2 : 0,
-                        borderColor: active ? colors.pageWhite : 'transparent',
-                        transform: [{ scale: active ? 1.08 : 1 }],
-                      }}
-                    >
-                      <View className="h-[18px] w-[18px] rounded-full" style={{ backgroundColor: swatch }} />
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          ) : null}
-        </View>
-
+      <View className="flex-row items-center" style={{ position: 'absolute', top: 16, right: 16, zIndex: 10 }}>
         <View
-          className="h-11 flex-row items-center px-4"
-          style={{
-            backgroundColor: colors.surface,
-            borderTopWidth: 1,
-            borderBottomWidth: 1,
-            borderColor: colors.border,
-          }}
-        >
-          <TouchableOpacity onPress={() => createBlock({ kind: 'field', label: '', value: '' }, 'label')}>
-            <Text className="text-sm font-medium" style={{ color: colors.accent }}>
-              + Field
-            </Text>
+          className="mr-2 h-[6px] w-[6px] rounded-full"
+          style={{ backgroundColor: saveState === 'saved' ? colors.bible : colors.accent }}
+        />
+        <Text className="text-xs font-medium" style={{ color: colors.faint }}>
+          {saveState === 'saved' ? 'Saved' : 'Saving…'}
+        </Text>
+      </View>
+
+      <View className="px-8 pb-4 pt-10">
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          placeholder="Untitled"
+          placeholderTextColor={colors.faint}
+          style={{ color: colors.text, fontSize: 28, fontWeight: '700', paddingVertical: 0 }}
+        />
+
+        <View className="mt-2 flex-row items-center">
+          <TouchableOpacity onPress={() => setColorPickerOpen((current) => !current)}>
+            <View
+              className="h-[14px] w-[14px] rounded-full"
+              style={{ backgroundColor: color ?? colors.muted }}
+            />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => createBlock({ kind: 'note', title: '', body: '' }, 'title')} className="ml-4">
-            <Text className="text-sm font-medium" style={{ color: colors.accent }}>
-              + Note
+          <View className="ml-3 rounded-full border px-2 py-1" style={{ borderColor: colors.border }}>
+            <Text className="text-[11px]" style={{ color: colors.muted }}>
+              Character
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleRandomField} className="ml-4">
-            <Text className="text-sm" style={{ color: colors.muted }}>
-              ⚄
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSortMode((current) => nextSortMode(current))} className="ml-auto">
-            <Text className="text-xs" style={{ color: colors.muted }}>
-              {sortLabel(sortMode)}
-            </Text>
-          </TouchableOpacity>
+          </View>
         </View>
 
-        <ScrollView className="flex-1 px-4 pt-4" keyboardShouldPersistTaps="handled">
-          {sortedBlocks.map((block) => (
-            block.kind === 'field' ? (
+        {colorPickerOpen ? (
+          <View className="mt-2 flex-row items-center justify-between">
+            {COLOR_PALETTE.map((swatch) => {
+              const active = swatch === color;
+              return (
+                <TouchableOpacity key={swatch} onPress={() => handleColorChange(swatch)}>
+                  <View
+                    className="h-[22px] w-[22px] items-center justify-center rounded-full"
+                    style={{
+                      backgroundColor: active ? colors.pageWhite : 'transparent',
+                      borderWidth: active ? 2 : 0,
+                      borderColor: active ? colors.pageWhite : 'transparent',
+                      transform: [{ scale: active ? 1.08 : 1 }],
+                    }}
+                  >
+                    <View className="h-[18px] w-[18px] rounded-full" style={{ backgroundColor: swatch }} />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : null}
+      </View>
+
+      <View
+        className="h-11 flex-row items-center px-4"
+        style={{
+          backgroundColor: colors.surface,
+          borderTopWidth: 1,
+          borderBottomWidth: 1,
+          borderColor: colors.border,
+        }}
+      >
+        <TouchableOpacity onPress={() => createBlock({ kind: 'text', content: '' }, 'content')}>
+          <Text className="text-sm font-medium" style={{ color: colors.accent }}>
+            + Text
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => createBlock({ kind: 'field', label: '', value: '' }, 'label')} className="ml-4">
+          <Text className="text-sm font-medium" style={{ color: colors.accent }}>
+            + Field
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => createBlock({ kind: 'note', title: '', body: '' }, 'title')} className="ml-4">
+          <Text className="text-sm font-medium" style={{ color: colors.accent }}>
+            + Note
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleRandomField} className="ml-4">
+          <Text className="text-sm" style={{ color: colors.muted }}>
+            ⚄
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setSortMode((current) => nextSortMode(current))} className="ml-auto">
+          <Text className="text-xs" style={{ color: colors.muted }}>
+            {sortLabel(sortMode)}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView className="flex-1 pt-4" keyboardShouldPersistTaps="handled">
+        {sortedBlocks.map((block) => {
+          if (block.kind === 'text') {
+            return (
+              <TextBlock
+                key={block.id}
+                block={block}
+                onUpdate={handleBlockUpdate}
+                onDelete={handleBlockDelete}
+                onFocus={() => {
+                  lastFocusedBlockIdRef.current = block.id;
+                }}
+                inputRefs={inputRefs}
+              />
+            );
+          }
+
+          if (block.kind === 'field') {
+            return (
               <FieldBlock
                 key={block.id}
                 block={block}
                 onUpdate={handleBlockUpdate}
                 onDelete={handleBlockDelete}
+                onFocus={() => {
+                  lastFocusedBlockIdRef.current = block.id;
+                }}
                 inputRefs={inputRefs}
               />
-            ) : (
-              <NoteBlock
-                key={block.id}
-                block={block}
-                onUpdate={handleBlockUpdate}
-                onDelete={handleBlockDelete}
-                inputRefs={inputRefs}
-              />
-            )
-          ))}
-          <View className="h-16" />
-        </ScrollView>
-      </View>
+            );
+          }
+
+          return (
+            <NoteBlock
+              key={block.id}
+              block={block}
+              onUpdate={handleBlockUpdate}
+              onDelete={handleBlockDelete}
+              onFocus={() => {
+                lastFocusedBlockIdRef.current = block.id;
+              }}
+              inputRefs={inputRefs}
+            />
+          );
+        })}
+        <View className="h-16" />
+      </ScrollView>
     </View>
   );
 }
