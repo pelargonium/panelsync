@@ -127,38 +127,47 @@ See DESIGN.md — The Event Log.
 
 ---
 
-## 7. The workspace and navigation state — OPEN
+## ✅ 7. The workspace and navigation state — RESOLVED
 
-- Where does user navigation state live — last open entity, depth state (entity only / split / dossier only), warm contexts? Persisted to DB or in-memory per session?
-- Route structure: the series segment question is resolved (containers replace series/issues with a single flexible hierarchy). But the exact URL structure for the new container-based hierarchy needs to be decided before the workspace shell is built.
-
----
-
-## 8. The issue-level script editor — OPEN
-
-- The editor loads all pages of a container as one continuous document. How does auto-save work — whole container at once, or page by page as edited?
-- How does the editor know which page to scroll to on open — container ID + page ID in URL as scroll target?
+**Decisions:**
+- Navigation state persists to the database — `workspace_state` table, one row per user per universe
+- Written on navigation actions (not keystrokes), debounced
+- Fields: `activeEntityType`, `activeEntityId`, `depthState`, `binderOpen`, `warmContexts` (jsonb, capped ~10 entries)
+- Route structure is flat: `/universe/[id]` is the only workspace route, no path segments for open entity
+- Deep links via generated share tokens (`/share/[token]`), deferred to v2
 
 ---
 
-## 10. Versioning and locking — OPEN
+## ✅ 8. The script editor — RESOLVED
 
-- Pages can be locked. Can dossier attachments be locked independently of the entity they're attached to?
-- Does the handoff phase of a character dossier need locked state on individual attachments, or just on the dossier as a whole?
-- Block-level versioning for undo history and collaboration — does the event log cover this, or is something more needed?
+**Decisions:**
+- Auto-save is block-level, debounced 500ms after last keystroke
+- Save indicator tracks dirty state per block — "All saved" when all blocks are clean
+- Editor maintains a ref map of page scroll offsets — scroll to page on activation, no remount
+- Page switching in the binder = scroll, not navigation. Same editor component, different scroll position.
 
 ---
 
-## 11. The schedule — OPEN
+## ✅ 10. Versioning and locking — RESOLVED
 
-**Current agreed order:**
-1. Schema revision (Drizzle + Neon migration)
-2. API route updates (containers, drafts, hierarchy)
-3. Workspace shell (persistent universe screen, UniverseContext)
-4. Inline creation in binder
-5. Script editor
+**Decisions:**
+- Dossier attachments can be locked individually via `state` field (`draft`, `canonical`, `locked`)
+- Whole-entity lock exists as a batch convenience operation that sets all attachments to locked at once
+- Event log is sufficient for v1 block versioning — covers undo history and audit trail
+- Formal `script_block_versions` table deferred to v2
 
-Questions remaining:
-- At what point does the dossier UI get built — before or after the script editor?
-- When does file upload / R2 integration ship?
-- Bible (characters, locations) — before or after the script editor?
+---
+
+## ✅ 11. The schedule — RESOLVED
+
+**Agreed build order:**
+1. ✅ Schema revision (complete)
+2. Workspace shell — persistent universe screen, shared UniverseContext, `workspace_state` table
+3. Inline creation in binder (replace modals)
+4. Script editor — block-level, continuous scroll, auto-save
+5. Bible (characters, locations) — dossier-first
+6. Dossier UI — after Bible so there's real content to attach to
+7. File upload / R2 integration — alongside or just before dossier UI
+8. Timeline tool
+9. Collaboration, comments, share links
+10. Export

@@ -408,7 +408,52 @@ Both can coexist on the same entity.
 
 ---
 
+## Workspace State
+
+Navigation state persists to the database. One row per user per universe, updated on navigation actions.
+
+### `workspace_state` Table
+
+```
+- id
+- universeId      uuid references universes.id
+- userId          uuid references users.id
+- activeEntityType  text nullable
+- activeEntityId    uuid nullable
+- depthState        text nullable    ('entity_only', 'split', 'dossier_only')
+- binderOpen        boolean notNull default true
+- warmContexts      jsonb notNull default '[]'   -- array of { entityType, entityId, depthState }, capped ~10
+- updatedAt         timestamp notNull defaultNow
+```
+
+Unique constraint on `(universeId, userId)`.
+
+Written on every navigation action, not on every keystroke. The `warmContexts` array is the binder's recent history — entities the user has visited, preserved so they can resume any of them.
+
+---
+
+## Script Editor — Key Decisions
+
+- **Auto-save:** block-level, debounced 500ms after last keystroke. One API write per changed block.
+- **Save indicator:** tracks dirty state per block. "All saved" when all blocks are clean.
+- **Scroll to page:** editor maintains a ref map of `{ [pageId]: scrollOffset }`. On page activation, scrolls to offset without remounting the editor component.
+- **Page switching:** same editor component always, binder tap triggers scroll not navigation.
+
+---
+
+## Versioning and Locking
+
+- **Individual attachment locking:** `dossier_attachments.state` field — `draft`, `canonical`, `locked`. Any attachment can be locked independently.
+- **Whole-entity lock:** batch operation that sets all attachments on an entity to `locked` at once. Convenience wrapper over individual locking.
+- **Block versioning v1:** event log is sufficient — stores before/after values per block save, covers undo history and audit trail.
+- **Formal block versioning (`script_block_versions` table):** deferred to v2. Unlocks diff view, restore to point-in-time, branching.
+
+---
+
 ## Complete Schema — Revised Table List
+
+### New (added after initial revision)
+- `workspace_state`
 
 ### Staying (simplified)
 - `users`
