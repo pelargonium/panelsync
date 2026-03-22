@@ -111,8 +111,6 @@ function TextBlock({
           onFocus={onFocus}
           multiline
           textAlignVertical="top"
-          placeholder="Write…"
-          placeholderTextColor={colors.faint}
           ref={(ref) => {
             inputRefs.current[`${block.id}:content`] = ref;
           }}
@@ -356,8 +354,6 @@ function NoteBlock({
             onUpdate(block.id, { title: nextTitle });
           }}
           onFocus={onFocus}
-          placeholder="Note title…"
-          placeholderTextColor={colors.faint}
           ref={(ref) => {
             inputRefs.current[`${block.id}:title`] = ref;
           }}
@@ -389,20 +385,18 @@ function NoteBlock({
         )}
       </View>
 
-      <TextInput
-        value={body}
-        onChangeText={(nextBody) => {
-          setBody(nextBody);
-          onUpdate(block.id, { body: nextBody });
-        }}
-        onFocus={onFocus}
-        multiline
-        textAlignVertical="top"
-        placeholder="Write something…"
-        placeholderTextColor={colors.faint}
-        ref={(ref) => {
-          inputRefs.current[`${block.id}:body`] = ref;
-        }}
+        <TextInput
+          value={body}
+          onChangeText={(nextBody) => {
+            setBody(nextBody);
+            onUpdate(block.id, { body: nextBody });
+          }}
+          onFocus={onFocus}
+          multiline
+          textAlignVertical="top"
+          ref={(ref) => {
+            inputRefs.current[`${block.id}:body`] = ref;
+          }}
         style={{ color: colors.text, fontSize: 15, lineHeight: 22, ...(noOutline as object) }}
       />
     </View>
@@ -701,59 +695,13 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
         ) : null}
       </View>
 
-      <View
-        className="h-11 flex-row items-center px-4"
-        style={{
-          backgroundColor: colors.surface,
-          borderTopWidth: 1,
-          borderBottomWidth: 1,
-          borderColor: colors.border,
-        }}
-      >
-        <TouchableOpacity onPress={() => createBlock({ kind: 'field', label: '', value: '' }, 'label')}>
-          <Text className="text-sm font-medium" style={{ color: colors.accent }}>
-            + Field
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={async () => {
-            if (!fieldMode) {
-              setFieldMode(true);
-              await createBlock({ kind: 'field', label: '', value: '' }, 'label');
-            } else {
-              setFieldMode(false);
-            }
-          }}
-          className="ml-4"
-        >
-          <Text
-            className="text-sm font-medium"
-            style={{
-              color: fieldMode ? colors.text : colors.muted,
-              textDecorationLine: fieldMode ? 'underline' : 'none',
-            }}
-          >
-            Fields
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => createBlock({ kind: 'note', title: '', body: '' }, 'title')} className="ml-4">
-          <Text className="text-sm font-medium" style={{ color: colors.accent }}>
-            + Note
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleRandomField} className="ml-4">
-          <Text className="text-sm" style={{ color: colors.muted }}>
-            ⚄
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setSortMode((current) => nextSortMode(current))} className="ml-auto">
-          <Text className="text-xs" style={{ color: colors.muted }}>
-            {sortLabel(sortMode)}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <View style={{ height: 1, backgroundColor: colors.border }} />
 
-      <ScrollView className="flex-1 pt-4" keyboardShouldPersistTaps="handled">
+      <ScrollView
+        className="flex-1 pt-4"
+        keyboardShouldPersistTaps="handled"
+        style={{ backgroundColor: colors.pageWhite }}
+      >
         {sortedBlocks.map((block, index) => {
           const prev = sortedBlocks[index - 1];
           const needsZoneBefore = block.kind !== 'text' && (index === 0 || prev.kind !== 'text');
@@ -807,12 +755,70 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
         })}
 
         <InsertZone
-          onPress={() => createBlock({ kind: 'text', content: '' }, 'content', undefined)}
+          onPress={() => {
+            const last = sortedBlocks[sortedBlocks.length - 1];
+            if (last?.kind === 'text') {
+              inputRefs.current[`${last.id}:content`]?.focus();
+            } else {
+              createBlock({ kind: 'text', content: '' }, 'content', undefined);
+            }
+          }}
           minHeight={64}
         />
 
         <View className="h-16" />
       </ScrollView>
+
+      <View
+        className="h-11 flex-row items-center px-4"
+        style={{
+          backgroundColor: colors.surface,
+          borderTopWidth: 1,
+          borderColor: colors.border,
+        }}
+      >
+        <TouchableOpacity onPress={() => createBlock({ kind: 'field', label: '', value: '' }, 'label')}>
+          <Text className="text-sm font-medium" style={{ color: colors.accent }}>
+            + Field
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={async () => {
+            if (!fieldMode) {
+              setFieldMode(true);
+              await createBlock({ kind: 'field', label: '', value: '' }, 'label');
+            } else {
+              setFieldMode(false);
+            }
+          }}
+          className="ml-4"
+        >
+          <Text
+            className="text-sm font-medium"
+            style={{
+              color: fieldMode ? colors.text : colors.muted,
+              textDecorationLine: fieldMode ? 'underline' : 'none',
+            }}
+          >
+            Fields
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => createBlock({ kind: 'note', title: '', body: '' }, 'title')} className="ml-4">
+          <Text className="text-sm font-medium" style={{ color: colors.accent }}>
+            + Note
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleRandomField} className="ml-4">
+          <Text className="text-sm" style={{ color: colors.muted }}>
+            ⚄
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setSortMode((current) => nextSortMode(current))} className="ml-auto">
+          <Text className="text-xs" style={{ color: colors.muted }}>
+            {sortLabel(sortMode)}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
