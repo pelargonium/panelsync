@@ -26,7 +26,7 @@
 - Design session complete: foundational principles, entity model, dossier system, workspace interaction model all documented in `documents/DESIGN.md`.
 
 ## Next Step
-Write the Codex task brief for the schema revision: update the Drizzle schema to match DESIGN.md (new tables, removed tables, revised tables), run the migration against Neon, and update the API routes for the new container/hierarchy/draft model.
+Build the persistent workspace shell: refactor the universe screen into a persistent workspace with a always-present binder, shared UniverseContext holding containers/pages state, and entity panels opening in the content area without pushing new screens.
 
 ---
 
