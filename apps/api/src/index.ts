@@ -6,6 +6,7 @@ import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
 import { universesRoutes } from './routes/universes.js';
 import { containersRoutes } from './routes/containers.js';
+import { bibleRoutes } from './routes/bible.js';
 
 const server = Fastify({ logger: true });
 
@@ -16,6 +17,7 @@ server.register(healthRoutes);
 server.register(authRoutes, { prefix: '/api/auth' });
 server.register(universesRoutes, { prefix: '/api/universes' });
 server.register(containersRoutes);
+server.register(bibleRoutes, { prefix: '/api' });
 
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? '0.0.0.0';

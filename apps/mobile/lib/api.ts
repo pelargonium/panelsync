@@ -102,6 +102,19 @@ export interface ApiScriptBlock {
   updatedAt: string;
 }
 
+export interface ApiBibleEntry {
+  id: string;
+  universeId: string;
+  type: 'character' | 'location' | 'note';
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiBibleEntryDetail extends ApiBibleEntry {
+  bodyText: string;
+}
+
 export type ApiSeries = ApiContainer;
 export type ApiIssue = ApiContainer;
 
@@ -300,6 +313,30 @@ export const api = {
       request<{ data: { id: string } }>(`/api/pages/${pageId}/blocks/${blockId}`, {
         method: 'DELETE',
       }),
+  },
+
+  bible: {
+    list: (universeId: string) =>
+      request<{ data: ApiBibleEntry[] }>(`/api/universes/${universeId}/bible`),
+    create: (universeId: string, body: { name: string; type: ApiBibleEntry['type'] }) =>
+      request<{ data: ApiBibleEntry }>(`/api/universes/${universeId}/bible`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    get: (id: string) =>
+      request<{ data: ApiBibleEntryDetail }>(`/api/bible/${id}`),
+    update: (id: string, body: { name?: string; type?: ApiBibleEntry['type'] }) =>
+      request<{ data: ApiBibleEntry }>(`/api/bible/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    updateContent: (id: string, text: string) =>
+      request<{ data: { id: string; text: string } }>(`/api/bible/${id}/content`, {
+        method: 'PATCH',
+        body: JSON.stringify({ text }),
+      }),
+    delete: (id: string) =>
+      request<void>(`/api/bible/${id}`, { method: 'DELETE' }),
   },
 
   series: {

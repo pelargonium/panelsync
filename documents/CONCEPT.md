@@ -6,16 +6,16 @@
 - Real auth: `POST /api/auth/register` and `POST /api/auth/login` with scrypt + JWT.
 - Container routes at `/api/containers`, `/api/hierarchy`, `/api/drafts`, `/api/pages`. All auth-gated, universe-membership-checked.
 - Workspace state routes: `GET /api/workspace-state`, `PUT /api/workspace-state` — per-user per-universe nav persistence.
-- `UniverseContext.tsx`: shared React context. On mount fetches hierarchy levels, containers, and workspace state in parallel. Restores full nav state. Saves state debounced 800ms on every nav change. Lazy page loading cached by containerId. Inline container/page creation methods.
-- `universe/[id].tsx`: persistent workspace shell. Wraps in UniverseProvider. No local series/issues state. Inline creation (no modals). Double-tap depth cycling. ContentArea renders entity_only / split / dossier_only layouts.
-- Script editor: `ScriptEditor.tsx` component. Issue-scoped continuous scroll across all pages. Final Draft-style visual design: panel blocks as dividers, Courier New monospace throughout, dialogue indented, caption with left border, SFX large. Enter advances with smart defaults (panel→scene→desc→dlg), Tab cycles type, type toolbar on focus. Auto-save 500ms per block, block CRUD, scroll-to-page on binder tap.
+- Bible API: `GET/POST /api/universes/:id/bible`, `GET/PATCH /api/bible/:id`, `PATCH /api/bible/:id/content`, `DELETE /api/bible/:id`. Backed by `bible_entries` + `dossier_attachments` (type='text'). All auth-gated.
+- `UniverseContext.tsx`: fetches entity list + workspace state in parallel on mount. Entity CRUD: createEntity, deleteEntity, updateEntityName. pagesByContainer/loadPages shims kept for ScriptEditor typecheck compatibility.
+- `universe/[id].tsx`: binder shows flat entity list only (no hierarchy). Binder header: universe name + Sort + + + collapse. Sort picker (A-Z / Type / Recent). Type picker (Character / Location / Note) on + tap. Entity rows: border-bottom demarcation, left accent bar + bg tint on active row, type color dot. Long press → inline delete confirmation. Tapping content area dismisses pickers.
+- `EntityEditor.tsx`: title (28px bold) + freeform text body. Auto-saves both fields 600ms debounced. Save indicator dot (bible=saved, accent=saving). Cancels correctly on entityId change.
+- Script editor: `ScriptEditor.tsx` still present. Final Draft-style visual design. Not currently routed to from the new binder (hierarchy removed), but component is intact.
 - Block CRUD API: `GET/POST /api/pages/:pageId/blocks`, `PATCH/DELETE /api/pages/:pageId/blocks/:blockId`.
-- Mobile API client updated: `ApiHierarchyLevel`, `ApiContainer`, `ApiDraft` types. `api.hierarchy`, `api.containers`, `api.drafts` objects. Backward-compat shims for `api.series` and `api.issues`.
-- All three migrations applied to Neon: schema revision, workspace_state shell, active_entity_id text change.
-- Design session complete: foundational principles, entity model, dossier system, workspace interaction model all documented in `documents/DESIGN.md`. All 11 open questions resolved.
+- All migrations applied to Neon. No new migrations needed for bible (uses existing tables).
 
 ## Next Step
-Workshop the script editor with real usage and surface any UX issues for the next polish pass.
+Deploy the API to Railway and run an EAS preview build so the app can be tested on iPad with real persistence.
 
 ---
 
@@ -38,17 +38,15 @@ Workshop the script editor with real usage and surface any UX issues for the nex
 ---
 
 ## Sprint Position
-Sprints 1–5 complete. Next: **Sprints 6–7** (Script editor).
+Pivoted from sprint-by-feature model. Focus: make the universe workspace feel real and usable before deepening individual features.
 
-| Sprints | Deliverable |
-|---------|------------|
-| 1–2 ✅ | Expo monorepo, NativeWind, Expo Router, backend skeleton, auth skeleton |
-| 3 ✅ | Mockup — binder/sidebar (the persistent nav shell, on every screen) |
-| 4–5 ✅ | Drizzle schema (full) + real auth + Series/Issue/Page CRUD |
-| 6–7 | Script editor — all block types, panel size tags, keyboard flow, distraction-free |
-| 8–9 | Skia drawing engine — storyboard canvas + Bible images/sketches (shared) |
-| 10–11 | Universe Bible — unified database, type tags, custom fields, series overlays |
-| 12–13 | Timeline tool |
-| 14–15 | Collaboration — roles, access scope, private workspace, comments, share links |
-| 16 | Export — script PDF (both styles), plain text, storyboard PDF |
-| 17 | Polish, onboarding, perf |
+| Phase | Deliverable |
+|-------|-------------|
+| ✅ Foundation | Expo monorepo, NativeWind, Expo Router, auth, Drizzle schema, workspace shell |
+| ✅ Script editor | Block-based editor, Final Draft visual style, block CRUD API |
+| ✅ Entity list + editor | Flat entity list in binder, freeform text editor, persists to DB |
+| Next | Deploy to Railway + EAS build → iPad |
+| After | Global chrome (top bar), Universe Home screen |
+| After | Bible entity types (structured fields for characters, locations) |
+| After | Binder full feature set (search, sections, tear-off) |
+| Later | Storyboard canvas (Skia), Timeline tool, Collaboration, Export |

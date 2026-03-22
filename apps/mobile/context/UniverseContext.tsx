@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { api, getToken, type ApiContainer, type ApiHierarchyLevel, type ApiPage } from '../lib/api';
+import { api, getToken, type ApiBibleEntry, type ApiPage } from '../lib/api';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
@@ -24,13 +24,14 @@ interface WorkspaceStateResponse {
 interface UniverseContextValue {
   universeId: string;
   universeName: string;
-  hierarchyLevels: ApiHierarchyLevel[];
-  containers: ApiContainer[];
-  loadingContainers: boolean;
-  refreshContainers: () => Promise<void>;
+  entities: ApiBibleEntry[];
+  loadingEntities: boolean;
+  refreshEntities: () => Promise<void>;
+  createEntity: (type: ApiBibleEntry['type']) => Promise<ApiBibleEntry>;
+  deleteEntity: (id: string) => Promise<void>;
+  updateEntityName: (id: string, name: string) => void;
   pagesByContainer: Record<string, ApiPage[]>;
   loadPages: (containerId: string) => Promise<void>;
-  addPage: (containerId: string, page: ApiPage) => void;
   binderOpen: boolean;
   setBinderOpen: (open: boolean) => void;
   activeEntityType: string | null;
@@ -39,8 +40,6 @@ interface UniverseContextValue {
   activateEntity: (type: string, id: string) => void;
   cycleDepthState: () => void;
   warmContexts: WarmContext[];
-  createContainer: (levelId: string, parentId: string | null, name: string) => Promise<ApiContainer>;
-  createPage: (containerId: string) => Promise<ApiPage>;
 }
 
 const UniverseContext = createContext<UniverseContextValue | null>(null);
@@ -90,6 +89,12 @@ function cycleDepth(current: DepthState): DepthState {
   return 'entity_only';
 }
 
+function defaultNameForType(type: ApiBibleEntry['type']) {
+  if (type === 'character') return 'Untitled Character';
+  if (type === 'location') return 'Untitled Location';
+  return 'Untitled Note';
+}
+
 export function UniverseProvider({
   universeId,
   universeName,
@@ -99,10 +104,9 @@ export function UniverseProvider({
   universeName: string;
   children: ReactNode;
 }) {
-  const [hierarchyLevels, setHierarchyLevels] = useState<ApiHierarchyLevel[]>([]);
-  const [containers, setContainers] = useState<ApiContainer[]>([]);
-  const [loadingContainers, setLoadingContainers] = useState(true);
-  const [pagesByContainer, setPagesByContainer] = useState<Record<string, ApiPage[]>>({});
+  const [entities, setEntities] = useState<ApiBibleEntry[]>([]);
+  const [loadingEntities, setLoadingEntities] = useState(true);
+  const [pagesByContainer] = useState<Record<string, ApiPage[]>>({});
   const [binderOpenState, setBinderOpenState] = useState(true);
   const [activeEntityType, setActiveEntityType] = useState<string | null>(null);
   const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
@@ -111,30 +115,43 @@ export function UniverseProvider({
   const hasHydratedRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function refreshContainers() {
-    setLoadingContainers(true);
-    try {
-      const [levelsRes, containersRes, workspaceRes] = await Promise.all([
-        api.hierarchy.list(universeId),
-        api.containers.list(universeId),
-        requestWorkspaceState<WorkspaceStateResponse>(`/api/workspace-state?universeId=${universeId}`),
-      ]);
-
-      setHierarchyLevels(levelsRes.data);
-      setContainers(containersRes.data);
-      setBinderOpenState(workspaceRes.data.binderOpen);
-      setActiveEntityType(workspaceRes.data.activeEntityType);
-      setActiveEntityId(workspaceRes.data.activeEntityId);
-      setDepthState(workspaceRes.data.depthState);
-      setWarmContexts(normalizeWarmContexts(workspaceRes.data.warmContexts));
-      hasHydratedRef.current = true;
-    } finally {
-      setLoadingContainers(false);
-    }
+  async function refreshEntities() {
+    const res = await api.bible.list(universeId);
+    setEntities(res.data);
   }
 
   useEffect(() => {
-    refreshContainers();
+    let cancelled = false;
+    hasHydratedRef.current = false;
+    setLoadingEntities(true);
+    setEntities([]);
+
+    Promise.all([
+      api.bible.list(universeId),
+      requestWorkspaceState<WorkspaceStateResponse>(`/api/workspace-state?universeId=${universeId}`),
+    ])
+      .then(([entitiesRes, workspaceRes]) => {
+        if (cancelled) return;
+        setEntities(entitiesRes.data);
+        setBinderOpenState(workspaceRes.data.binderOpen);
+        setActiveEntityType(workspaceRes.data.activeEntityType);
+        setActiveEntityId(workspaceRes.data.activeEntityId);
+        setDepthState(workspaceRes.data.depthState);
+        setWarmContexts(normalizeWarmContexts(workspaceRes.data.warmContexts));
+        hasHydratedRef.current = true;
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingEntities(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
   }, [universeId]);
 
   useEffect(() => {
@@ -165,23 +182,6 @@ export function UniverseProvider({
     };
   }, [universeId, activeEntityType, activeEntityId, depthState, binderOpenState, warmContexts]);
 
-  async function loadPages(containerId: string) {
-    if (pagesByContainer[containerId]) return;
-
-    const res = await api.containers.pages(containerId);
-    setPagesByContainer((current) => {
-      if (current[containerId]) return current;
-      return { ...current, [containerId]: res.data };
-    });
-  }
-
-  function addPage(containerId: string, page: ApiPage) {
-    setPagesByContainer((current) => ({
-      ...current,
-      [containerId]: [...(current[containerId] ?? []), page],
-    }));
-  }
-
   function activateEntity(type: string, id: string) {
     const isSameEntity = activeEntityType === type && activeEntityId === id;
     const nextDepth = isSameEntity ? depthState : 'entity_only';
@@ -206,36 +206,51 @@ export function UniverseProvider({
     setBinderOpenState(open);
   }
 
-  async function createContainer(levelId: string, parentId: string | null, name: string) {
-    const res = await api.containers.create({
-      universeId,
-      levelId,
-      parentId,
-      name,
+  async function createEntity(type: ApiBibleEntry['type']) {
+    const res = await api.bible.create(universeId, {
+      type,
+      name: defaultNameForType(type),
     });
 
-    setContainers((current) => [...current, res.data]);
+    setEntities((current) => [...current, res.data]);
     return res.data;
   }
 
-  async function createPage(containerId: string) {
-    const res = await api.containers.createPage(containerId);
-    addPage(containerId, res.data);
-    return res.data;
+  async function deleteEntity(id: string) {
+    await api.bible.delete(id);
+
+    setEntities((current) => current.filter((entry) => entry.id !== id));
+    setWarmContexts((current) => current.filter((entry) => entry.entityId !== id));
+
+    if (activeEntityId === id) {
+      setActiveEntityType(null);
+      setActiveEntityId(null);
+    }
   }
+
+  function updateEntityName(id: string, name: string) {
+    setEntities((current) => current.map((entry) => (
+      entry.id === id
+        ? { ...entry, name, updatedAt: new Date().toISOString() }
+        : entry
+    )));
+  }
+
+  async function loadPages(_containerId: string) {}
 
   return (
     <UniverseContext.Provider
       value={{
         universeId,
         universeName,
-        hierarchyLevels,
-        containers,
-        loadingContainers,
-        refreshContainers,
+        entities,
+        loadingEntities,
+        refreshEntities,
+        createEntity,
+        deleteEntity,
+        updateEntityName,
         pagesByContainer,
         loadPages,
-        addPage,
         binderOpen: binderOpenState,
         setBinderOpen,
         activeEntityType,
@@ -244,8 +259,6 @@ export function UniverseProvider({
         activateEntity,
         cycleDepthState,
         warmContexts,
-        createContainer,
-        createPage,
       }}
     >
       {children}
