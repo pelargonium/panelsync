@@ -18,6 +18,7 @@ const FIELD_SUGGESTIONS = [
 ];
 
 const COLOR_PALETTE = ['#c8a768', '#1E6B3C', '#1B4FD8', '#6B2D8B', '#C41E1E', '#4A4A5A'];
+const noOutline = { outlineWidth: 0 } as object;
 
 type SortMode = 'written' | 'type' | 'az';
 type SaveState = 'saved' | 'saving';
@@ -69,13 +70,21 @@ function nextSortMode(current: SortMode): SortMode {
 }
 
 function sortLabel(sortMode: SortMode) {
-  if (sortMode === 'written') return 'Written';
+  if (sortMode === 'written') return 'Document';
   if (sortMode === 'type') return 'Type';
-  return 'A-Z';
+  return 'A–Z';
 }
 
 function updateLocalBlock(blocks: ApiBibleBlock[], id: string, patch: Partial<ApiBibleBlock>) {
   return blocks.map((block) => (block.id === id ? { ...block, ...patch } : block));
+}
+
+function InsertZone({ onPress, minHeight = 20 }: { onPress: () => void; minHeight?: number }) {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={1} style={{ minHeight }}>
+      <View style={{ flex: 1 }} />
+    </TouchableOpacity>
+  );
 }
 
 function TextBlock({
@@ -95,7 +104,7 @@ function TextBlock({
 
   return (
     <View className="mb-1 px-4 py-1">
-      <View className="flex-row">
+      <View className="flex-row items-start">
         <TextInput
           value={block.content ?? ''}
           onChangeText={(content) => onUpdate(block.id, { content })}
@@ -107,33 +116,33 @@ function TextBlock({
           ref={(ref) => {
             inputRefs.current[`${block.id}:content`] = ref;
           }}
-          style={{ flex: 1, color: colors.text, fontSize: 15, lineHeight: 22 }}
+          style={{ flex: 1, color: colors.text, fontSize: 15, lineHeight: 22, ...(noOutline as object) }}
         />
 
-        <TouchableOpacity onPress={() => setPendingDelete(true)} className="pl-2 pt-1">
-          <Text style={{ color: colors.faint, fontSize: 14 }}>
-            ×
-          </Text>
-        </TouchableOpacity>
+        {pendingDelete ? (
+          <View className="ml-3 flex-row items-center">
+            <Text className="text-xs" style={{ color: colors.text }}>
+              Delete?
+            </Text>
+            <TouchableOpacity onPress={() => onDelete(block.id)} className="ml-3">
+              <Text className="text-xs font-semibold" style={{ color: '#d14b4b' }}>
+                Yes
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setPendingDelete(false)} className="ml-3">
+              <Text className="text-xs font-semibold" style={{ color: colors.faint }}>
+                No
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity onPress={() => setPendingDelete(true)} className="pl-2 pt-1">
+            <Text style={{ color: colors.faint, fontSize: 14 }}>
+              ×
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
-
-      {pendingDelete ? (
-        <View className="mt-1 flex-row items-center">
-          <Text className="text-xs" style={{ color: colors.faint }}>
-            Delete?
-          </Text>
-          <TouchableOpacity onPress={() => onDelete(block.id)} className="ml-2">
-            <Text className="text-xs" style={{ color: '#d14b4b' }}>
-              Yes
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setPendingDelete(false)} className="ml-2">
-            <Text className="text-xs" style={{ color: colors.faint }}>
-              No
-            </Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -144,22 +153,31 @@ function FieldBlock({
   onDelete,
   onFocus,
   inputRefs,
+  fieldMode,
+  onFieldNext,
 }: {
   block: ApiBibleBlock;
   onUpdate: (id: string, patch: BlockPatch) => void;
   onDelete: (id: string) => void;
   onFocus: () => void;
   inputRefs: MutableRefObject<Record<string, TextInput | null>>;
+  fieldMode?: boolean;
+  onFieldNext?: () => void;
 }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
+  const [label, setLabel] = useState(block.label ?? '');
+  const [value, setValue] = useState(block.value ?? '');
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevIdRef = useRef(block.id);
 
-  const filteredSuggestions = block.label && block.label.length > 0
-    ? FIELD_SUGGESTIONS.filter((item) =>
-        item.toLowerCase().includes((block.label ?? '').toLowerCase()),
-      ).slice(0, 6)
-    : [];
+  useEffect(() => {
+    if (block.id !== prevIdRef.current) {
+      prevIdRef.current = block.id;
+      setLabel(block.label ?? '');
+      setValue(block.value ?? '');
+    }
+  }, [block.id, block.label, block.value]);
 
   useEffect(() => () => {
     if (blurTimerRef.current) {
@@ -167,12 +185,24 @@ function FieldBlock({
     }
   }, []);
 
+  const filteredSuggestions = label.length > 0
+    ? FIELD_SUGGESTIONS.filter((item) =>
+        item.toLowerCase().includes(label.toLowerCase()),
+      ).slice(0, 6)
+    : [];
+
   return (
-    <View className="mb-3 rounded-lg px-4 pb-3 pt-3" style={{ backgroundColor: colors.surface }}>
+    <View
+      className="mb-2 mx-4 rounded-md px-3 py-1"
+      style={{ borderWidth: 1, borderColor: colors.border }}
+    >
       <View className="flex-row items-center">
         <TextInput
-          value={block.label ?? ''}
-          onChangeText={(label) => onUpdate(block.id, { label })}
+          value={label}
+          onChangeText={(nextLabel) => {
+            setLabel(nextLabel);
+            onUpdate(block.id, { label: nextLabel });
+          }}
           onFocus={() => {
             onFocus();
             setShowSuggestions(true);
@@ -180,20 +210,51 @@ function FieldBlock({
           onBlur={() => {
             blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 150);
           }}
+          onSubmitEditing={() => {
+            if (fieldMode) {
+              inputRefs.current[`${block.id}:value`]?.focus();
+            }
+          }}
+          returnKeyType={fieldMode ? 'next' : 'default'}
           autoCapitalize="characters"
           maxLength={60}
-          placeholder="FIELD NAME"
+          placeholder="FIELD"
           placeholderTextColor={colors.faint}
           ref={(ref) => {
             inputRefs.current[`${block.id}:label`] = ref;
           }}
           style={{
-            flex: 1,
+            width: 110,
             color: colors.muted,
             fontSize: 11,
             fontWeight: '700',
             letterSpacing: 1.5,
+            ...(noOutline as object),
           }}
+        />
+
+        <View className="mx-3 w-px self-stretch" style={{ backgroundColor: colors.border }} />
+
+        <TextInput
+          value={value}
+          onChangeText={(nextValue) => {
+            setValue(nextValue);
+            onUpdate(block.id, { value: nextValue });
+          }}
+          onFocus={onFocus}
+          onSubmitEditing={() => {
+            if (fieldMode) {
+              onFieldNext?.();
+            }
+          }}
+          returnKeyType={fieldMode ? 'next' : 'default'}
+          maxLength={280}
+          placeholder="—"
+          placeholderTextColor={colors.faint}
+          ref={(ref) => {
+            inputRefs.current[`${block.id}:value`] = ref;
+          }}
+          style={{ flex: 1, color: colors.text, fontSize: 14, ...(noOutline as object) }}
         />
 
         {pendingDelete ? (
@@ -234,6 +295,7 @@ function FieldBlock({
                   if (blurTimerRef.current) {
                     clearTimeout(blurTimerRef.current);
                   }
+                  setLabel(suggestion);
                   onUpdate(block.id, { label: suggestion });
                   setShowSuggestions(false);
                 }}
@@ -251,20 +313,6 @@ function FieldBlock({
           </ScrollView>
         </View>
       ) : null}
-
-      <TextInput
-        value={block.value ?? ''}
-        onChangeText={(value) => onUpdate(block.id, { value })}
-        onFocus={onFocus}
-        maxLength={280}
-        placeholder="—"
-        placeholderTextColor={colors.faint}
-        ref={(ref) => {
-          inputRefs.current[`${block.id}:value`] = ref;
-        }}
-        className="mt-1"
-        style={{ color: colors.text, fontSize: 15 }}
-      />
     </View>
   );
 }
@@ -283,20 +331,37 @@ function NoteBlock({
   inputRefs: MutableRefObject<Record<string, TextInput | null>>;
 }) {
   const [pendingDelete, setPendingDelete] = useState(false);
+  const [title, setTitle] = useState(block.title ?? '');
+  const [body, setBody] = useState(block.body ?? '');
+  const prevIdRef = useRef(block.id);
+
+  useEffect(() => {
+    if (block.id !== prevIdRef.current) {
+      prevIdRef.current = block.id;
+      setTitle(block.title ?? '');
+      setBody(block.body ?? '');
+    }
+  }, [block.id, block.title, block.body]);
 
   return (
-    <View className="mb-3 rounded-lg px-4 pb-3 pt-3" style={{ backgroundColor: colors.surface }}>
+    <View
+      className="mb-3 rounded-lg mx-4 pb-3 pt-3 px-4"
+      style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
+    >
       <View className="mb-2 flex-row items-center">
         <TextInput
-          value={block.title ?? ''}
-          onChangeText={(title) => onUpdate(block.id, { title })}
+          value={title}
+          onChangeText={(nextTitle) => {
+            setTitle(nextTitle);
+            onUpdate(block.id, { title: nextTitle });
+          }}
           onFocus={onFocus}
           placeholder="Note title…"
           placeholderTextColor={colors.faint}
           ref={(ref) => {
             inputRefs.current[`${block.id}:title`] = ref;
           }}
-          style={{ flex: 1, color: colors.text, fontSize: 16, fontWeight: '600' }}
+          style={{ flex: 1, color: colors.text, fontSize: 16, fontWeight: '600', ...(noOutline as object) }}
         />
 
         {pendingDelete ? (
@@ -325,8 +390,11 @@ function NoteBlock({
       </View>
 
       <TextInput
-        value={block.body ?? ''}
-        onChangeText={(body) => onUpdate(block.id, { body })}
+        value={body}
+        onChangeText={(nextBody) => {
+          setBody(nextBody);
+          onUpdate(block.id, { body: nextBody });
+        }}
         onFocus={onFocus}
         multiline
         textAlignVertical="top"
@@ -335,7 +403,7 @@ function NoteBlock({
         ref={(ref) => {
           inputRefs.current[`${block.id}:body`] = ref;
         }}
-        style={{ color: colors.text, fontSize: 15, lineHeight: 22 }}
+        style={{ color: colors.text, fontSize: 15, lineHeight: 22, ...(noOutline as object) }}
       />
     </View>
   );
@@ -350,6 +418,7 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
   const [sortMode, setSortMode] = useState<SortMode>('written');
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('saved');
+  const [fieldMode, setFieldMode] = useState(false);
   const hydratedRef = useRef(false);
   const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blockTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -433,6 +502,7 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
     inFlightSavesRef.current = 0;
     setSaveState('saved');
     setColorPickerOpen(false);
+    setFieldMode(false);
     setLoading(true);
     setBlocks([]);
 
@@ -526,17 +596,21 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
   async function createBlock(
     body: { kind: 'field' | 'note' | 'text'; label?: string; value?: string; title?: string; body?: string; content?: string },
     focusKey: string,
+    explicitPosition?: number,
   ) {
-    let position: number | undefined;
-    const lastId = lastFocusedBlockIdRef.current;
-    if (lastId) {
-      const sorted = sortBlocks(blocksRef.current, 'written');
-      const idx = sorted.findIndex((block) => block.id === lastId);
-      if (idx !== -1) {
-        const after = sorted[idx + 1];
-        position = after
-          ? (sorted[idx].position + after.position) / 2
-          : sorted[idx].position + 1.0;
+    let position: number | undefined = explicitPosition;
+
+    if (position === undefined) {
+      const lastId = lastFocusedBlockIdRef.current;
+      if (lastId) {
+        const sorted = sortBlocks(blocksRef.current, 'written');
+        const idx = sorted.findIndex((block) => block.id === lastId);
+        if (idx !== -1) {
+          const after = sorted[idx + 1];
+          position = after
+            ? (sorted[idx].position + after.position) / 2
+            : sorted[idx].position + 1.0;
+        }
       }
     }
 
@@ -550,7 +624,7 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
 
   async function handleRandomField() {
     const used = new Set(
-      blocks
+      blocksRef.current
         .filter((block) => block.kind === 'field')
         .map((block) => block.label ?? ''),
     );
@@ -586,7 +660,7 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
           onChangeText={setName}
           placeholder="Untitled"
           placeholderTextColor={colors.faint}
-          style={{ color: colors.text, fontSize: 28, fontWeight: '700', paddingVertical: 0 }}
+          style={{ color: colors.text, fontSize: 28, fontWeight: '700', paddingVertical: 0, ...(noOutline as object) }}
         />
 
         <View className="mt-2 flex-row items-center">
@@ -636,14 +710,30 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
           borderColor: colors.border,
         }}
       >
-        <TouchableOpacity onPress={() => createBlock({ kind: 'text', content: '' }, 'content')}>
-          <Text className="text-sm font-medium" style={{ color: colors.accent }}>
-            + Text
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => createBlock({ kind: 'field', label: '', value: '' }, 'label')} className="ml-4">
+        <TouchableOpacity onPress={() => createBlock({ kind: 'field', label: '', value: '' }, 'label')}>
           <Text className="text-sm font-medium" style={{ color: colors.accent }}>
             + Field
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={async () => {
+            if (!fieldMode) {
+              setFieldMode(true);
+              await createBlock({ kind: 'field', label: '', value: '' }, 'label');
+            } else {
+              setFieldMode(false);
+            }
+          }}
+          className="ml-4"
+        >
+          <Text
+            className="text-sm font-medium"
+            style={{
+              color: fieldMode ? colors.text : colors.muted,
+              textDecorationLine: fieldMode ? 'underline' : 'none',
+            }}
+          >
+            Fields
           </Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => createBlock({ kind: 'note', title: '', body: '' }, 'title')} className="ml-4">
@@ -664,50 +754,63 @@ export default function CharacterEditor({ entityId }: CharacterEditorProps) {
       </View>
 
       <ScrollView className="flex-1 pt-4" keyboardShouldPersistTaps="handled">
-        {sortedBlocks.map((block) => {
-          if (block.kind === 'text') {
-            return (
-              <TextBlock
-                key={block.id}
-                block={block}
-                onUpdate={handleBlockUpdate}
-                onDelete={handleBlockDelete}
-                onFocus={() => {
-                  lastFocusedBlockIdRef.current = block.id;
-                }}
-                inputRefs={inputRefs}
-              />
-            );
-          }
-
-          if (block.kind === 'field') {
-            return (
-              <FieldBlock
-                key={block.id}
-                block={block}
-                onUpdate={handleBlockUpdate}
-                onDelete={handleBlockDelete}
-                onFocus={() => {
-                  lastFocusedBlockIdRef.current = block.id;
-                }}
-                inputRefs={inputRefs}
-              />
-            );
-          }
+        {sortedBlocks.map((block, index) => {
+          const prev = sortedBlocks[index - 1];
+          const needsZoneBefore = block.kind !== 'text' && (index === 0 || prev.kind !== 'text');
+          const zonePosition = index === 0 ? block.position - 1.0 : (prev.position + block.position) / 2;
 
           return (
-            <NoteBlock
-              key={block.id}
-              block={block}
-              onUpdate={handleBlockUpdate}
-              onDelete={handleBlockDelete}
-              onFocus={() => {
-                lastFocusedBlockIdRef.current = block.id;
-              }}
-              inputRefs={inputRefs}
-            />
+            <View key={block.id}>
+              {needsZoneBefore ? (
+                <InsertZone
+                  onPress={() => createBlock({ kind: 'text', content: '' }, 'content', zonePosition)}
+                />
+              ) : null}
+
+              {block.kind === 'text' ? (
+                <TextBlock
+                  block={block}
+                  onUpdate={handleBlockUpdate}
+                  onDelete={handleBlockDelete}
+                  onFocus={() => {
+                    lastFocusedBlockIdRef.current = block.id;
+                  }}
+                  inputRefs={inputRefs}
+                />
+              ) : block.kind === 'field' ? (
+                <FieldBlock
+                  block={block}
+                  onUpdate={handleBlockUpdate}
+                  onDelete={handleBlockDelete}
+                  onFocus={() => {
+                    lastFocusedBlockIdRef.current = block.id;
+                  }}
+                  inputRefs={inputRefs}
+                  fieldMode={fieldMode}
+                  onFieldNext={async () => {
+                    await createBlock({ kind: 'field', label: '', value: '' }, 'label');
+                  }}
+                />
+              ) : (
+                <NoteBlock
+                  block={block}
+                  onUpdate={handleBlockUpdate}
+                  onDelete={handleBlockDelete}
+                  onFocus={() => {
+                    lastFocusedBlockIdRef.current = block.id;
+                  }}
+                  inputRefs={inputRefs}
+                />
+              )}
+            </View>
           );
         })}
+
+        <InsertZone
+          onPress={() => createBlock({ kind: 'text', content: '' }, 'content', undefined)}
+          minHeight={64}
+        />
+
         <View className="h-16" />
       </ScrollView>
     </View>
