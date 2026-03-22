@@ -13,9 +13,10 @@
 - Script editor: `ScriptEditor.tsx` still present. Final Draft-style visual design. Not currently routed to from the new binder (hierarchy removed), but component is intact.
 - Block CRUD API: `GET/POST /api/pages/:pageId/blocks`, `PATCH/DELETE /api/pages/:pageId/blocks/:blockId`.
 - All migrations applied to Neon. No new migrations needed for bible (uses existing tables).
+- CharacterEditor: block-based editor for character bible entries. Fields (labeled, autocomplete from 50-item list) + Notes (title + body). Toolbar: + Field, + Note, ⚄ Random. Sort toggle (Written / Type / A-Z). Color picker (6 swatches). All persists to dossier_attachments. New characters auto-seed with Role, Age, Motivation fields.
 
 ## Next Step
-Deploy the API to Railway and run an EAS preview build so the app can be tested on iPad with real persistence.
+Build the groups feature: add 'group' to bibleEntryTypeEnum, implement group membership via dossier_attachments, expandable binder rows, and a GroupEditor component.
 
 ---
 

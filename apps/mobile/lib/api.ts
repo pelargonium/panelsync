@@ -107,12 +107,25 @@ export interface ApiBibleEntry {
   universeId: string;
   type: 'character' | 'location' | 'note';
   name: string;
+  color: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface ApiBibleEntryDetail extends ApiBibleEntry {
   bodyText: string;
+}
+
+export interface ApiBibleBlock {
+  id: string;
+  kind: 'field' | 'note';
+  label?: string;
+  value?: string;
+  title?: string;
+  body?: string;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type ApiSeries = ApiContainer;
@@ -325,7 +338,7 @@ export const api = {
       }),
     get: (id: string) =>
       request<{ data: ApiBibleEntryDetail }>(`/api/bible/${id}`),
-    update: (id: string, body: { name?: string; type?: ApiBibleEntry['type'] }) =>
+    update: (id: string, body: { name?: string; type?: ApiBibleEntry['type']; color?: string }) =>
       request<{ data: ApiBibleEntry }>(`/api/bible/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(body),
@@ -337,6 +350,34 @@ export const api = {
       }),
     delete: (id: string) =>
       request<void>(`/api/bible/${id}`, { method: 'DELETE' }),
+    blocks: {
+      list: (entryId: string) =>
+        request<{ data: ApiBibleBlock[] }>(`/api/bible/${entryId}/blocks`),
+      create: (entryId: string, body: {
+        kind: 'field' | 'note';
+        label?: string;
+        value?: string;
+        title?: string;
+        body?: string;
+        position?: number;
+      }) =>
+        request<{ data: ApiBibleBlock }>(`/api/bible/${entryId}/blocks`, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }),
+      update: (entryId: string, blockId: string, body: {
+        label?: string;
+        value?: string;
+        title?: string;
+        body?: string;
+      }) =>
+        request<{ data: ApiBibleBlock }>(`/api/bible/${entryId}/blocks/${blockId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+        }),
+      delete: (entryId: string, blockId: string) =>
+        request<void>(`/api/bible/${entryId}/blocks/${blockId}`, { method: 'DELETE' }),
+    },
   },
 
   series: {

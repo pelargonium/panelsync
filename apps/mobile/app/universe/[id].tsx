@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import CharacterEditor from '../../components/CharacterEditor';
 import EntityEditor from '../../components/EntityEditor';
 import { UniverseProvider, useUniverse } from '../../context/UniverseContext';
 import { type ApiBibleEntry } from '../../lib/api';
@@ -61,9 +62,13 @@ function compareEntities(left: ApiBibleEntry, right: ApiBibleEntry, sortMode: So
 }
 
 function PrimaryContent() {
-  const { activeEntityType, activeEntityId, universeName } = useUniverse();
+  const { activeEntityType, activeEntityId, universeName, entities } = useUniverse();
 
   if (activeEntityType === 'bible_entry' && activeEntityId) {
+    const entity = entities.find((item) => item.id === activeEntityId);
+    if (entity?.type === 'character') {
+      return <CharacterEditor entityId={activeEntityId} />;
+    }
     return <EntityEditor entityId={activeEntityId} />;
   }
 
