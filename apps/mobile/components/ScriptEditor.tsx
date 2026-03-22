@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { colors } from '../theme';
 import { api, type ApiPage, type ApiScriptBlock, type ScriptBlockType } from '../lib/api';
 import { useUniverse } from '../context/UniverseContext';
@@ -27,12 +27,37 @@ const PANEL_SIZE_OPTIONS = [
   { label: 'QUARTER', value: 'quarter' },
 ];
 
+const TYPE_ORDER: ScriptBlockType[] = ['panel', 'scene', 'description', 'dialogue', 'caption', 'sfx'];
+
 function sortBlocks(blocks: ApiScriptBlock[]) {
   return [...blocks].sort((a, b) => a.position - b.position);
 }
 
 function emptyForBlock(block: ApiScriptBlock) {
   return !(block.content?.text?.trim()) && !(block.speaker?.trim());
+}
+
+function typeColor(type: ScriptBlockType) {
+  if (type === 'panel') return colors.accent;
+  if (type === 'scene') return colors.muted;
+  if (type === 'description') return colors.faint;
+  if (type === 'dialogue') return colors.timeline;
+  if (type === 'caption') return colors.accent;
+  return colors.chalkboard;
+}
+
+function nextType(type: ScriptBlockType): ScriptBlockType {
+  const currentIndex = TYPE_ORDER.indexOf(type);
+  return TYPE_ORDER[(currentIndex + 1) % TYPE_ORDER.length];
+}
+
+function advanceType(type: ScriptBlockType): ScriptBlockType {
+  if (type === 'panel') return 'scene';
+  if (type === 'scene') return 'description';
+  if (type === 'description') return 'dialogue';
+  if (type === 'dialogue') return 'dialogue';
+  if (type === 'caption') return 'description';
+  return 'description';
 }
 
 export default function ScriptEditor({ issueId, activePageId }: ScriptEditorProps) {
@@ -122,6 +147,7 @@ export default function ScriptEditor({ issueId, activePageId }: ScriptEditorProp
   }, []);
 
   const isSaving = Object.values(dirtyIds).some(Boolean);
+  const isLoading = pages.length > 0 && pages.some((page) => !(page.id in blocksByPage));
 
   function updateLocalBlock(pageId: string, blockId: string, updates: Partial<ApiScriptBlock>) {
     setBlocksByPage((current) => ({
@@ -167,7 +193,7 @@ export default function ScriptEditor({ issueId, activePageId }: ScriptEditorProp
     }, 500);
   }
 
-  async function insertBlock(pageId: string, insertAfterIndex: number) {
+  async function insertBlock(pageId: string, insertAfterIndex: number, type: ScriptBlockType = 'description') {
     const blocks = blocksByPage[pageId] ?? [];
     const previous = insertAfterIndex >= 0 ? blocks[insertAfterIndex] : null;
     const next = insertAfterIndex + 1 < blocks.length ? blocks[insertAfterIndex + 1] : null;
@@ -182,7 +208,7 @@ export default function ScriptEditor({ issueId, activePageId }: ScriptEditorProp
     }
 
     const res = await api.blocks.create(pageId, {
-      type: 'description',
+      type,
       content: { text: '' },
       position,
     });
@@ -194,7 +220,9 @@ export default function ScriptEditor({ issueId, activePageId }: ScriptEditorProp
     setFocusedBlockId(res.data.id);
 
     setTimeout(() => {
-      inputRefs.current[res.data.id]?.focus();
+      if (type !== 'panel') {
+        inputRefs.current[`${res.data.id}:primary`]?.focus();
+      }
     }, 50);
   }
 
@@ -223,7 +251,7 @@ export default function ScriptEditor({ issueId, activePageId }: ScriptEditorProp
     if (previous) {
       setFocusedBlockId(previous.id);
       setTimeout(() => {
-        inputRefs.current[previous.id]?.focus();
+        inputRefs.current[`${previous.id}:primary`]?.focus();
       }, 50);
     } else {
       setFocusedBlockId(null);
@@ -248,163 +276,412 @@ export default function ScriptEditor({ issueId, activePageId }: ScriptEditorProp
     updateLocalBlock(pageId, block.id, res.data);
   }
 
-  function blockLabel(type: ScriptBlockType) {
-    if (type === 'panel') return 'PANEL';
-    if (type === 'scene') return 'SCENE';
-    if (type === 'description') return 'DESCRIPTION';
-    if (type === 'dialogue') return 'DIALOGUE';
-    if (type === 'caption') return 'CAPTION';
-    return 'SFX';
+  async function focusOrAdvance(pageId: string, index: number, block: ApiScriptBlock) {
+    const blocks = blocksByPage[pageId] ?? [];
+    const next = blocks[index + 1];
+
+    if (next) {
+      setFocusedBlockId(next.id);
+      setTimeout(() => {
+        if (next.type !== 'panel') {
+          inputRefs.current[`${next.id}:primary`]?.focus();
+        }
+      }, 50);
+      return;
+    }
+
+    await insertBlock(pageId, index, advanceType(block.type));
   }
 
-  function renderBlock(page: ApiPage, block: ApiScriptBlock, index: number) {
+  function cycleTypeByTab(pageId: string, block: ApiScriptBlock) {
+    updateType(pageId, block, nextType(block.type)).catch(() => {});
+  }
+
+  function panelNumberForPage(blocks: ApiScriptBlock[], blockId: string) {
+    let count = 0;
+    for (const block of blocks) {
+      if (block.type === 'panel') count += 1;
+      if (block.id === blockId) return count;
+    }
+    return count;
+  }
+
+  function AddBlockButton({
+    pageId,
+    insertAfterIndex,
+    prominent = false,
+    label = '＋ add block',
+    type = 'description',
+  }: {
+    pageId: string;
+    insertAfterIndex: number;
+    prominent?: boolean;
+    label?: string;
+    type?: ScriptBlockType;
+  }) {
+    return (
+      <TouchableOpacity
+        onPress={() => insertBlock(pageId, insertAfterIndex, type)}
+        className={prominent ? 'items-center justify-center py-10' : 'px-4 py-1'}
+      >
+        <Text
+          className={prominent ? 'text-sm' : 'text-xs'}
+          style={{ color: colors.faint, fontFamily: 'Courier New' }}
+        >
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  }
+
+  function renderToolbar(page: ApiPage, block: ApiScriptBlock, index: number) {
+    return (
+      <View>
+        <View
+          className="mt-3 flex-row items-center border-y px-4 py-2"
+          style={{ borderColor: colors.border, backgroundColor: colors.surface }}
+        >
+          {TYPE_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              onPress={() => updateType(page.id, block, option.value)}
+              className="mr-3"
+            >
+              <Text
+                className="text-[10px] font-bold uppercase"
+                style={{
+                  color: block.type === option.value ? typeColor(option.value) : colors.muted,
+                  fontFamily: 'Courier New',
+                }}
+              >
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+
+          <View className="flex-1" />
+
+          <TouchableOpacity onPress={() => focusOrAdvance(page.id, index, block)}>
+            <Text
+              className="text-[12px] font-bold"
+              style={{ color: colors.accent, fontFamily: 'Courier New' }}
+            >
+              ↵
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {block.type === 'panel' && (
+          <View className="flex-row px-4 pb-2 pt-2" style={{ backgroundColor: colors.surface }}>
+            {PANEL_SIZE_OPTIONS.map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                onPress={() => updatePanelSize(page.id, block, option.value)}
+                className="mr-3"
+              >
+                <Text
+                  className="text-[10px] uppercase"
+                  style={{
+                    color: block.sizeTag === option.value ? colors.accent : colors.muted,
+                    fontFamily: 'Courier New',
+                  }}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  function renderBlock(page: ApiPage, block: ApiScriptBlock, index: number, blocks: ApiScriptBlock[]) {
     const isFocused = focusedBlockId === block.id;
+    const sharedTextStyle = { color: colors.text, fontFamily: 'Courier New' as const };
+    const pagePanelNumber = panelNumberForPage(blocks, block.id);
 
     return (
       <View key={block.id}>
-        <TouchableOpacity
-          onPress={() => insertBlock(page.id, index - 1)}
-          className="mx-6 h-8 items-center justify-center rounded border border-dashed"
-          style={{ borderColor: colors.border }}
-        >
-          <Text className="text-base" style={{ color: colors.accent }}>＋</Text>
-        </TouchableOpacity>
+        {index > 0 && <AddBlockButton pageId={page.id} insertAfterIndex={index - 1} />}
 
-        <View
-          className="mx-4 my-2 rounded-lg border p-3"
-          style={{
-            borderColor: isFocused ? colors.accent : colors.border,
-            backgroundColor: colors.surface,
-          }}
-        >
-          <Text className="mb-2 text-[10px] font-bold tracking-[1.4px]" style={{ color: colors.muted }}>
-            {blockLabel(block.type)}
-            {block.type === 'panel' && block.sizeTag ? ` · ${block.sizeTag.toUpperCase()}` : ''}
-          </Text>
+        <View className="px-4 py-2">
+          {block.type === 'panel' && (
+            <TouchableOpacity onPress={() => setFocusedBlockId(block.id)} className="py-4">
+              <View className="flex-row items-center">
+                <View className="flex-1" style={{ height: 1, backgroundColor: colors.accent }} />
+                <View className="px-4">
+                  <Text
+                    className="text-[11px] font-semibold"
+                    style={{ color: colors.accent, fontFamily: 'Courier New', letterSpacing: 1 }}
+                  >
+                    PANEL {pagePanelNumber}
+                  </Text>
+                </View>
+                <View className="flex-1" style={{ height: 1, backgroundColor: colors.accent }} />
+              </View>
+            </TouchableOpacity>
+          )}
 
-          {block.type === 'dialogue' && (
+          {block.type === 'scene' && (
             <TextInput
-              value={block.speaker ?? ''}
+              ref={(ref) => {
+                inputRefs.current[`${block.id}:primary`] = ref;
+              }}
+              value={block.content?.text ?? ''}
               onFocus={() => setFocusedBlockId(block.id)}
-            onChangeText={(speaker) => {
-                updateLocalBlock(page.id, block.id, { speaker });
+              onChangeText={(text) => {
+                updateLocalBlock(page.id, block.id, { content: { text } });
                 scheduleSave(page.id, block.id);
               }}
-              placeholder="Speaker"
+              onSubmitEditing={() => {
+                focusOrAdvance(page.id, index, block).catch(() => {});
+              }}
+              returnKeyType="next"
+              autoCapitalize="characters"
+              placeholder="INT./EXT. LOCATION — TIME"
               placeholderTextColor={colors.faint}
-              className="mb-2 rounded border px-3 py-2 text-sm"
-              style={{ borderColor: colors.border, color: colors.text }}
+              className="py-1 text-[14px]"
+              style={{ ...sharedTextStyle, textTransform: 'uppercase' }}
             />
           )}
 
-          <TextInput
-            ref={(ref) => {
-              inputRefs.current[block.id] = ref;
-            }}
-            multiline
-            value={block.content?.text ?? ''}
-            onFocus={() => setFocusedBlockId(block.id)}
-            onChangeText={(text) => {
-              const content = { text };
-              updateLocalBlock(page.id, block.id, { content });
-              scheduleSave(page.id, block.id);
-            }}
-            onKeyPress={({ nativeEvent }) => {
-              if (nativeEvent.key === 'Backspace' && emptyForBlock(block)) {
-                deleteBlock(page.id, block.id).catch(() => {});
-              }
-            }}
-            placeholder={block.type === 'panel' ? 'Panel note…' : 'Write…'}
-            placeholderTextColor={colors.faint}
-            className="min-h-[64px] text-sm"
-            style={{ color: colors.text, textAlignVertical: 'top' }}
-          />
+          {block.type === 'description' && (
+            <TextInput
+              ref={(ref) => {
+                inputRefs.current[`${block.id}:primary`] = ref;
+              }}
+              multiline
+              scrollEnabled={false}
+              value={block.content?.text ?? ''}
+              onFocus={() => setFocusedBlockId(block.id)}
+              onChangeText={(text) => {
+                updateLocalBlock(page.id, block.id, { content: { text } });
+                scheduleSave(page.id, block.id);
+              }}
+              onKeyPress={(event) => {
+                const key = event.nativeEvent.key;
+                const native = event.nativeEvent as typeof event.nativeEvent & { shiftKey?: boolean };
+                if (key === 'Backspace' && emptyForBlock(block)) {
+                  deleteBlock(page.id, block.id).catch(() => {});
+                } else if (key === 'Tab') {
+                  cycleTypeByTab(page.id, block);
+                } else if (key === 'Enter' && !native.shiftKey) {
+                  focusOrAdvance(page.id, index, block).catch(() => {});
+                }
+              }}
+              placeholder="Describe the action…"
+              placeholderTextColor={colors.faint}
+              className="min-h-[30px] py-1 text-[14px]"
+              style={{ ...sharedTextStyle, color: colors.muted, textAlignVertical: 'top' }}
+            />
+          )}
 
-          {isFocused && (
-            <View className="mt-3">
-              <View className="flex-row flex-wrap">
-                {TYPE_OPTIONS.map((option) => {
-                  const active = block.type === option.value;
-                  return (
-                    <TouchableOpacity
-                      key={option.value}
-                      onPress={() => updateType(page.id, block, option.value)}
-                      className="mr-2 mt-2 rounded px-3 py-2"
-                      style={{ backgroundColor: active ? colors.accent : colors.bg }}
-                    >
-                      <Text className="text-[11px] font-semibold" style={{ color: active ? colors.surface : colors.text }}>
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {block.type === 'panel' && (
-                <View className="mt-2 flex-row flex-wrap">
-                  {PANEL_SIZE_OPTIONS.map((option) => {
-                    const active = block.sizeTag === option.value;
-                    return (
-                      <TouchableOpacity
-                        key={option.value}
-                        onPress={() => updatePanelSize(page.id, block, option.value)}
-                        className="mr-2 mt-2 rounded px-3 py-2"
-                        style={{ backgroundColor: active ? colors.timeline : colors.bg }}
-                      >
-                        <Text className="text-[11px] font-semibold" style={{ color: active ? colors.surface : colors.text }}>
-                          {option.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
+          {block.type === 'dialogue' && (
+            <View style={{ paddingLeft: 100 }}>
+              <TextInput
+                ref={(ref) => {
+                  inputRefs.current[`${block.id}:speaker`] = ref;
+                }}
+                value={block.speaker ?? ''}
+                onFocus={() => setFocusedBlockId(block.id)}
+                onChangeText={(speaker) => {
+                  updateLocalBlock(page.id, block.id, { speaker });
+                  scheduleSave(page.id, block.id);
+                }}
+                onSubmitEditing={() => {
+                  inputRefs.current[`${block.id}:primary`]?.focus();
+                }}
+                returnKeyType="next"
+                autoCapitalize="characters"
+                placeholder="CHARACTER"
+                placeholderTextColor={colors.faint}
+                className="py-1 text-[13px] font-bold uppercase"
+                style={{ ...sharedTextStyle, fontWeight: '700' }}
+              />
+              <TextInput
+                ref={(ref) => {
+                  inputRefs.current[`${block.id}:primary`] = ref;
+                }}
+                multiline
+                scrollEnabled={false}
+                value={block.content?.text ?? ''}
+                onFocus={() => setFocusedBlockId(block.id)}
+                onChangeText={(text) => {
+                  updateLocalBlock(page.id, block.id, { content: { text } });
+                  scheduleSave(page.id, block.id);
+                }}
+                onKeyPress={(event) => {
+                  const key = event.nativeEvent.key;
+                  const native = event.nativeEvent as typeof event.nativeEvent & { shiftKey?: boolean };
+                  if (key === 'Backspace' && emptyForBlock(block)) {
+                    deleteBlock(page.id, block.id).catch(() => {});
+                  } else if (key === 'Tab') {
+                    cycleTypeByTab(page.id, block);
+                  } else if (key === 'Enter' && !native.shiftKey) {
+                    focusOrAdvance(page.id, index, block).catch(() => {});
+                  }
+                }}
+                placeholder="Dialogue…"
+                placeholderTextColor={colors.faint}
+                className="min-h-[30px] py-1 text-[14px]"
+                style={{ ...sharedTextStyle, color: colors.muted, textAlignVertical: 'top' }}
+              />
             </View>
           )}
+
+          {block.type === 'caption' && (
+            <View className="rounded-r-md py-2 pl-3 pr-2" style={{ borderLeftWidth: 2, borderLeftColor: colors.accent }}>
+              <TextInput
+                ref={(ref) => {
+                  inputRefs.current[`${block.id}:primary`] = ref;
+                }}
+                multiline
+                scrollEnabled={false}
+                value={block.content?.text ?? ''}
+                onFocus={() => setFocusedBlockId(block.id)}
+                onChangeText={(text) => {
+                  updateLocalBlock(page.id, block.id, { content: { text } });
+                  scheduleSave(page.id, block.id);
+                }}
+                onKeyPress={(event) => {
+                  const key = event.nativeEvent.key;
+                  const native = event.nativeEvent as typeof event.nativeEvent & { shiftKey?: boolean };
+                  if (key === 'Backspace' && emptyForBlock(block)) {
+                    deleteBlock(page.id, block.id).catch(() => {});
+                  } else if (key === 'Tab') {
+                    cycleTypeByTab(page.id, block);
+                  } else if (key === 'Enter' && !native.shiftKey) {
+                    focusOrAdvance(page.id, index, block).catch(() => {});
+                  }
+                }}
+                placeholder="Narration…"
+                placeholderTextColor={colors.faint}
+                className="min-h-[30px] py-1 text-[14px]"
+                style={{ ...sharedTextStyle, color: colors.muted, fontStyle: 'italic', textAlignVertical: 'top' }}
+              />
+            </View>
+          )}
+
+          {block.type === 'sfx' && (
+            <TextInput
+              ref={(ref) => {
+                inputRefs.current[`${block.id}:primary`] = ref;
+              }}
+              value={block.content?.text ?? ''}
+              onFocus={() => setFocusedBlockId(block.id)}
+              onChangeText={(text) => {
+                updateLocalBlock(page.id, block.id, { content: { text } });
+                scheduleSave(page.id, block.id);
+              }}
+              onSubmitEditing={() => {
+                focusOrAdvance(page.id, index, block).catch(() => {});
+              }}
+              onKeyPress={(event) => {
+                if (event.nativeEvent.key === 'Tab') {
+                  cycleTypeByTab(page.id, block);
+                }
+              }}
+              returnKeyType="next"
+              autoCapitalize="characters"
+              placeholder="KRAAKOOOM"
+              placeholderTextColor={colors.faint}
+              className="py-1 text-[22px] font-bold"
+              style={{ ...sharedTextStyle, color: colors.chalkboard, fontWeight: '700' }}
+            />
+          )}
         </View>
+
+        {isFocused && renderToolbar(page, block, index)}
       </View>
     );
   }
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.bg }}>
-      <View className="border-b px-4 py-3" style={{ borderColor: colors.border, backgroundColor: colors.surface }}>
-        <Text className="text-xs font-semibold" style={{ color: isSaving ? colors.accent : colors.faint }}>
-          {isSaving ? 'Saving…' : 'All saved'}
+      <View
+        className="flex-row items-center border-b px-4"
+        style={{ height: 36, borderColor: colors.border, backgroundColor: colors.surface }}
+      >
+        <View
+          className="mr-2 h-[6px] w-[6px] rounded-full"
+          style={{ backgroundColor: isSaving ? colors.accent : colors.bible }}
+        />
+        <Text
+          className="text-[10px]"
+          style={{ color: isSaving ? colors.accent : colors.bible, fontFamily: 'Courier New', letterSpacing: 1 }}
+        >
+          {isSaving ? 'SAVING' : 'ALL SAVED'}
         </Text>
       </View>
 
-      <ScrollView ref={scrollViewRef} className="flex-1" contentContainerStyle={{ paddingBottom: 200 }}>
-        {pages.map((page) => {
-          const blocks = sortBlocks(blocksByPage[page.id] ?? []);
-          return (
-            <View
-              key={page.id}
-              onLayout={(event) => {
-                pageOffsets.current[page.id] = event.nativeEvent.layout.y;
-              }}
-              className="border-b pb-6"
-              style={{ borderColor: colors.border }}
-            >
-              <View className="px-4 py-4">
-                <Text className="text-base font-bold" style={{ color: activePageId === page.id ? colors.accent : colors.text }}>
-                  Page {page.number}
-                </Text>
+      {isLoading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color={colors.accent} />
+        </View>
+      ) : (
+        <ScrollView
+          ref={scrollViewRef}
+          className="flex-1"
+          contentContainerStyle={{ paddingTop: 24, paddingBottom: 200 }}
+        >
+          {pages.map((page, pageIndex) => {
+            const blocks = sortBlocks(blocksByPage[page.id] ?? []);
+            return (
+              <View key={page.id}>
+                {pageIndex > 0 && (
+                  <View className="mx-4 h-[72px] items-center justify-center">
+                    <View className="absolute left-4 right-4 h-px" style={{ backgroundColor: colors.border }} />
+                    <Text
+                      className="px-3 text-[9px] uppercase"
+                      style={{ color: colors.faint, backgroundColor: colors.bg, fontFamily: 'Courier New', letterSpacing: 1 }}
+                    >
+                      PAGE {String(page.number).padStart(2, '0')}
+                    </Text>
+                  </View>
+                )}
+
+                <View
+                  onLayout={(event) => {
+                    pageOffsets.current[page.id] = event.nativeEvent.layout.y;
+                  }}
+                  className="mx-4 rounded-lg px-0 pb-8"
+                  style={{ backgroundColor: colors.pageWhite }}
+                >
+                  <View className="px-4 pt-6 pb-4">
+                    <Text
+                      className="text-[11px]"
+                      style={{
+                        color: activePageId === page.id ? colors.accent : colors.muted,
+                        fontFamily: 'Courier New',
+                        letterSpacing: 1.2,
+                      }}
+                    >
+                      PAGE {String(page.number).padStart(2, '0')}
+                    </Text>
+                  </View>
+
+                  {blocks.length === 0 ? (
+                    <TouchableOpacity onPress={() => insertBlock(page.id, -1, 'scene')} className="items-center justify-center py-16">
+                      <Text className="text-sm" style={{ color: colors.faint, fontFamily: 'Courier New' }}>
+                        Tap to start writing…
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    blocks.map((block, index) => renderBlock(page, block, index, blocks))
+                  )}
+
+                  <TouchableOpacity onPress={() => insertBlock(page.id, blocks.length - 1)} className="px-4 pt-2">
+                    <Text className="text-xs" style={{ color: colors.faint, fontFamily: 'Courier New' }}>
+                      ＋
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-
-              {blocks.map((block, index) => renderBlock(page, block, index))}
-
-              <TouchableOpacity
-                onPress={() => insertBlock(page.id, blocks.length - 1)}
-                className="mx-6 mt-1 h-8 items-center justify-center rounded border border-dashed"
-                style={{ borderColor: colors.border }}
-              >
-                <Text className="text-base" style={{ color: colors.accent }}>＋</Text>
-              </TouchableOpacity>
-            </View>
-          );
-        })}
-      </ScrollView>
+            );
+          })}
+        </ScrollView>
+      )}
     </View>
   );
 }

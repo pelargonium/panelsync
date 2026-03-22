@@ -8,14 +8,14 @@
 - Workspace state routes: `GET /api/workspace-state`, `PUT /api/workspace-state` — per-user per-universe nav persistence.
 - `UniverseContext.tsx`: shared React context. On mount fetches hierarchy levels, containers, and workspace state in parallel. Restores full nav state. Saves state debounced 800ms on every nav change. Lazy page loading cached by containerId. Inline container/page creation methods.
 - `universe/[id].tsx`: persistent workspace shell. Wraps in UniverseProvider. No local series/issues state. Inline creation (no modals). Double-tap depth cycling. ContentArea renders entity_only / split / dossier_only layouts.
-- Script editor: `ScriptEditor.tsx` component. Issue-scoped continuous scroll across all pages. TextInput-based block editor, 6 block types (panel/scene/description/dialogue/caption/sfx), panel size tags, auto-save 500ms per block, block CRUD (add/delete/type-change), scroll-to-page on binder tap.
+- Script editor: `ScriptEditor.tsx` component. Issue-scoped continuous scroll across all pages. Final Draft-style visual design: panel blocks as dividers, Courier New monospace throughout, dialogue indented, caption with left border, SFX large. Enter advances with smart defaults (panel→scene→desc→dlg), Tab cycles type, type toolbar on focus. Auto-save 500ms per block, block CRUD, scroll-to-page on binder tap.
 - Block CRUD API: `GET/POST /api/pages/:pageId/blocks`, `PATCH/DELETE /api/pages/:pageId/blocks/:blockId`.
 - Mobile API client updated: `ApiHierarchyLevel`, `ApiContainer`, `ApiDraft` types. `api.hierarchy`, `api.containers`, `api.drafts` objects. Backward-compat shims for `api.series` and `api.issues`.
 - All three migrations applied to Neon: schema revision, workspace_state shell, active_entity_id text change.
 - Design session complete: foundational principles, entity model, dossier system, workspace interaction model all documented in `documents/DESIGN.md`. All 11 open questions resolved.
 
 ## Next Step
-Workshop the script editor with real usage and address polish: derived panel numbers, keyboard flow improvements, and any UX issues surfaced during testing.
+Workshop the script editor with real usage and surface any UX issues for the next polish pass.
 
 ---
 
