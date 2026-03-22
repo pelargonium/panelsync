@@ -1,0 +1,1 @@
+ALTER TABLE "workspace_state" ALTER COLUMN "active_entity_id" SET DATA TYPE text;

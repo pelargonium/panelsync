@@ -107,6 +107,12 @@ export const eventActionEnum = pgEnum('event_action', [
   'unlocked',
 ]);
 
+export const depthStateEnum = pgEnum('depth_state', [
+  'entity_only',
+  'split',
+  'dossier_only',
+]);
+
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: text('email').notNull().unique(),
@@ -324,4 +330,16 @@ export const events = pgTable('events', {
   entityId: uuid('entity_id').notNull(),
   payload: jsonb('payload').notNull().default({}),
   createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const workspaceState = pgTable('workspace_state', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  universeId: uuid('universe_id').notNull().references(() => universes.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  activeEntityType: text('active_entity_type'),
+  activeEntityId: text('active_entity_id'),
+  depthState: depthStateEnum('depth_state').notNull().default('entity_only'),
+  binderOpen: boolean('binder_open').notNull().default(true),
+  warmContexts: jsonb('warm_contexts').notNull().default([]),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

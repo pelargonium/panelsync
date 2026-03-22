@@ -1,254 +1,305 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Modal, TextInput,
-  KeyboardAvoidingView, Platform, SafeAreaView,
+  ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { colors, spacing, radius } from '../../theme';
-import { modalStyles as m } from '../../components/modalStyles';
-import { api, type ApiSeries, type ApiIssue, type ApiPage } from '../../lib/api';
+import { colors } from '../../theme';
+import { type ApiContainer, type ApiHierarchyLevel, type ApiPage } from '../../lib/api';
 import CharactersEntity from '../../entities/CharactersEntity';
 import LocationsEntity from '../../entities/LocationsEntity';
 import TimelineEntity from '../../entities/TimelineEntity';
 import NotesEntity from '../../entities/NotesEntity';
 import type { Universe } from '../../types';
+import { UniverseProvider, useUniverse } from '../../context/UniverseContext';
 
 type SectionKey = 'characters' | 'locations' | 'timeline' | 'notes';
 
-const BINDER_W = 264;
+const BINDER_WIDTH = 264;
 
-function NewSeriesModal({ visible, universeId, onClose, onCreate }: {
-  visible: boolean;
-  universeId: string;
-  onClose: () => void;
-  onCreate: (s: ApiSeries) => void;
-}) {
-  const [name, setName] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function labelForContainer(level: ApiHierarchyLevel | undefined, container: ApiContainer) {
+  const levelName = level?.name ?? 'Container';
+  const numbered = container.number ? `${levelName} ${container.number}` : levelName;
+  return `${numbered} — ${container.name}`;
+}
 
-  async function handleCreate() {
-    if (!name.trim()) return;
-    setError(null);
-    setLoading(true);
-    try {
-      const res = await api.series.create({ universeId, name: name.trim() });
-      onCreate(res.data);
-      setName('');
-      onClose();
-    } catch (e: any) {
-      setError(e.message ?? 'Failed to create series.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
+function EmptyContent({ universeName }: { universeName: string }) {
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={m.overlay}>
-        <TouchableOpacity style={m.backdrop} onPress={onClose} />
-        <View style={m.sheet}>
-          <Text style={m.title}>New Series</Text>
-          <TextInput
-            style={m.input}
-            placeholder="Series name..."
-            placeholderTextColor={colors.faint}
-            value={name}
-            onChangeText={setName}
-            autoFocus
-            onSubmitEditing={handleCreate}
-          />
-          {error && <Text style={s.modalError}>{error}</Text>}
-          <View style={m.actions}>
-            <TouchableOpacity style={m.cancel} onPress={onClose}>
-              <Text style={m.cancelTxt}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[m.create, (!name.trim() || loading) && m.createOff]}
-              onPress={handleCreate}
-              disabled={loading}
-            >
-              {loading
-                ? <ActivityIndicator color={colors.surface} />
-                : <Text style={m.createTxt}>Create</Text>
-              }
-            </TouchableOpacity>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+    <View className="flex-1 items-center justify-center px-8" style={{ backgroundColor: colors.bg }}>
+      <Text className="text-center text-2xl font-bold" style={{ color: colors.text }}>
+        {universeName}
+      </Text>
+      <Text className="mt-3 text-center text-sm" style={{ color: colors.faint }}>
+        Select a page or section from the binder to open it in the workspace.
+      </Text>
+    </View>
   );
 }
 
-function NewIssueModal({ visible, seriesId, onClose, onCreate }: {
-  visible: boolean;
-  seriesId: string;
-  onClose: () => void;
-  onCreate: (issue: ApiIssue) => void;
-}) {
-  const [name, setName] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function DossierPlaceholder() {
+  return (
+    <View className="flex-1 items-center justify-center" style={{ backgroundColor: colors.bg }}>
+      <Text className="text-sm" style={{ color: colors.faint }}>
+        Dossier
+      </Text>
+    </View>
+  );
+}
 
-  async function handleCreate() {
-    if (!name.trim()) return;
-    setError(null);
-    setLoading(true);
+function PageContent({ pageId }: { pageId: string }) {
+  return (
+    <View className="flex-1 items-center justify-center px-8" style={{ backgroundColor: colors.bg }}>
+      <Text className="text-lg font-semibold" style={{ color: colors.text }}>
+        Page Selected
+      </Text>
+      <Text className="mt-2 text-center text-sm" style={{ color: colors.faint }}>
+        Script editor wiring lands in a later task. Active page: {pageId}
+      </Text>
+    </View>
+  );
+}
+
+function SectionContent({ sectionKey }: { sectionKey: SectionKey }) {
+  const { universeId, universeName } = useUniverse();
+  const universe: Universe = { id: universeId, name: universeName, seriesCount: 0, lastEdited: '' };
+
+  if (sectionKey === 'characters') return <CharactersEntity universe={universe} />;
+  if (sectionKey === 'locations') return <LocationsEntity universe={universe} />;
+  if (sectionKey === 'timeline') return <TimelineEntity universe={universe} />;
+  return <NotesEntity universe={universe} />;
+}
+
+function PrimaryContent() {
+  const { activeEntityType, activeEntityId, universeName } = useUniverse();
+
+  if (!activeEntityType || !activeEntityId) {
+    return <EmptyContent universeName={universeName} />;
+  }
+
+  if (activeEntityType === 'section') {
+    return <SectionContent sectionKey={activeEntityId as SectionKey} />;
+  }
+
+  if (activeEntityType === 'page') {
+    return <PageContent pageId={activeEntityId} />;
+  }
+
+  return <EmptyContent universeName={universeName} />;
+}
+
+function ContentArea() {
+  const { depthState } = useUniverse();
+
+  if (depthState === 'dossier_only') {
+    return <DossierPlaceholder />;
+  }
+
+  if (depthState === 'split') {
+    return (
+      <View className="flex-1 flex-row">
+        <View className="flex-1 border-r" style={{ borderColor: colors.border }}>
+          <PrimaryContent />
+        </View>
+        <View className="flex-1">
+          <DossierPlaceholder />
+        </View>
+      </View>
+    );
+  }
+
+  return <PrimaryContent />;
+}
+
+function InlineCreateRow({
+  placeholder,
+  onCreate,
+  onCancel,
+}: {
+  placeholder: string;
+  onCreate: (value: string) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit() {
+    if (!value.trim() || submitting) return;
+    setSubmitting(true);
     try {
-      const res = await api.issues.create(seriesId, { name: name.trim() });
-      onCreate(res.data);
-      setName('');
-      onClose();
-    } catch (e: any) {
-      setError(e.message ?? 'Failed to create issue.');
+      await onCreate(value.trim());
+      setValue('');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={m.overlay}>
-        <TouchableOpacity style={m.backdrop} onPress={onClose} />
-        <View style={m.sheet}>
-          <Text style={m.title}>New Issue</Text>
-          <TextInput
-            style={m.input}
-            placeholder="Issue name..."
-            placeholderTextColor={colors.faint}
-            value={name}
-            onChangeText={setName}
-            autoFocus
-            onSubmitEditing={handleCreate}
-          />
-          {error && <Text style={s.modalError}>{error}</Text>}
-          <View style={m.actions}>
-            <TouchableOpacity style={m.cancel} onPress={onClose}>
-              <Text style={m.cancelTxt}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[m.create, (!name.trim() || loading) && m.createOff]}
-              onPress={handleCreate}
-              disabled={loading}
-            >
-              {loading
-                ? <ActivityIndicator color={colors.surface} />
-                : <Text style={m.createTxt}>Create</Text>
-              }
-            </TouchableOpacity>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+    <View className="mx-4 mt-2 flex-row items-center rounded-md border px-3 py-2" style={{ borderColor: colors.border, backgroundColor: colors.surface }}>
+      <TextInput
+        autoFocus
+        value={value}
+        onChangeText={setValue}
+        onSubmitEditing={submit}
+        onBlur={onCancel}
+        onKeyPress={(event) => {
+          if (event.nativeEvent.key === 'Escape') onCancel();
+        }}
+        placeholder={placeholder}
+        placeholderTextColor={colors.faint}
+        className="flex-1 text-sm"
+        style={{ color: colors.text }}
+      />
+      <TouchableOpacity disabled={submitting || !value.trim()} onPress={submit} className="ml-2">
+        <Text className="text-base font-semibold" style={{ color: value.trim() ? colors.accent : colors.faint }}>
+          ✓
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function useDoubleTap(onSingleTap: () => void, onDoubleTap: () => void) {
+  const lastTapRef = useRef(0);
+
+  return () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      lastTapRef.current = 0;
+      onDoubleTap();
+      return;
+    }
+
+    lastTapRef.current = now;
+    onSingleTap();
+  };
+}
+
+function PageRow({ page }: { page: ApiPage }) {
+  const { activateEntity, activeEntityType, activeEntityId } = useUniverse();
+  const isActive = activeEntityType === 'page' && activeEntityId === page.id;
+
+  return (
+    <View className="flex-row items-center pl-14 pr-3 py-1">
+      <Text className="flex-1 text-xs" style={{ color: isActive ? colors.accent : colors.text }}>
+        Page {page.number}
+      </Text>
+      <View className="flex-row">
+        <TouchableOpacity
+          onPress={() => activateEntity('page', page.id)}
+          className="h-6 w-6 items-center justify-center rounded border"
+          style={{
+            borderColor: isActive ? colors.accent : colors.border,
+            backgroundColor: isActive ? colors.accent : colors.surface,
+          }}
+        >
+          <Text className="text-[11px] font-semibold" style={{ color: isActive ? colors.surface : colors.text }}>
+            S
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          disabled
+          className="ml-2 h-6 w-6 items-center justify-center rounded border"
+          style={{ borderColor: colors.border }}
+        >
+          <Text className="text-[11px]" style={{ color: colors.faint }}>
+            B
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
 function IssueRow({
   issue,
-  universeId,
-  universeName,
+  level,
 }: {
-  issue: ApiIssue;
-  universeId: string;
-  universeName: string;
+  issue: ApiContainer;
+  level: ApiHierarchyLevel | undefined;
 }) {
-  const router = useRouter();
+  const { pagesByContainer, loadPages, createPage, activateEntity, cycleDepthState, activeEntityType, activeEntityId } = useUniverse();
   const [expanded, setExpanded] = useState(false);
-  const [pages, setPages] = useState<ApiPage[]>([]);
   const [loadingPages, setLoadingPages] = useState(false);
   const [creatingPage, setCreatingPage] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
+  const pages = pagesByContainer[issue.id];
+  const isActive = activeEntityType === 'container' && activeEntityId === issue.id;
+
+  const handleTap = useDoubleTap(
+    () => activateEntity('container', issue.id),
+    cycleDepthState,
+  );
 
   async function toggle() {
-    if (!expanded && pages.length === 0) {
+    if (!expanded && !pages) {
       setLoadingPages(true);
+      setPageError(null);
       try {
-        const res = await api.pages.list(issue.id);
-        setPages(res.data);
-      } catch (e: any) {
-        setPageError(e.message ?? 'Failed to load pages.');
+        await loadPages(issue.id);
+      } catch (error: any) {
+        setPageError(error.message ?? 'Failed to load pages.');
       } finally {
         setLoadingPages(false);
       }
     }
-    setExpanded(prev => !prev);
+
+    setExpanded((current) => !current);
   }
 
   async function handleCreatePage() {
-    setPageError(null);
     setCreatingPage(true);
+    setPageError(null);
     try {
-      const res = await api.pages.create(issue.id);
-      setPages(prev => [...prev, res.data]);
+      await createPage(issue.id);
       setExpanded(true);
-    } catch (e: any) {
-      setPageError(e.message ?? 'Failed to create page.');
+    } catch (error: any) {
+      setPageError(error.message ?? 'Failed to create page.');
     } finally {
       setCreatingPage(false);
     }
   }
 
-  function openScript(page: ApiPage) {
-    router.push({
-      pathname: '/universe/[id]/issue/[iid]/page/[pid]',
-      params: {
-        id: universeId,
-        iid: issue.id,
-        pid: page.id,
-        pageNum: String(page.number),
-        universeName: encodeURIComponent(universeName),
-      },
-    });
-  }
-
   return (
     <View>
-      <View style={s.row}>
-        <TouchableOpacity onPress={toggle} style={[s.chevronHitArea, s.indentIssue]}>
-          <Text style={s.rowChevron}>{expanded ? '▾' : '▸'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={toggle} style={s.rowLabel}>
-          <Text style={s.issueName} numberOfLines={1}>
-            Issue {issue.number} — {issue.name}
+      <View className="flex-row items-center min-h-8">
+        <TouchableOpacity onPress={toggle} className="w-7 items-center justify-center pl-1">
+          <Text className="text-[10px]" style={{ color: colors.faint }}>
+            {expanded ? '▾' : '▸'}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.issueAddButton, creatingPage && s.issueAddButtonOff]}
-          onPress={handleCreatePage}
-          disabled={creatingPage}
-        >
+        <TouchableOpacity onPress={handleTap} className="flex-1 py-2 pr-2">
+          <Text className="text-xs" style={{ color: isActive ? colors.accent : colors.text }}>
+            {labelForContainer(level, issue)}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleCreatePage} disabled={creatingPage} className="mr-3 w-6 items-center justify-center">
           {creatingPage
-            ? <ActivityIndicator size="small" color={colors.surface} />
-            : <Text style={s.issueAddText}>＋</Text>
-          }
+            ? <ActivityIndicator size="small" color={colors.accent} />
+            : <Text className="text-base" style={{ color: colors.accent }}>＋</Text>}
         </TouchableOpacity>
       </View>
 
       {expanded && (
         <View>
-          {loadingPages
-            ? <ActivityIndicator size="small" color={colors.muted} style={s.loadingPages} />
-            : pages.length === 0
-              ? <Text style={s.emptyPageRow}>No pages yet</Text>
-              : pages.map(page => (
-                  <View key={page.id} style={[s.row, s.pageRow]}>
-                    <Text style={s.pageNum}>Page {page.number}</Text>
-                    <View style={s.pageIcons}>
-                      <TouchableOpacity
-                        style={[s.pageIcon, s.pageIconActive]}
-                        onPress={() => openScript(page)}
-                      >
-                        <Text style={[s.pageIconText, s.pageIconTextActive]}>S</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={s.pageIcon} disabled>
-                        <Text style={s.pageIconText}>B</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))
-          }
-          {pageError && <Text style={s.inlineError}>{pageError}</Text>}
+          {loadingPages && <ActivityIndicator size="small" color={colors.faint} className="py-2" />}
+          {!loadingPages && (pages?.length ?? 0) === 0 && (
+            <Text className="pl-14 py-1 text-xs" style={{ color: colors.faint }}>
+              No pages yet
+            </Text>
+          )}
+          {!loadingPages && (pages ?? []).map((page) => (
+            <PageRow key={page.id} page={page} />
+          ))}
+          {pageError && (
+            <Text className="pl-14 py-1 text-xs" style={{ color: colors.accent }}>
+              {pageError}
+            </Text>
+          )}
         </View>
       )}
     </View>
@@ -257,333 +308,302 @@ function IssueRow({
 
 function SeriesRow({
   series,
-  universeId,
-  universeName,
+  level,
+  issueLevel,
 }: {
-  series: ApiSeries;
-  universeId: string;
-  universeName: string;
+  series: ApiContainer;
+  level: ApiHierarchyLevel | undefined;
+  issueLevel: ApiHierarchyLevel | undefined;
 }) {
+  const { containers, createContainer, activateEntity, cycleDepthState, activeEntityType, activeEntityId } = useUniverse();
   const [expanded, setExpanded] = useState(false);
-  const [issues, setIssues] = useState<ApiIssue[]>([]);
-  const [loadingIssues, setLoadingIssues] = useState(false);
-  const [issuesError, setIssuesError] = useState<string | null>(null);
-  const [newIssueVisible, setNewIssueVisible] = useState(false);
+  const [addingChild, setAddingChild] = useState(false);
+  const issues = containers.filter((container) => container.parentId === series.id);
+  const isActive = activeEntityType === 'container' && activeEntityId === series.id;
 
-  async function toggle() {
-    if (!expanded && issues.length === 0) {
-      setIssuesError(null);
-      setLoadingIssues(true);
-      try {
-        const res = await api.issues.list(series.id);
-        setIssues(res.data);
-      } catch (e: any) {
-        setIssuesError(e.message ?? 'Failed to load issues.');
-      } finally {
-        setLoadingIssues(false);
-      }
-    }
-    setExpanded(prev => !prev);
-  }
+  const handleTap = useDoubleTap(
+    () => activateEntity('container', series.id),
+    cycleDepthState,
+  );
 
-  function handleIssueCreate(issue: ApiIssue) {
-    setIssues(prev => [...prev, issue]);
+  async function handleCreateIssue(name: string) {
+    if (!issueLevel) return;
+    await createContainer(issueLevel.id, series.id, name);
+    setAddingChild(false);
     setExpanded(true);
   }
 
   return (
     <View>
-      <View style={s.row}>
-        <TouchableOpacity onPress={toggle} style={s.chevronHitArea}>
-          <Text style={s.rowChevron}>{expanded ? '▾' : '▸'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={toggle} style={s.rowLabel}>
-          <Text style={s.seriesName} numberOfLines={1}>
-            Series {series.number} — {series.name}
+      <View className="flex-row items-center min-h-8">
+        <TouchableOpacity onPress={() => setExpanded((current) => !current)} className="w-7 items-center justify-center pl-4">
+          <Text className="text-[10px]" style={{ color: colors.faint }}>
+            {expanded ? '▾' : '▸'}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.seriesAddButton} onPress={() => setNewIssueVisible(true)}>
-          <Text style={s.seriesAddText}>＋</Text>
+        <TouchableOpacity onPress={handleTap} className="flex-1 py-2 pr-2">
+          <Text className="text-[13px] font-semibold" style={{ color: isActive ? colors.accent : colors.text }}>
+            {labelForContainer(level, series)}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setAddingChild(true)} className="mr-3 w-6 items-center justify-center">
+          <Text className="text-base" style={{ color: colors.accent }}>＋</Text>
         </TouchableOpacity>
       </View>
 
       {expanded && (
         <View>
-          {loadingIssues
-            ? <ActivityIndicator size="small" color={colors.muted} style={s.loadingIssues} />
-            : issues.length === 0
-              ? <Text style={s.emptyIssueRow}>No issues yet</Text>
-              : issues.map(issue => (
-                  <IssueRow
-                    key={issue.id}
-                    issue={issue}
-                    universeId={universeId}
-                    universeName={universeName}
-                  />
-                ))
-          }
-          {issuesError && <Text style={s.inlineError}>{issuesError}</Text>}
+          {issues.length === 0 && !addingChild && (
+            <Text className="pl-11 py-1 text-xs" style={{ color: colors.faint }}>
+              No issues yet
+            </Text>
+          )}
+          {issues.map((issue) => (
+            <IssueRow key={issue.id} issue={issue} level={issueLevel} />
+          ))}
+          {addingChild && issueLevel && (
+            <InlineCreateRow
+              placeholder={`${issueLevel.name} name...`}
+              onCreate={handleCreateIssue}
+              onCancel={() => setAddingChild(false)}
+            />
+          )}
         </View>
       )}
-
-      <NewIssueModal
-        visible={newIssueVisible}
-        seriesId={series.id}
-        onClose={() => setNewIssueVisible(false)}
-        onCreate={handleIssueCreate}
-      />
     </View>
   );
 }
 
-function MainContent({ section, universe }: { section: SectionKey | null; universe: Universe }) {
-  switch (section) {
-    case 'characters': return <CharactersEntity universe={universe} />;
-    case 'locations':  return <LocationsEntity universe={universe} />;
-    case 'timeline':   return <TimelineEntity universe={universe} />;
-    case 'notes':      return <NotesEntity universe={universe} />;
-    default: return (
-      <View style={s.contentEmpty}>
-        <Text style={s.contentEmptyTitle}>{universe.name}</Text>
-        <Text style={s.contentEmptyHint}>Select a page from the binder to open the script editor, or choose a section to browse your universe.</Text>
-      </View>
-    );
-  }
+function SectionButton({
+  sectionKey,
+  label,
+  color,
+}: {
+  sectionKey: SectionKey;
+  label: string;
+  color: string;
+}) {
+  const { activeEntityType, activeEntityId, activateEntity } = useUniverse();
+  const isActive = activeEntityType === 'section' && activeEntityId === sectionKey;
+
+  return (
+    <TouchableOpacity
+      onPress={() => activateEntity('section', sectionKey)}
+      className="flex-row items-center justify-between px-4 pt-4 pb-1"
+    >
+      <Text className="text-[10px] font-bold tracking-[1.5px]" style={{ color: isActive ? color : colors.muted }}>
+        {label}
+      </Text>
+      <View className="h-[7px] w-[7px] rounded-full" style={{ backgroundColor: color }} />
+    </TouchableOpacity>
+  );
 }
 
-export default function UniverseScreen() {
-  const { id, name } = useLocalSearchParams<{ id: string; name: string }>();
+function BinderFooterPill({
+  label,
+  onPress,
+  active,
+  color,
+}: {
+  label: string;
+  onPress: () => void;
+  active: boolean;
+  color: string;
+}) {
+  return (
+    <TouchableOpacity onPress={onPress} className="mr-2">
+      <View
+        className="min-w-9 items-center rounded px-2 py-1"
+        style={{
+          backgroundColor: color,
+          borderWidth: active ? 1 : 0,
+          borderColor: colors.text,
+        }}
+      >
+        <Text className="text-[10px] font-semibold" style={{ color: colors.surface }}>
+          {label}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function UniverseWorkspace() {
   const router = useRouter();
-  const universeId = id as string;
-  const universeName = decodeURIComponent(name as string);
+  const {
+    universeName,
+    hierarchyLevels,
+    containers,
+    loadingContainers,
+    binderOpen,
+    setBinderOpen,
+    activeEntityType,
+    activeEntityId,
+    createContainer,
+    activateEntity,
+  } = useUniverse();
+  const [addingSeries, setAddingSeries] = useState(false);
+  const seriesLevel = hierarchyLevels.find((level) => level.position === 1);
+  const issueLevel = hierarchyLevels.find((level) => level.position === 2);
+  const seriesList = seriesLevel
+    ? containers.filter((container) => container.levelId === seriesLevel.id && !container.parentId)
+    : [];
 
-  const [seriesList, setSeriesList] = useState<ApiSeries[]>([]);
-  const [loadingSeries, setLoadingSeries] = useState(true);
-  const [activeSection, setActiveSection] = useState<SectionKey | null>(null);
-  const [newSeriesVisible, setNewSeriesVisible] = useState(false);
-  const [binderOpen, setBinderOpen] = useState(true);
-
-  const universe: Universe = { id: universeId, name: universeName, seriesCount: 0, lastEdited: '' };
-
-  const loadSeries = useCallback(async () => {
-    try {
-      const res = await api.series.list(universeId);
-      setSeriesList(res.data);
-    } catch {}
-  }, [universeId]);
-
-  useEffect(() => {
-    setLoadingSeries(true);
-    loadSeries().finally(() => setLoadingSeries(false));
-  }, [loadSeries]);
-
-  function toggleSection(key: SectionKey) {
-    setActiveSection(prev => prev === key ? null : key);
+  async function handleCreateSeries(name: string) {
+    if (!seriesLevel) return;
+    await createContainer(seriesLevel.id, null, name);
+    setAddingSeries(false);
   }
 
   return (
-    <SafeAreaView style={s.root}>
-      <View style={s.chrome}>
-        <TouchableOpacity onPress={() => router.back()} style={s.chromeBack}>
-          <Text style={s.chromeBackText}>← Universes</Text>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }}>
+      <View
+        className="flex-row items-center px-4"
+        style={{ height: 48, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}
+      >
+        <TouchableOpacity onPress={() => router.back()} className="flex-1">
+          <Text className="text-[13px] font-semibold" style={{ color: colors.accent }}>
+            ← Universes
+          </Text>
         </TouchableOpacity>
-        <Text style={s.saveStatus}>● Saved</Text>
-        <View style={s.chromeRight} />
+        <Text className="text-[10px]" style={{ color: colors.faint }}>
+          ● Saved
+        </Text>
+        <View className="flex-1" />
       </View>
 
-      <View style={s.workspace}>
+      <View className="flex-1 flex-row">
         {binderOpen ? (
-          <View style={s.binder}>
-            <View style={s.binderHeader}>
-              <Text style={s.binderUniverseName} numberOfLines={1}>{universeName}</Text>
-              <TouchableOpacity onPress={() => setBinderOpen(false)} style={s.collapseBtn}>
-                <Text style={s.chevronLarge}>‹</Text>
+          <View
+            className="flex-col"
+            style={{ width: BINDER_WIDTH, backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border }}
+          >
+            <View className="flex-row items-center border-b px-4 py-3" style={{ borderColor: colors.border }}>
+              <Text className="flex-1 text-sm font-bold" style={{ color: colors.text }}>
+                {universeName}
+              </Text>
+              <TouchableOpacity onPress={() => setBinderOpen(false)}>
+                <Text className="text-xl" style={{ color: colors.muted }}>‹</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={s.searchWrap}>
-              <View style={s.searchBar}>
-                <Text style={s.searchIcon}>⌕</Text>
+            <View className="border-b p-2" style={{ borderColor: colors.border }}>
+              <View className="flex-row items-center rounded-md px-3 py-2" style={{ backgroundColor: colors.bg }}>
+                <Text className="mr-1 text-sm" style={{ color: colors.faint }}>⌕</Text>
                 <TextInput
                   placeholder="Search universe…"
                   placeholderTextColor={colors.faint}
-                  style={s.searchInput}
+                  className="flex-1 text-sm"
+                  style={{ color: colors.text }}
                 />
               </View>
             </View>
 
-            <ScrollView style={s.sections} showsVerticalScrollIndicator={false}>
-              <View style={s.sectionHeaderRow}>
-                <Text style={s.sectionLabel}>SERIES / ISSUE / PAGE</Text>
-                <TouchableOpacity onPress={() => setNewSeriesVisible(true)}>
-                  <Text style={s.sectionAdd}>＋</Text>
+            <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+              <View className="flex-row items-center justify-between px-4 pt-4 pb-1">
+                <Text className="text-[10px] font-bold tracking-[1.5px]" style={{ color: colors.muted }}>
+                  SERIES / ISSUE / PAGE
+                </Text>
+                <TouchableOpacity onPress={() => setAddingSeries(true)}>
+                  <Text className="text-base" style={{ color: colors.accent }}>＋</Text>
                 </TouchableOpacity>
               </View>
-              {loadingSeries
-                ? <ActivityIndicator size="small" color={colors.muted} style={s.loadingSeries} />
-                : seriesList.length === 0
-                  ? <TouchableOpacity onPress={() => setNewSeriesVisible(true)}>
-                      <Text style={s.emptyRow}>+ Add a series</Text>
-                    </TouchableOpacity>
-                  : seriesList.map(series => (
-                      <SeriesRow
-                        key={series.id}
-                        series={series}
-                        universeId={universeId}
-                        universeName={universeName}
-                      />
-                    ))
-              }
 
-              <TouchableOpacity
-                style={s.sectionHeaderRow}
-                onPress={() => toggleSection('characters')}
-              >
-                <Text style={[s.sectionLabel, activeSection === 'characters' && { color: colors.accent }]}>
-                  CHARACTERS
-                </Text>
-                <View style={[s.typeDot, { backgroundColor: colors.accent }]} />
-              </TouchableOpacity>
+              {loadingContainers && (
+                <ActivityIndicator size="small" color={colors.faint} className="py-4" />
+              )}
 
-              <TouchableOpacity
-                style={s.sectionHeaderRow}
-                onPress={() => toggleSection('locations')}
-              >
-                <Text style={[s.sectionLabel, activeSection === 'locations' && { color: colors.bible }]}>
-                  LOCATIONS
-                </Text>
-                <View style={[s.typeDot, { backgroundColor: colors.bible }]} />
-              </TouchableOpacity>
+              {!loadingContainers && seriesList.length === 0 && !addingSeries && (
+                <TouchableOpacity onPress={() => setAddingSeries(true)} className="px-4 py-2">
+                  <Text className="text-sm" style={{ color: colors.faint }}>
+                    + Add a series
+                  </Text>
+                </TouchableOpacity>
+              )}
 
-              <TouchableOpacity
-                style={s.sectionHeaderRow}
-                onPress={() => toggleSection('timeline')}
-              >
-                <Text style={[s.sectionLabel, activeSection === 'timeline' && { color: colors.timeline }]}>
-                  TIMELINE
-                </Text>
-                <View style={[s.typeDot, { backgroundColor: colors.timeline }]} />
-              </TouchableOpacity>
+              {!loadingContainers && seriesList.map((series) => (
+                <SeriesRow
+                  key={series.id}
+                  series={series}
+                  level={seriesLevel}
+                  issueLevel={issueLevel}
+                />
+              ))}
 
-              <TouchableOpacity
-                style={s.sectionHeaderRow}
-                onPress={() => toggleSection('notes')}
-              >
-                <Text style={[s.sectionLabel, activeSection === 'notes' && { color: colors.muted }]}>
-                  NOTES
-                </Text>
-                <View style={[s.typeDot, { backgroundColor: colors.faint }]} />
-              </TouchableOpacity>
+              {addingSeries && seriesLevel && (
+                <InlineCreateRow
+                  placeholder={`${seriesLevel.name} name...`}
+                  onCreate={handleCreateSeries}
+                  onCancel={() => setAddingSeries(false)}
+                />
+              )}
 
-              <View style={{ height: spacing.lg }} />
+              <SectionButton sectionKey="characters" label="CHARACTERS" color={colors.accent} />
+              <SectionButton sectionKey="locations" label="LOCATIONS" color={colors.bible} />
+              <SectionButton sectionKey="timeline" label="TIMELINE" color={colors.timeline} />
+              <SectionButton sectionKey="notes" label="NOTES" color={colors.faint} />
+              <View className="h-6" />
             </ScrollView>
 
-            <View style={s.binderFooter}>
-              <TouchableOpacity style={s.footerTag} onPress={() => toggleSection('characters')}>
-                <View style={[s.footerPill, { backgroundColor: colors.accent }, activeSection === 'characters' && s.footerPillActive]}>
-                  <Text style={s.footerPillText}>Chr</Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.footerTag} onPress={() => toggleSection('locations')}>
-                <View style={[s.footerPill, { backgroundColor: colors.bible }, activeSection === 'locations' && s.footerPillActive]}>
-                  <Text style={s.footerPillText}>Loc</Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.footerTag} onPress={() => toggleSection('timeline')}>
-                <View style={[s.footerPill, { backgroundColor: colors.timeline }, activeSection === 'timeline' && s.footerPillActive]}>
-                  <Text style={s.footerPillText}>TL</Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.footerTag} onPress={() => toggleSection('notes')}>
-                <View style={[s.footerPill, { backgroundColor: colors.muted }, activeSection === 'notes' && s.footerPillActive]}>
-                  <Text style={s.footerPillText}>Nte</Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.footerTag} onPress={() => setNewSeriesVisible(true)}>
-                <View style={[s.footerPill, { backgroundColor: colors.text }]}>
-                  <Text style={s.footerPillText}>+</Text>
-                </View>
-              </TouchableOpacity>
+            <View className="flex-row items-center border-t px-4 py-3" style={{ borderColor: colors.border }}>
+              <BinderFooterPill
+                label="Chr"
+                onPress={() => activateEntity('section', 'characters')}
+                active={activeEntityType === 'section' && activeEntityId === 'characters'}
+                color={colors.accent}
+              />
+              <BinderFooterPill
+                label="Loc"
+                onPress={() => activateEntity('section', 'locations')}
+                active={activeEntityType === 'section' && activeEntityId === 'locations'}
+                color={colors.bible}
+              />
+              <BinderFooterPill
+                label="TL"
+                onPress={() => activateEntity('section', 'timeline')}
+                active={activeEntityType === 'section' && activeEntityId === 'timeline'}
+                color={colors.timeline}
+              />
+              <BinderFooterPill
+                label="Nte"
+                onPress={() => activateEntity('section', 'notes')}
+                active={activeEntityType === 'section' && activeEntityId === 'notes'}
+                color={colors.muted}
+              />
+              <BinderFooterPill
+                label="+"
+                onPress={() => setAddingSeries(true)}
+                active={false}
+                color={colors.text}
+              />
             </View>
           </View>
         ) : (
-          <TouchableOpacity style={s.binderCollapsed} onPress={() => setBinderOpen(true)}>
-            <Text style={s.chevronLarge}>›</Text>
+          <TouchableOpacity
+            onPress={() => setBinderOpen(true)}
+            className="items-center justify-center"
+            style={{ width: 22, backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border }}
+          >
+            <Text className="text-xl" style={{ color: colors.muted }}>›</Text>
           </TouchableOpacity>
         )}
 
-        <View style={s.content}>
-          <MainContent section={activeSection} universe={universe} />
+        <View className="flex-1">
+          <ContentArea />
         </View>
       </View>
-
-      <NewSeriesModal
-        visible={newSeriesVisible}
-        universeId={universeId}
-        onClose={() => setNewSeriesVisible(false)}
-        onCreate={series => setSeriesList(prev => [...prev, series])}
-      />
     </SafeAreaView>
   );
 }
 
-const s = StyleSheet.create({
-  root:               { flex: 1, backgroundColor: colors.bg },
-  chrome:             { height: 48, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md },
-  chromeBack:         { flex: 1 },
-  chromeBackText:     { fontSize: 13, fontWeight: '600', color: colors.accent },
-  saveStatus:         { fontSize: 10, color: colors.faint, letterSpacing: 0.5 },
-  chromeRight:        { flex: 1 },
-  workspace:          { flex: 1, flexDirection: 'row' },
-  binder:             { width: BINDER_W, backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border, flexDirection: 'column' },
-  binderHeader:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-  binderUniverseName: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.text },
-  collapseBtn:        { paddingLeft: spacing.sm },
-  chevronLarge:       { fontSize: 20, color: colors.muted },
-  binderCollapsed:    { width: 22, backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  searchWrap:         { padding: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
-  searchBar:          { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 6, gap: 4 },
-  searchIcon:         { fontSize: 14, color: colors.faint },
-  searchInput:        { flex: 1, fontSize: 13, color: colors.text },
-  sections:           { flex: 1 },
-  sectionHeaderRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 4 },
-  sectionLabel:       { fontSize: 10, fontWeight: '700', letterSpacing: 1.5, color: colors.muted },
-  sectionAdd:         { fontSize: 16, color: colors.accent, lineHeight: 18 },
-  typeDot:            { width: 7, height: 7, borderRadius: 4 },
-  row:                { flexDirection: 'row', alignItems: 'center', minHeight: 32 },
-  rowLabel:           { flex: 1, paddingVertical: 7, paddingRight: spacing.xs },
-  chevronHitArea:     { width: 28, paddingLeft: spacing.md, alignItems: 'center', justifyContent: 'center' },
-  indentIssue:        { paddingLeft: spacing.md + 10 },
-  rowChevron:         { fontSize: 10, color: colors.faint },
-  seriesName:         { fontSize: 13, fontWeight: '600', color: colors.text },
-  issueName:          { fontSize: 12, color: colors.text },
-  seriesAddButton:    { width: 24, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
-  seriesAddText:      { fontSize: 16, color: colors.accent, lineHeight: 18 },
-  issueAddButton:     { width: 20, height: 20, borderRadius: 3, marginRight: spacing.sm, borderWidth: 1, borderColor: colors.accent, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-  issueAddButtonOff:  { opacity: 0.7 },
-  issueAddText:       { fontSize: 12, fontWeight: '700', color: '#fff', lineHeight: 14 },
-  loadingSeries:      { paddingVertical: 12 },
-  loadingIssues:      { paddingVertical: 8, paddingLeft: 38 },
-  loadingPages:       { paddingVertical: 8, paddingLeft: 52 },
-  emptyRow:           { fontSize: 12, color: colors.faint, fontStyle: 'italic', paddingHorizontal: spacing.md, paddingVertical: 6 },
-  emptyIssueRow:      { fontSize: 12, color: colors.faint, fontStyle: 'italic', paddingLeft: spacing.md + 28, paddingVertical: 6 },
-  emptyPageRow:       { fontSize: 11, color: colors.faint, fontStyle: 'italic', paddingLeft: spacing.md + 40, paddingVertical: 6 },
-  inlineError:        { fontSize: 11, color: '#e05050', paddingLeft: spacing.md + 28, paddingBottom: 6 },
-  pageRow:            { paddingLeft: spacing.md + 24 },
-  pageNum:            { flex: 1, fontSize: 11, color: colors.muted, paddingVertical: 6 },
-  pageIcons:          { flexDirection: 'row', gap: 3, paddingRight: spacing.sm },
-  pageIcon:           { width: 20, height: 20, borderRadius: 3, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
-  pageIconActive:     { backgroundColor: colors.accent, borderColor: colors.accent },
-  pageIconText:       { fontSize: 9, fontWeight: '700', color: colors.muted },
-  pageIconTextActive: { color: '#fff' },
-  binderFooter:       { height: 44, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: spacing.sm },
-  footerTag:          { alignItems: 'center', justifyContent: 'center' },
-  footerPill:         { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 10, opacity: 0.75 },
-  footerPillActive:   { opacity: 1 },
-  footerPillText:     { fontSize: 10, fontWeight: '700', color: '#fff' },
-  content:            { flex: 1, backgroundColor: colors.bg },
-  contentEmpty:       { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  contentEmptyTitle:  { fontSize: 20, fontWeight: '700', color: colors.muted, marginBottom: spacing.sm },
-  contentEmptyHint:   { fontSize: 13, color: colors.faint, textAlign: 'center', lineHeight: 20 },
-  modalError:         { color: '#e05050', fontSize: 12, marginBottom: 8 },
-});
+export default function UniverseScreen() {
+  const { id, name } = useLocalSearchParams<{ id: string; name: string }>();
+  const universeId = id as string;
+  const universeName = decodeURIComponent(name as string);
+
+  return (
+    <UniverseProvider universeId={universeId} universeName={universeName}>
+      <UniverseWorkspace />
+    </UniverseProvider>
+  );
+}

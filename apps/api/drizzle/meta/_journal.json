@@ -8,6 +8,20 @@
       "when": 1774156140034,
       "tag": "0000_schema_revision_flexible_hierarchy",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774159322621,
+      "tag": "0001_workspace_state_shell",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774159543330,
+      "tag": "0002_workspace_state_active_entity_text",
+      "breakpoints": true
     }
   ]
 }

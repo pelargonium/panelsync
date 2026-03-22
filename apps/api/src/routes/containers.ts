@@ -8,6 +8,7 @@ import {
   pages,
   universes,
   universeMembers,
+  workspaceState,
 } from '../db/schema.js';
 
 async function assertUniverseAccess(universeId: string, userId: string): Promise<boolean> {
@@ -69,6 +70,16 @@ async function getPageUniverseId(pageId: string): Promise<string | null> {
   }
 
   return null;
+}
+
+function defaultWorkspaceState() {
+  return {
+    activeEntityType: null,
+    activeEntityId: null,
+    depthState: 'entity_only' as const,
+    binderOpen: true,
+    warmContexts: [],
+  };
 }
 
 export async function containersRoutes(server: FastifyInstance) {
@@ -563,4 +574,109 @@ export async function containersRoutes(server: FastifyInstance) {
       return { data: row };
     },
   );
+
+  server.get<{ Querystring: { universeId?: string } }>('/api/workspace-state', async (request, reply) => {
+    const { universeId } = request.query;
+    const userId = request.user.sub;
+
+    if (!universeId) {
+      reply.code(400);
+      return { error: 'universeId is required' };
+    }
+
+    if (!await assertUniverseAccess(universeId, userId)) {
+      reply.code(403);
+      return { error: 'forbidden' };
+    }
+
+    const [row] = await db
+      .select()
+      .from(workspaceState)
+      .where(and(
+        eq(workspaceState.universeId, universeId),
+        eq(workspaceState.userId, userId),
+      ))
+      .limit(1);
+
+    if (!row) {
+      return { data: defaultWorkspaceState() };
+    }
+
+    return {
+      data: {
+        activeEntityType: row.activeEntityType,
+        activeEntityId: row.activeEntityId,
+        depthState: row.depthState,
+        binderOpen: row.binderOpen,
+        warmContexts: row.warmContexts,
+      },
+    };
+  });
+
+  server.put<{
+    Body: {
+      universeId: string;
+      activeEntityType?: string | null;
+      activeEntityId?: string | null;
+      depthState?: 'entity_only' | 'split' | 'dossier_only';
+      binderOpen?: boolean;
+      warmContexts?: Array<{ entityType: string; entityId: string; depthState: string }>;
+    };
+  }>('/api/workspace-state', async (request, reply) => {
+    const { universeId } = request.body;
+    const userId = request.user.sub;
+
+    if (!universeId) {
+      reply.code(400);
+      return { error: 'universeId is required' };
+    }
+
+    if (!await assertUniverseAccess(universeId, userId)) {
+      reply.code(403);
+      return { error: 'forbidden' };
+    }
+
+    const [existing] = await db
+      .select()
+      .from(workspaceState)
+      .where(and(
+        eq(workspaceState.universeId, universeId),
+        eq(workspaceState.userId, userId),
+      ))
+      .limit(1);
+
+    const nextValues = {
+      activeEntityType: request.body.activeEntityType ?? null,
+      activeEntityId: request.body.activeEntityId ?? null,
+      depthState: request.body.depthState ?? 'entity_only',
+      binderOpen: request.body.binderOpen ?? true,
+      warmContexts: request.body.warmContexts ?? [],
+      updatedAt: new Date(),
+    };
+
+    const [row] = existing
+      ? await db
+          .update(workspaceState)
+          .set(nextValues)
+          .where(eq(workspaceState.id, existing.id))
+          .returning()
+      : await db
+          .insert(workspaceState)
+          .values({
+            universeId,
+            userId,
+            ...nextValues,
+          })
+          .returning();
+
+    return {
+      data: {
+        activeEntityType: row.activeEntityType,
+        activeEntityId: row.activeEntityId,
+        depthState: row.depthState,
+        binderOpen: row.binderOpen,
+        warmContexts: row.warmContexts,
+      },
+    };
+  });
 }
