@@ -15,6 +15,7 @@ import CharactersEntity from '../../entities/CharactersEntity';
 import LocationsEntity from '../../entities/LocationsEntity';
 import TimelineEntity from '../../entities/TimelineEntity';
 import NotesEntity from '../../entities/NotesEntity';
+import ScriptEditor from '../../components/ScriptEditor';
 import type { Universe } from '../../types';
 import { UniverseProvider, useUniverse } from '../../context/UniverseContext';
 
@@ -51,19 +52,6 @@ function DossierPlaceholder() {
   );
 }
 
-function PageContent({ pageId }: { pageId: string }) {
-  return (
-    <View className="flex-1 items-center justify-center px-8" style={{ backgroundColor: colors.bg }}>
-      <Text className="text-lg font-semibold" style={{ color: colors.text }}>
-        Page Selected
-      </Text>
-      <Text className="mt-2 text-center text-sm" style={{ color: colors.faint }}>
-        Script editor wiring lands in a later task. Active page: {pageId}
-      </Text>
-    </View>
-  );
-}
-
 function SectionContent({ sectionKey }: { sectionKey: SectionKey }) {
   const { universeId, universeName } = useUniverse();
   const universe: Universe = { id: universeId, name: universeName, seriesCount: 0, lastEdited: '' };
@@ -75,7 +63,7 @@ function SectionContent({ sectionKey }: { sectionKey: SectionKey }) {
 }
 
 function PrimaryContent() {
-  const { activeEntityType, activeEntityId, universeName } = useUniverse();
+  const { activeEntityType, activeEntityId, universeName, pagesByContainer } = useUniverse();
 
   if (!activeEntityType || !activeEntityId) {
     return <EmptyContent universeName={universeName} />;
@@ -86,7 +74,15 @@ function PrimaryContent() {
   }
 
   if (activeEntityType === 'page') {
-    return <PageContent pageId={activeEntityId} />;
+    const issueEntry = Object.entries(pagesByContainer).find(([, pages]) =>
+      pages.some((page) => page.id === activeEntityId),
+    );
+
+    if (!issueEntry) {
+      return <EmptyContent universeName={universeName} />;
+    }
+
+    return <ScriptEditor issueId={issueEntry[0]} activePageId={activeEntityId} />;
   }
 
   return <EmptyContent universeName={universeName} />;

@@ -88,6 +88,20 @@ export interface ApiPage {
   updatedAt: string;
 }
 
+export type ScriptBlockType = 'panel' | 'scene' | 'description' | 'dialogue' | 'caption' | 'sfx';
+
+export interface ApiScriptBlock {
+  id: string;
+  pageId: string;
+  type: ScriptBlockType;
+  content: { text: string };
+  speaker: string | null;
+  sizeTag: string | null;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ApiSeries = ApiContainer;
 export type ApiIssue = ApiContainer;
 
@@ -255,6 +269,37 @@ export const api = {
       const res = await request<{ data: RawApiPage }>(`/api/pages/${pageId}`, { method: 'PATCH', body: JSON.stringify(body) });
       return { data: normalizePage(res.data) };
     },
+  },
+
+  blocks: {
+    list: (pageId: string) =>
+      request<{ data: ApiScriptBlock[] }>(`/api/pages/${pageId}/blocks`),
+    create: (pageId: string, body: {
+      type: ScriptBlockType;
+      content?: { text: string };
+      speaker?: string | null;
+      sizeTag?: string | null;
+      position: number;
+    }) =>
+      request<{ data: ApiScriptBlock }>(`/api/pages/${pageId}/blocks`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    update: (pageId: string, blockId: string, body: {
+      type?: ScriptBlockType;
+      content?: { text: string };
+      speaker?: string | null;
+      sizeTag?: string | null;
+      position?: number;
+    }) =>
+      request<{ data: ApiScriptBlock }>(`/api/pages/${pageId}/blocks/${blockId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    delete: (pageId: string, blockId: string) =>
+      request<{ data: { id: string } }>(`/api/pages/${pageId}/blocks/${blockId}`, {
+        method: 'DELETE',
+      }),
   },
 
   series: {

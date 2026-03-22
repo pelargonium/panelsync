@@ -6,6 +6,7 @@ import {
   drafts,
   hierarchyLevels,
   pages,
+  scriptBlocks,
   universes,
   universeMembers,
   workspaceState,
@@ -70,6 +71,31 @@ async function getPageUniverseId(pageId: string): Promise<string | null> {
   }
 
   return null;
+}
+
+async function getPageForAccess(pageId: string, userId: string) {
+  const [page] = await db.select().from(pages).where(eq(pages.id, pageId)).limit(1);
+  if (!page) return { error: 'not found' as const };
+
+  const universeId = await getPageUniverseId(pageId);
+  if (!universeId) return { error: 'not found' as const };
+  if (!await assertUniverseAccess(universeId, userId)) return { error: 'forbidden' as const };
+
+  return { page, universeId };
+}
+
+function serializeBlock(block: typeof scriptBlocks.$inferSelect) {
+  return {
+    id: block.id,
+    pageId: block.pageId,
+    type: block.type,
+    content: block.content,
+    speaker: block.speaker,
+    sizeTag: block.sizeTag,
+    position: block.position,
+    createdAt: block.createdAt,
+    updatedAt: block.updatedAt,
+  };
 }
 
 function defaultWorkspaceState() {
@@ -574,6 +600,122 @@ export async function containersRoutes(server: FastifyInstance) {
       return { data: row };
     },
   );
+
+  server.get<{ Params: { pageId: string } }>('/api/pages/:pageId/blocks', async (request, reply) => {
+    const { pageId } = request.params;
+    const userId = request.user.sub;
+
+    const result = await getPageForAccess(pageId, userId);
+    if ('error' in result) {
+      reply.code(result.error === 'not found' ? 404 : 403);
+      return { error: result.error };
+    }
+
+    const rows = await db
+      .select()
+      .from(scriptBlocks)
+      .where(eq(scriptBlocks.pageId, pageId))
+      .orderBy(asc(scriptBlocks.position));
+
+    return { data: rows.map(serializeBlock) };
+  });
+
+  server.post<{
+    Params: { pageId: string };
+    Body: {
+      type: 'panel' | 'scene' | 'description' | 'dialogue' | 'caption' | 'sfx';
+      content?: { text: string };
+      speaker?: string | null;
+      sizeTag?: string | null;
+      position: number;
+    };
+  }>('/api/pages/:pageId/blocks', async (request, reply) => {
+    const { pageId } = request.params;
+    const userId = request.user.sub;
+
+    const result = await getPageForAccess(pageId, userId);
+    if ('error' in result) {
+      reply.code(result.error === 'not found' ? 404 : 403);
+      return { error: result.error };
+    }
+
+    const [row] = await db
+      .insert(scriptBlocks)
+      .values({
+        pageId,
+        type: request.body.type,
+        content: request.body.content ?? { text: '' },
+        speaker: request.body.speaker ?? null,
+        sizeTag: request.body.sizeTag ?? null,
+        position: request.body.position,
+        createdBy: userId,
+        updatedBy: userId,
+      })
+      .returning();
+
+    reply.code(201);
+    return { data: serializeBlock(row) };
+  });
+
+  server.patch<{
+    Params: { pageId: string; blockId: string };
+    Body: {
+      type?: 'panel' | 'scene' | 'description' | 'dialogue' | 'caption' | 'sfx';
+      content?: { text: string };
+      speaker?: string | null;
+      sizeTag?: string | null;
+      position?: number;
+    };
+  }>('/api/pages/:pageId/blocks/:blockId', async (request, reply) => {
+    const { pageId, blockId } = request.params;
+    const userId = request.user.sub;
+
+    const result = await getPageForAccess(pageId, userId);
+    if ('error' in result) {
+      reply.code(result.error === 'not found' ? 404 : 403);
+      return { error: result.error };
+    }
+
+    const [block] = await db.select().from(scriptBlocks).where(eq(scriptBlocks.id, blockId)).limit(1);
+    if (!block || block.pageId !== pageId) {
+      reply.code(404);
+      return { error: 'not found' };
+    }
+
+    const updates: Partial<typeof scriptBlocks.$inferInsert> = {
+      updatedAt: new Date(),
+      updatedBy: userId,
+    };
+
+    if (request.body.type !== undefined) updates.type = request.body.type;
+    if (request.body.content !== undefined) updates.content = request.body.content;
+    if (request.body.speaker !== undefined) updates.speaker = request.body.speaker;
+    if (request.body.sizeTag !== undefined) updates.sizeTag = request.body.sizeTag;
+    if (request.body.position !== undefined) updates.position = request.body.position;
+
+    const [row] = await db.update(scriptBlocks).set(updates).where(eq(scriptBlocks.id, blockId)).returning();
+    return { data: serializeBlock(row) };
+  });
+
+  server.delete<{ Params: { pageId: string; blockId: string } }>('/api/pages/:pageId/blocks/:blockId', async (request, reply) => {
+    const { pageId, blockId } = request.params;
+    const userId = request.user.sub;
+
+    const result = await getPageForAccess(pageId, userId);
+    if ('error' in result) {
+      reply.code(result.error === 'not found' ? 404 : 403);
+      return { error: result.error };
+    }
+
+    const [block] = await db.select().from(scriptBlocks).where(eq(scriptBlocks.id, blockId)).limit(1);
+    if (!block || block.pageId !== pageId) {
+      reply.code(404);
+      return { error: 'not found' };
+    }
+
+    await db.delete(scriptBlocks).where(eq(scriptBlocks.id, blockId));
+    return { data: { id: blockId } };
+  });
 
   server.get<{ Querystring: { universeId?: string } }>('/api/workspace-state', async (request, reply) => {
     const { universeId } = request.query;
