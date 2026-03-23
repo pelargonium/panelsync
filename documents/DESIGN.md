@@ -169,6 +169,18 @@ Most work happens at Page level — tapping a page opens it in the content area.
 
 **Pages created in Publishing mode inside an issue also appear in Everything mode** — same rule as everywhere. Everything is always everything. Pages can also be created from Everything mode with no issue assigned — they land in the pool.
 
+**Navigation within the tree:** tapping a disclosure triangle expands or collapses the node. Tapping the name is a destination:
+
+| Tap target | Result |
+|---|---|
+| ▶ Triangle | Expand/collapse tree node |
+| Series name | Series landing page — arc overview, issue list with statuses, character status |
+| Issue name | Issue landing page — stats, completion, view mode switcher (Script / Storyboard / Issue Map / Reader / Printer) |
+| Page name | Opens page in content area |
+| Panel (expanded) | Opens page scrolled to that panel |
+
+**Share and export live in Publishing mode.** The issue and series landing pages are where export is initiated — contextual to what is selected. Exporting from an issue landing page offers issue-level formats (PDF, script, storyboard). Exporting from a series landing page offers arc-level formats (collected edition, full script). This is the natural home for share/export because Publishing mode is where the work is viewed as a finished artifact.
+
 ### The Staging Area vs. The Board
 
 These look similar but serve different purposes:
