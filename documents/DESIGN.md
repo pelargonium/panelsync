@@ -334,6 +334,35 @@ Location-specific tools (maps, spatial tools, etc.) are not yet designed — fla
 
 **Key fact:** Locations and characters are the same kind of entity at the data level. Their default fields and eventual specialized tools differ, but the underlying pattern is identical.
 
+### Bible
+
+A Bible is a **first-class entity type** — not a mode, not a section of the app, but a thing that exists in the universe like a character or a location. It is a curated, canonizable artifact that organizes other entities into a reference document.
+
+**The spectrum from rough to refined:**
+- **Rough:** a tagged collection in Everything promoted to artifact status. "Enclose as Bible" takes a staged set of entities and gives the collection a name, a type, and an existence as its own entity. The underlying entities still live in Everything — the Bible is a curated view on top of them.
+- **Middle:** structured and organized, useful for reference. Most Bibles live here most of the time.
+- **Refined:** a laid-out document with pages, ordered sections, editorial design. Something handed to a publisher, a new writer on the team, or an editor at a publishing house.
+
+**Key properties:**
+- Has a dossier — the Bible's own notes, cover, editorial context
+- Nestable — a Universe Bible contains a Characters Bible contains an X-Men Bible. Multiple volumes as the work expands.
+- Lockable — an editor can lock a Bible when it is canonical. Locking the Bible does not lock the underlying entities — it locks this particular curation.
+- Exportable — a publishable artifact, initiated from Publishing mode like any other output
+- Appears in Everything mode (like any entity), in File mode under a "Bibles" type folder, and can be added to a Board
+- Can be referenced from the dossier of other entities
+
+**States:**
+- **In progress** — being written, curated, expanded by writers
+- **Locked** — canonized by an editor. The content of this Bible is authoritative. New collaborators coming onto the project read the locked Bible to understand what is established.
+
+**Dual purpose:**
+- Reference document for the solo writer — a place to consolidate what is true about the universe as it grows
+- Handoff document for a new collaborator — the thing an editor produces when a new writer comes on, condensing what is canonical, what has happened, what the new author can and cannot change
+
+**The Bible does not own its entities.** A character in the X-Men Bible still exists in Everything. Removing a character from the Bible does not delete them. The Bible is a curated artifact, not a container.
+
+**Key fact:** The "Bible" as a named app section no longer exists. There is no Bible mode. A Bible is an entity you create and refine, visible through the same modes as everything else.
+
 ### Timeline
 
 A timeline is simultaneously:
