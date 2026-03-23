@@ -4,7 +4,7 @@
     "slug": "panelsync",
     "scheme": "panelsync",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
@@ -13,6 +13,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "bundleIdentifier": "com.panelsync.app",
+      "buildNumber": "1",
       "supportsTablet": true
     },
     "android": {
