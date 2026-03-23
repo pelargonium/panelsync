@@ -7,6 +7,9 @@
       "distribution": "internal",
       "ios": {
         "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://panelsyncapi-production.up.railway.app"
       }
     },
     "preview-simulator": {
