@@ -20,7 +20,7 @@
 - CLAUDE.md: "Lenses, Not Containers" read directive added to session start checklist.
 
 ## Next Step
-Begin schema migration: rename `bible_entries` → `entities`, add `tags`, `entity_tags`, `entity_memberships`, `boards`, `board_members`, `perspectives` tables, and add `stagingArea`/`everythingDepth` to `workspace_state`.
+Deploy the API to Railway so the app can be tested on iPad with real persistence.
 
 ---
 

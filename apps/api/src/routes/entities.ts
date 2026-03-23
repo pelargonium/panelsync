@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, max, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/client.js';
-import { bibleEntries, dossierAttachments, universes, universeMembers } from '../db/schema.js';
+import { dossierAttachments, entities, universes, universeMembers } from '../db/schema.js';
 
 async function assertUniverseAccess(universeId: string, userId: string): Promise<boolean> {
   const [universe] = await db
@@ -25,7 +25,7 @@ async function assertUniverseAccess(universeId: string, userId: string): Promise
   return !!membership;
 }
 
-function serializeEntry(entry: typeof bibleEntries.$inferSelect) {
+function serializeEntry(entry: typeof entities.$inferSelect) {
   return {
     id: entry.id,
     universeId: entry.universeId,
@@ -64,17 +64,17 @@ function serializeBlock(row: typeof dossierAttachments.$inferSelect) {
 }
 
 async function getEntryForAccess(id: string, userId: string) {
-  const [entry] = await db.select().from(bibleEntries).where(eq(bibleEntries.id, id)).limit(1);
+  const [entry] = await db.select().from(entities).where(eq(entities.id, id)).limit(1);
   if (!entry) return { error: 'not found' as const };
   if (!await assertUniverseAccess(entry.universeId, userId)) return { error: 'forbidden' as const };
   return { entry };
 }
 
-export async function bibleRoutes(server: FastifyInstance) {
+export async function entityRoutes(server: FastifyInstance) {
   server.addHook('onRequest', server.authenticate);
 
   server.get<{ Params: { universeId: string } }>(
-    '/universes/:universeId/bible/memberships',
+    '/universes/:universeId/entities/memberships',
     async (request, reply) => {
       const { universeId } = request.params;
       const userId = request.user.sub;
@@ -89,7 +89,7 @@ export async function bibleRoutes(server: FastifyInstance) {
         .from(dossierAttachments)
         .where(and(
           eq(dossierAttachments.universeId, universeId),
-          eq(dossierAttachments.entityType, 'bible_entry'),
+          eq(dossierAttachments.entityType, 'entity'),
           eq(dossierAttachments.type, 'text'),
           sql`${dossierAttachments.payload}->>'kind' = 'group_membership'`,
         ));
@@ -104,7 +104,7 @@ export async function bibleRoutes(server: FastifyInstance) {
   );
 
   server.get<{ Params: { universeId: string } }>(
-    '/universes/:universeId/bible',
+    '/universes/:universeId/entities',
     async (request, reply) => {
       const { universeId } = request.params;
       const userId = request.user.sub;
@@ -116,16 +116,16 @@ export async function bibleRoutes(server: FastifyInstance) {
 
       const rows = await db
         .select()
-        .from(bibleEntries)
-        .where(eq(bibleEntries.universeId, universeId))
-        .orderBy(asc(bibleEntries.name));
+        .from(entities)
+        .where(eq(entities.universeId, universeId))
+        .orderBy(asc(entities.name));
 
       return { data: rows.map(serializeEntry) };
     },
   );
 
   server.post<{ Params: { universeId: string }; Body: { name: string; type: 'character' | 'location' | 'note' | 'group' } }>(
-    '/universes/:universeId/bible',
+    '/universes/:universeId/entities',
     async (request, reply) => {
       const { universeId } = request.params;
       const { name, type } = request.body;
@@ -142,12 +142,12 @@ export async function bibleRoutes(server: FastifyInstance) {
       }
 
       const [maxPositionRow] = await db
-        .select({ value: max(bibleEntries.position) })
-        .from(bibleEntries)
-        .where(eq(bibleEntries.universeId, universeId));
+        .select({ value: max(entities.position) })
+        .from(entities)
+        .where(eq(entities.universeId, universeId));
 
       const [row] = await db
-        .insert(bibleEntries)
+        .insert(entities)
         .values({
           universeId,
           type,
@@ -162,7 +162,7 @@ export async function bibleRoutes(server: FastifyInstance) {
         await db.insert(dossierAttachments).values([
           {
             universeId,
-            entityType: 'bible_entry',
+            entityType: 'entity',
             entityId: row.id,
             type: 'text',
             payload: { kind: 'text', content: '' },
@@ -172,7 +172,7 @@ export async function bibleRoutes(server: FastifyInstance) {
           },
           {
             universeId,
-            entityType: 'bible_entry',
+            entityType: 'entity',
             entityId: row.id,
             type: 'text',
             payload: { kind: 'field', label: 'Role', value: '' },
@@ -182,7 +182,7 @@ export async function bibleRoutes(server: FastifyInstance) {
           },
           {
             universeId,
-            entityType: 'bible_entry',
+            entityType: 'entity',
             entityId: row.id,
             type: 'text',
             payload: { kind: 'field', label: 'Age', value: '' },
@@ -192,7 +192,7 @@ export async function bibleRoutes(server: FastifyInstance) {
           },
           {
             universeId,
-            entityType: 'bible_entry',
+            entityType: 'entity',
             entityId: row.id,
             type: 'text',
             payload: { kind: 'field', label: 'Motivation', value: '' },
@@ -209,7 +209,7 @@ export async function bibleRoutes(server: FastifyInstance) {
   );
 
   server.get<{ Params: { id: string } }>(
-    '/bible/:id',
+    '/entities/:id',
     async (request, reply) => {
       const { id } = request.params;
       const userId = request.user.sub;
@@ -224,7 +224,7 @@ export async function bibleRoutes(server: FastifyInstance) {
         .select({ payload: dossierAttachments.payload })
         .from(dossierAttachments)
         .where(and(
-          eq(dossierAttachments.entityType, 'bible_entry'),
+          eq(dossierAttachments.entityType, 'entity'),
           eq(dossierAttachments.entityId, id),
           eq(dossierAttachments.type, 'text'),
         ))
@@ -243,7 +243,7 @@ export async function bibleRoutes(server: FastifyInstance) {
   );
 
   server.patch<{ Params: { id: string }; Body: { name?: string; type?: 'character' | 'location' | 'note' | 'group'; color?: string; position?: number | null } }>(
-    '/bible/:id',
+    '/entities/:id',
     async (request, reply) => {
       const { id } = request.params;
       const userId = request.user.sub;
@@ -254,7 +254,7 @@ export async function bibleRoutes(server: FastifyInstance) {
         return { error: result.error };
       }
 
-      const updates: Partial<typeof bibleEntries.$inferInsert> = {
+      const updates: Partial<typeof entities.$inferInsert> = {
         updatedAt: new Date(),
         updatedBy: userId,
       };
@@ -280,13 +280,13 @@ export async function bibleRoutes(server: FastifyInstance) {
         updates.position = request.body.position;
       }
 
-      const [row] = await db.update(bibleEntries).set(updates).where(eq(bibleEntries.id, id)).returning();
+      const [row] = await db.update(entities).set(updates).where(eq(entities.id, id)).returning();
       return { data: serializeEntry(row) };
     },
   );
 
   server.patch<{ Params: { id: string }; Body: { text: string } }>(
-    '/bible/:id/content',
+    '/entities/:id/content',
     async (request, reply) => {
       const { id } = request.params;
       const { text } = request.body;
@@ -303,7 +303,7 @@ export async function bibleRoutes(server: FastifyInstance) {
         .select({ id: dossierAttachments.id })
         .from(dossierAttachments)
         .where(and(
-          eq(dossierAttachments.entityType, 'bible_entry'),
+          eq(dossierAttachments.entityType, 'entity'),
           eq(dossierAttachments.entityId, id),
           eq(dossierAttachments.type, 'text'),
         ))
@@ -322,7 +322,7 @@ export async function bibleRoutes(server: FastifyInstance) {
       } else {
         await db.insert(dossierAttachments).values({
           universeId: result.entry.universeId,
-          entityType: 'bible_entry',
+          entityType: 'entity',
           entityId: id,
           type: 'text',
           payload: { text },
@@ -338,7 +338,7 @@ export async function bibleRoutes(server: FastifyInstance) {
   );
 
   server.delete<{ Params: { id: string } }>(
-    '/bible/:id',
+    '/entities/:id',
     async (request, reply) => {
       const { id } = request.params;
       const userId = request.user.sub;
@@ -352,17 +352,17 @@ export async function bibleRoutes(server: FastifyInstance) {
       await db
         .delete(dossierAttachments)
         .where(and(
-          eq(dossierAttachments.entityType, 'bible_entry'),
+          eq(dossierAttachments.entityType, 'entity'),
           eq(dossierAttachments.entityId, id),
         ));
 
-      await db.delete(bibleEntries).where(eq(bibleEntries.id, id));
+      await db.delete(entities).where(eq(entities.id, id));
       reply.code(204);
     },
   );
 
   server.post<{ Params: { groupId: string }; Body: { characterId: string } }>(
-    '/bible/:groupId/members',
+    '/entities/:groupId/members',
     async (request, reply) => {
       const { groupId } = request.params;
       const { characterId } = request.body;
@@ -379,7 +379,7 @@ export async function bibleRoutes(server: FastifyInstance) {
         return { error: 'group entry required' };
       }
 
-      const [character] = await db.select().from(bibleEntries).where(eq(bibleEntries.id, characterId)).limit(1);
+      const [character] = await db.select().from(entities).where(eq(entities.id, characterId)).limit(1);
       if (!character || character.type !== 'character' || character.universeId !== groupResult.entry.universeId) {
         reply.code(400);
         return { error: 'character entry required' };
@@ -401,7 +401,7 @@ export async function bibleRoutes(server: FastifyInstance) {
 
       await db.insert(dossierAttachments).values({
         universeId: groupResult.entry.universeId,
-        entityType: 'bible_entry',
+        entityType: 'entity',
         entityId: characterId,
         type: 'text',
         payload: { kind: 'group_membership', groupId },
@@ -416,7 +416,7 @@ export async function bibleRoutes(server: FastifyInstance) {
   );
 
   server.delete<{ Params: { groupId: string; characterId: string } }>(
-    '/bible/:groupId/members/:characterId',
+    '/entities/:groupId/members/:characterId',
     async (request, reply) => {
       const { groupId, characterId } = request.params;
       const userId = request.user.sub;
@@ -438,7 +438,7 @@ export async function bibleRoutes(server: FastifyInstance) {
   );
 
   server.get<{ Params: { id: string } }>(
-    '/bible/:id/blocks',
+    '/entities/:id/blocks',
     async (request, reply) => {
       const { id } = request.params;
       const userId = request.user.sub;
@@ -453,7 +453,7 @@ export async function bibleRoutes(server: FastifyInstance) {
         .select()
         .from(dossierAttachments)
         .where(and(
-          eq(dossierAttachments.entityType, 'bible_entry'),
+          eq(dossierAttachments.entityType, 'entity'),
           eq(dossierAttachments.entityId, id),
         ))
         .orderBy(asc(dossierAttachments.position));
@@ -470,7 +470,7 @@ export async function bibleRoutes(server: FastifyInstance) {
   );
 
   server.post<{ Params: { id: string }; Body: { kind: 'field' | 'note' | 'text'; label?: string; value?: string; title?: string; body?: string; content?: string; position?: number } }>(
-    '/bible/:id/blocks',
+    '/entities/:id/blocks',
     async (request, reply) => {
       const { id } = request.params;
       const { kind } = request.body;
@@ -488,7 +488,7 @@ export async function bibleRoutes(server: FastifyInstance) {
           .select({ value: max(dossierAttachments.position) })
           .from(dossierAttachments)
           .where(and(
-            eq(dossierAttachments.entityType, 'bible_entry'),
+            eq(dossierAttachments.entityType, 'entity'),
             eq(dossierAttachments.entityId, id),
           ));
 
@@ -518,7 +518,7 @@ export async function bibleRoutes(server: FastifyInstance) {
         .insert(dossierAttachments)
         .values({
           universeId: result.entry.universeId,
-          entityType: 'bible_entry',
+          entityType: 'entity',
           entityId: id,
           type: 'text',
           payload,
@@ -534,7 +534,7 @@ export async function bibleRoutes(server: FastifyInstance) {
   );
 
   server.patch<{ Params: { id: string; blockId: string }; Body: { label?: string; value?: string; title?: string; body?: string; content?: string } }>(
-    '/bible/:id/blocks/:blockId',
+    '/entities/:id/blocks/:blockId',
     async (request, reply) => {
       const { id, blockId } = request.params;
       const userId = request.user.sub;
@@ -584,7 +584,7 @@ export async function bibleRoutes(server: FastifyInstance) {
   );
 
   server.delete<{ Params: { id: string; blockId: string } }>(
-    '/bible/:id/blocks/:blockId',
+    '/entities/:id/blocks/:blockId',
     async (request, reply) => {
       const { id, blockId } = request.params;
       const userId = request.user.sub;

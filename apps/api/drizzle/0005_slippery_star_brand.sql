@@ -1,0 +1,1 @@
+-- No-op placeholder migration to satisfy the existing Drizzle journal entry.

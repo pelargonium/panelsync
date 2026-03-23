@@ -102,7 +102,7 @@ export interface ApiScriptBlock {
   updatedAt: string;
 }
 
-export interface ApiBibleEntry {
+export interface ApiEntity {
   id: string;
   universeId: string;
   type: 'character' | 'location' | 'note' | 'group';
@@ -113,7 +113,7 @@ export interface ApiBibleEntry {
   updatedAt: string;
 }
 
-export interface ApiBibleEntryDetail extends ApiBibleEntry {
+export interface ApiEntityDetail extends ApiEntity {
   bodyText: string;
 }
 
@@ -218,14 +218,14 @@ export const api = {
 
   memberships: {
     list: (universeId: string) =>
-      request<{ data: ApiMembership[] }>(`/api/universes/${universeId}/bible/memberships`),
+      request<{ data: ApiMembership[] }>(`/api/universes/${universeId}/entities/memberships`),
     add: (groupId: string, characterId: string) =>
-      request<{ data: ApiMembership }>(`/api/bible/${groupId}/members`, {
+      request<{ data: ApiMembership }>(`/api/entities/${groupId}/members`, {
         method: 'POST',
         body: JSON.stringify({ characterId }),
       }),
     remove: (groupId: string, characterId: string) =>
-      request<void>(`/api/bible/${groupId}/members/${characterId}`, { method: 'DELETE' }),
+      request<void>(`/api/entities/${groupId}/members/${characterId}`, { method: 'DELETE' }),
   },
 
   universes: {
@@ -347,31 +347,31 @@ export const api = {
       }),
   },
 
-  bible: {
+  entities: {
     list: (universeId: string) =>
-      request<{ data: ApiBibleEntry[] }>(`/api/universes/${universeId}/bible`),
-    create: (universeId: string, body: { name: string; type: ApiBibleEntry['type'] }) =>
-      request<{ data: ApiBibleEntry }>(`/api/universes/${universeId}/bible`, {
+      request<{ data: ApiEntity[] }>(`/api/universes/${universeId}/entities`),
+    create: (universeId: string, body: { name: string; type: ApiEntity['type'] }) =>
+      request<{ data: ApiEntity }>(`/api/universes/${universeId}/entities`, {
         method: 'POST',
         body: JSON.stringify(body),
       }),
     get: (id: string) =>
-      request<{ data: ApiBibleEntryDetail }>(`/api/bible/${id}`),
-    update: (id: string, body: { name?: string; type?: ApiBibleEntry['type']; color?: string; position?: number | null }) =>
-      request<{ data: ApiBibleEntry }>(`/api/bible/${id}`, {
+      request<{ data: ApiEntityDetail }>(`/api/entities/${id}`),
+    update: (id: string, body: { name?: string; type?: ApiEntity['type']; color?: string; position?: number | null }) =>
+      request<{ data: ApiEntity }>(`/api/entities/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(body),
       }),
     updateContent: (id: string, text: string) =>
-      request<{ data: { id: string; text: string } }>(`/api/bible/${id}/content`, {
+      request<{ data: { id: string; text: string } }>(`/api/entities/${id}/content`, {
         method: 'PATCH',
         body: JSON.stringify({ text }),
       }),
     delete: (id: string) =>
-      request<void>(`/api/bible/${id}`, { method: 'DELETE' }),
+      request<void>(`/api/entities/${id}`, { method: 'DELETE' }),
     blocks: {
       list: (entryId: string) =>
-        request<{ data: ApiBibleBlock[] }>(`/api/bible/${entryId}/blocks`),
+        request<{ data: ApiBibleBlock[] }>(`/api/entities/${entryId}/blocks`),
       create: (entryId: string, body: {
         kind: 'field' | 'note' | 'text';
         label?: string;
@@ -381,7 +381,7 @@ export const api = {
         content?: string;
         position?: number;
       }) =>
-        request<{ data: ApiBibleBlock }>(`/api/bible/${entryId}/blocks`, {
+        request<{ data: ApiBibleBlock }>(`/api/entities/${entryId}/blocks`, {
           method: 'POST',
           body: JSON.stringify(body),
         }),
@@ -392,12 +392,12 @@ export const api = {
         body?: string;
         content?: string;
       }) =>
-        request<{ data: ApiBibleBlock }>(`/api/bible/${entryId}/blocks/${blockId}`, {
+        request<{ data: ApiBibleBlock }>(`/api/entities/${entryId}/blocks/${blockId}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         }),
       delete: (entryId: string, blockId: string) =>
-        request<void>(`/api/bible/${entryId}/blocks/${blockId}`, { method: 'DELETE' }),
+        request<void>(`/api/entities/${entryId}/blocks/${blockId}`, { method: 'DELETE' }),
     },
   },
 

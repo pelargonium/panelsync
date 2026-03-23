@@ -549,7 +549,7 @@ export default function CharacterEditor({
           : { content: block.content ?? '' };
 
       runSave(async () => {
-        const res = await api.bible.blocks.update(entityId, blockId, body);
+        const res = await api.entities.blocks.update(entityId, blockId, body);
         setBlocks((current) => updateLocalBlock(current, blockId, res.data));
       }).catch(() => {});
     }, 600);
@@ -575,7 +575,7 @@ export default function CharacterEditor({
     setLoading(true);
     setBlocks([]);
 
-    Promise.all([api.bible.get(entityId), api.bible.blocks.list(entityId)])
+    Promise.all([api.entities.get(entityId), api.entities.blocks.list(entityId)])
       .then(([entryRes, blocksRes]) => {
         if (cancelled) return;
         setName(entryRes.data.name);
@@ -630,7 +630,7 @@ export default function CharacterEditor({
       }
 
       runSave(async () => {
-        await api.bible.update(entityId, { name: nextName });
+        await api.entities.update(entityId, { name: nextName });
         savedNameRef.current = nextName;
         updateEntityName(entityId, nextName);
       }).catch(() => {});
@@ -650,7 +650,7 @@ export default function CharacterEditor({
     setColor(nextColor);
     setColorPickerOpen(false);
     runSave(async () => {
-      await api.bible.update(entityId, { color: nextColor });
+      await api.entities.update(entityId, { color: nextColor });
     }).catch(() => {});
   }
 
@@ -699,7 +699,7 @@ export default function CharacterEditor({
     }
     syncSaveState();
     await runSave(async () => {
-      await api.bible.blocks.delete(entityId, id);
+      await api.entities.blocks.delete(entityId, id);
 
       if (shouldMerge) {
         const latestPrev = blocksRef.current.find((block) => block.id === prev.id);
@@ -708,8 +708,8 @@ export default function CharacterEditor({
         const nextContent = latestNext?.content ?? next.content ?? '';
         const merged = prevContent + (prevContent && nextContent ? '\n' : '') + nextContent;
 
-        await api.bible.blocks.update(entityId, prev.id, { content: merged });
-        await api.bible.blocks.delete(entityId, next.id);
+        await api.entities.blocks.update(entityId, prev.id, { content: merged });
+        await api.entities.blocks.delete(entityId, next.id);
 
         setBlocks((current) =>
           current
@@ -741,7 +741,7 @@ export default function CharacterEditor({
       }
     }
 
-    const res = await api.bible.blocks.create(entityId, { ...body, position });
+    const res = await api.entities.blocks.create(entityId, { ...body, position });
     setBlocks((current) => [...current, res.data]);
 
     setTimeout(() => {
@@ -781,14 +781,14 @@ export default function CharacterEditor({
 
         await runSave(async () => {
           if (before.trim()) {
-            await api.bible.blocks.update(entityId, focusedBlock.id, { content: before });
+            await api.entities.blocks.update(entityId, focusedBlock.id, { content: before });
             setBlocks((current) => updateLocalBlock(current, focusedBlock.id, { content: before }));
           } else {
-            await api.bible.blocks.delete(entityId, focusedBlock.id);
+            await api.entities.blocks.delete(entityId, focusedBlock.id);
             setBlocks((current) => current.filter((block) => block.id !== focusedBlock.id));
           }
 
-          const noteRes = await api.bible.blocks.create(entityId, {
+          const noteRes = await api.entities.blocks.create(entityId, {
             kind: 'note',
             body: selected,
             position: notePosition,
@@ -799,7 +799,7 @@ export default function CharacterEditor({
           }, 0);
 
           if (after.trim()) {
-            const afterRes = await api.bible.blocks.create(entityId, {
+            const afterRes = await api.entities.blocks.create(entityId, {
               kind: 'text',
               content: after,
               position: afterPosition,
@@ -813,12 +813,12 @@ export default function CharacterEditor({
         }
 
         await runSave(async () => {
-          const noteRes = await api.bible.blocks.create(entityId, {
+          const noteRes = await api.entities.blocks.create(entityId, {
             kind: 'note',
             body: content,
             position: focusedBlock.position,
           });
-          await api.bible.blocks.delete(entityId, focusedBlock.id);
+          await api.entities.blocks.delete(entityId, focusedBlock.id);
           setBlocks((current) => [...current.filter((block) => block.id !== focusedBlock.id), noteRes.data]);
           setTimeout(() => {
             inputRefs.current[`${noteRes.data.id}:title`]?.focus();
@@ -831,12 +831,12 @@ export default function CharacterEditor({
 
     const noteContent = focusedBlock.body ?? '';
     await runSave(async () => {
-      const textRes = await api.bible.blocks.create(entityId, {
+      const textRes = await api.entities.blocks.create(entityId, {
         kind: 'text',
         content: noteContent,
         position: focusedBlock.position,
       });
-      await api.bible.blocks.delete(entityId, focusedBlock.id);
+      await api.entities.blocks.delete(entityId, focusedBlock.id);
       setBlocks((current) => [...current.filter((block) => block.id !== focusedBlock.id), textRes.data]);
     }).catch(() => {});
   }

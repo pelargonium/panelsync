@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { api, getToken, type ApiBibleEntry, type ApiMembership, type ApiPage } from '../lib/api';
+import { api, getToken, type ApiEntity, type ApiMembership, type ApiPage } from '../lib/api';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
@@ -24,10 +24,10 @@ interface WorkspaceStateResponse {
 interface UniverseContextValue {
   universeId: string;
   universeName: string;
-  entities: ApiBibleEntry[];
+  entities: ApiEntity[];
   loadingEntities: boolean;
   refreshEntities: () => Promise<void>;
-  createEntity: (type: ApiBibleEntry['type']) => Promise<ApiBibleEntry>;
+  createEntity: (type: ApiEntity['type']) => Promise<ApiEntity>;
   deleteEntity: (id: string) => Promise<void>;
   updateEntityName: (id: string, name: string) => void;
   updateEntityPosition: (id: string, position: number) => void;
@@ -93,7 +93,7 @@ function cycleDepth(current: DepthState): DepthState {
   return 'entity_only';
 }
 
-function defaultNameForType(type: ApiBibleEntry['type']) {
+function defaultNameForType(type: ApiEntity['type']) {
   if (type === 'character') return 'Untitled Character';
   if (type === 'location') return 'Untitled Location';
   if (type === 'group') return 'Untitled Group';
@@ -109,7 +109,7 @@ export function UniverseProvider({
   universeName: string;
   children: ReactNode;
 }) {
-  const [entities, setEntities] = useState<ApiBibleEntry[]>([]);
+  const [entities, setEntities] = useState<ApiEntity[]>([]);
   const [memberships, setMemberships] = useState<ApiMembership[]>([]);
   const [loadingEntities, setLoadingEntities] = useState(true);
   const [pagesByContainer] = useState<Record<string, ApiPage[]>>({});
@@ -123,7 +123,7 @@ export function UniverseProvider({
 
   async function refreshEntities() {
     const [entitiesRes, membershipsRes] = await Promise.all([
-      api.bible.list(universeId),
+      api.entities.list(universeId),
       api.memberships.list(universeId),
     ]);
     setEntities(entitiesRes.data);
@@ -138,7 +138,7 @@ export function UniverseProvider({
     setMemberships([]);
 
     Promise.all([
-      api.bible.list(universeId),
+      api.entities.list(universeId),
       requestWorkspaceState<WorkspaceStateResponse>(`/api/workspace-state?universeId=${universeId}`),
       api.memberships.list(universeId),
     ])
@@ -219,8 +219,8 @@ export function UniverseProvider({
     setBinderOpenState(open);
   }
 
-  async function createEntity(type: ApiBibleEntry['type']) {
-    const res = await api.bible.create(universeId, {
+  async function createEntity(type: ApiEntity['type']) {
+    const res = await api.entities.create(universeId, {
       type,
       name: defaultNameForType(type),
     });
@@ -230,7 +230,7 @@ export function UniverseProvider({
   }
 
   async function deleteEntity(id: string) {
-    await api.bible.delete(id);
+    await api.entities.delete(id);
 
     setEntities((current) => current.filter((entry) => entry.id !== id));
     setWarmContexts((current) => current.filter((entry) => entry.entityId !== id));
@@ -274,7 +274,7 @@ export function UniverseProvider({
           : entry
       )),
     );
-    void api.bible.update(id, { position });
+    void api.entities.update(id, { position });
   }
 
   async function loadPages(_containerId: string) {}

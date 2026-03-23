@@ -85,7 +85,7 @@ export default function GroupEditor({ entityId }: GroupEditorProps) {
     setAddMemberOpen(false);
     setLoading(true);
 
-    api.bible.get(entityId)
+    api.entities.get(entityId)
       .then((res) => {
         if (cancelled) return;
         setName(res.data.name);
@@ -133,7 +133,7 @@ export default function GroupEditor({ entityId }: GroupEditorProps) {
       }
 
       runSave(async () => {
-        await api.bible.update(entityId, { name: nextName });
+        await api.entities.update(entityId, { name: nextName });
         savedNameRef.current = nextName;
         updateEntityName(entityId, nextName);
       }).catch(() => {});
@@ -167,7 +167,7 @@ export default function GroupEditor({ entityId }: GroupEditorProps) {
       const nextBody = latestBodyRef.current;
 
       runSave(async () => {
-        await api.bible.updateContent(entityId, nextBody);
+        await api.entities.updateContent(entityId, nextBody);
         savedBodyRef.current = nextBody;
       }).catch(() => {});
     }, 600);
@@ -186,7 +186,7 @@ export default function GroupEditor({ entityId }: GroupEditorProps) {
     setColor(nextColor);
     setColorPickerOpen(false);
     await runSave(async () => {
-      await api.bible.update(entityId, { color: nextColor });
+      await api.entities.update(entityId, { color: nextColor });
     }).catch(() => {});
   }
 

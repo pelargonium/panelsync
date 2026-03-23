@@ -14,16 +14,16 @@ import CharacterEditor from '../../components/CharacterEditor';
 import EntityEditor from '../../components/EntityEditor';
 import GroupEditor from '../../components/GroupEditor';
 import { UniverseProvider, useUniverse } from '../../context/UniverseContext';
-import { type ApiBibleEntry, type ApiMembership } from '../../lib/api';
+import { type ApiEntity, type ApiMembership } from '../../lib/api';
 import { colors } from '../../theme';
 
 const BINDER_WIDTH = 264;
 
 type SortMode = 'az' | 'type' | 'recent' | 'manual';
 type BinderItem =
-  | { kind: 'group'; entity: ApiBibleEntry }
-  | { kind: 'member'; entity: ApiBibleEntry; groupId: string }
-  | { kind: 'entity'; entity: ApiBibleEntry };
+  | { kind: 'group'; entity: ApiEntity }
+  | { kind: 'member'; entity: ApiEntity; groupId: string }
+  | { kind: 'entity'; entity: ApiEntity };
 
 function EmptyContent({ universeName }: { universeName: string }) {
   return (
@@ -48,20 +48,20 @@ function DossierPlaceholder() {
   );
 }
 
-function entityColor(type: ApiBibleEntry['type']) {
+function entityColor(type: ApiEntity['type']) {
   if (type === 'character') return colors.accent;
   if (type === 'location') return colors.bible;
   if (type === 'group') return '#9B7FD4';
   return colors.muted;
 }
 
-function compareEntities(left: ApiBibleEntry, right: ApiBibleEntry, sortMode: SortMode) {
+function compareEntities(left: ApiEntity, right: ApiEntity, sortMode: SortMode) {
   if (sortMode === 'recent') {
     return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
   }
 
   if (sortMode === 'type') {
-    const typeOrder: Record<ApiBibleEntry['type'], number> = {
+    const typeOrder: Record<ApiEntity['type'], number> = {
       group: 0,
       character: 1,
       location: 2,
@@ -74,7 +74,7 @@ function compareEntities(left: ApiBibleEntry, right: ApiBibleEntry, sortMode: So
   return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
 }
 
-function compareByPosition(left: ApiBibleEntry, right: ApiBibleEntry) {
+function compareByPosition(left: ApiEntity, right: ApiEntity) {
   if (left.position == null && right.position == null) {
     return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
   }
@@ -92,7 +92,7 @@ function PrimaryContent({
 }) {
   const { activeEntityType, activeEntityId, universeName, entities } = useUniverse();
 
-  if (activeEntityType === 'bible_entry' && activeEntityId) {
+  if (activeEntityType === 'entity' && activeEntityId) {
     const entity = entities.find((item) => item.id === activeEntityId);
     if (entity?.type === 'group') {
       return <GroupEditor entityId={activeEntityId} />;
@@ -181,10 +181,10 @@ function TypePicker({
   creatingType,
   onCreate,
 }: {
-  creatingType: ApiBibleEntry['type'] | null;
-  onCreate: (type: ApiBibleEntry['type']) => void;
+  creatingType: ApiEntity['type'] | null;
+  onCreate: (type: ApiEntity['type']) => void;
 }) {
-  const options: Array<{ type: ApiBibleEntry['type']; label: string }> = [
+  const options: Array<{ type: ApiEntity['type']; label: string }> = [
     { type: 'group', label: 'Group' },
     { type: 'character', label: 'Character' },
     { type: 'location', label: 'Location' },
@@ -221,7 +221,7 @@ function EntityRow({
   entity,
   onPress,
 }: {
-  entity: ApiBibleEntry;
+  entity: ApiEntity;
   onPress: () => void;
 }) {
   const { activeEntityId } = useUniverse();
@@ -266,7 +266,7 @@ function GroupRow({
   onToggle,
   onPress,
 }: {
-  group: ApiBibleEntry;
+  group: ApiEntity;
   memberCount: number;
   expanded: boolean;
   onToggle: () => void;
@@ -416,7 +416,7 @@ function UniverseWorkspace() {
   const [sortMode, setSortMode] = useState<SortMode>('az');
   const [sortPickerOpen, setSortPickerOpen] = useState(false);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
-  const [creatingType, setCreatingType] = useState<ApiBibleEntry['type'] | null>(null);
+  const [creatingType, setCreatingType] = useState<ApiEntity['type'] | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
 
@@ -461,7 +461,7 @@ function UniverseWorkspace() {
       const memberIds = membersByGroup[group.id] ?? [];
       const members = memberIds
         .map((id) => entities.find((entity) => entity.id === id))
-        .filter(Boolean) as ApiBibleEntry[];
+        .filter(Boolean) as ApiEntity[];
       members.sort(compareByPosition);
       for (const member of members) {
         flat.push({ kind: 'member', entity: member, groupId: group.id });
@@ -485,11 +485,11 @@ function UniverseWorkspace() {
     setTypePickerOpen(false);
   }
 
-  async function handleCreate(type: ApiBibleEntry['type']) {
+  async function handleCreate(type: ApiEntity['type']) {
     setCreatingType(type);
     try {
       const entry = await createEntity(type);
-      activateEntity('bible_entry', entry.id);
+      activateEntity('entity', entry.id);
       setJustCreatedId(entry.id);
       setTypePickerOpen(false);
     } finally {
@@ -647,7 +647,7 @@ function UniverseWorkspace() {
                       : undefined}
                     onPress={() => {
                       dismissTransientUi();
-                      activateEntity('bible_entry', item.entity.id);
+                      activateEntity('entity', item.entity.id);
                     }}
                     onDragLongPress={drag}
                     isDragging={isActive}
@@ -698,7 +698,7 @@ function UniverseWorkspace() {
                 const memberIds = membersByGroup[group.id] ?? [];
                 const memberEntities = memberIds
                   .map((id) => entities.find((entity) => entity.id === id))
-                  .filter(Boolean) as ApiBibleEntry[];
+                  .filter(Boolean) as ApiEntity[];
                 const isExpanded = expandedGroups[group.id] ?? false;
 
                 return (
@@ -712,7 +712,7 @@ function UniverseWorkspace() {
                       }
                       onPress={() => {
                         dismissTransientUi();
-                        activateEntity('bible_entry', group.id);
+                        activateEntity('entity', group.id);
                       }}
                     />
                     {isExpanded && memberEntities.map((member) => (
@@ -721,7 +721,7 @@ function UniverseWorkspace() {
                           entity={member}
                           onPress={() => {
                             dismissTransientUi();
-                            activateEntity('bible_entry', member.id);
+                            activateEntity('entity', member.id);
                           }}
                         />
                       </View>
@@ -740,7 +740,7 @@ function UniverseWorkspace() {
                   entity={entity}
                   onPress={() => {
                     dismissTransientUi();
-                    activateEntity('bible_entry', entity.id);
+                    activateEntity('entity', entity.id);
                   }}
                 />
               ))}

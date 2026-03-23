@@ -64,7 +64,7 @@ export default function EntityEditor({ entityId }: EntityEditorProps) {
     setSaveState('saved');
     setLoading(true);
 
-    api.bible.get(entityId)
+    api.entities.get(entityId)
       .then((res) => {
         if (cancelled) return;
         setName(res.data.name);
@@ -111,7 +111,7 @@ export default function EntityEditor({ entityId }: EntityEditorProps) {
       }
 
       runSave(async () => {
-        await api.bible.update(entityId, { name: nextName });
+        await api.entities.update(entityId, { name: nextName });
         savedNameRef.current = nextName;
         updateEntityName(entityId, nextName);
       }).catch(() => {});
@@ -145,7 +145,7 @@ export default function EntityEditor({ entityId }: EntityEditorProps) {
       const nextBody = latestBodyRef.current;
 
       runSave(async () => {
-        await api.bible.updateContent(entityId, nextBody);
+        await api.entities.updateContent(entityId, nextBody);
         savedBodyRef.current = nextBody;
       }).catch(() => {});
     }, 600);

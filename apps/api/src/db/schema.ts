@@ -43,11 +43,13 @@ export const scriptBlockTypeEnum = pgEnum('script_block_type', [
   'sfx',
 ]);
 
-export const bibleEntryTypeEnum = pgEnum('bible_entry_type', [
+export const entityTypeEnum = pgEnum('entity_type', [
   'character',
   'location',
   'note',
   'group',
+  'bible',
+  'folder',
 ]);
 
 export const pageStatusEnum = pgEnum('page_status', [
@@ -85,7 +87,7 @@ export const dossierEntityTypeEnum = pgEnum('dossier_entity_type', [
   'container',
   'page',
   'script_block',
-  'bible_entry',
+  'entity',
   'timeline',
   'timeline_event',
   'timeline_range',
@@ -228,10 +230,10 @@ export const files = pgTable('files', {
   uploadedAt: timestamp('uploaded_at').notNull().defaultNow(),
 });
 
-export const bibleEntries = pgTable('bible_entries', {
+export const entities = pgTable('entities', {
   id: uuid('id').primaryKey().defaultRandom(),
   universeId: uuid('universe_id').notNull().references(() => universes.id, { onDelete: 'cascade' }),
-  type: bibleEntryTypeEnum('type').notNull(),
+  type: entityTypeEnum('type').notNull(),
   name: text('name').notNull(),
   color: text('color'),
   position: real('position'),
@@ -343,5 +345,60 @@ export const workspaceState = pgTable('workspace_state', {
   depthState: depthStateEnum('depth_state').notNull().default('entity_only'),
   binderOpen: boolean('binder_open').notNull().default(true),
   warmContexts: jsonb('warm_contexts').notNull().default([]),
+  stagingArea: jsonb('staging_area').notNull().default([]),
+  everythingDepth: text('everything_depth').notNull().default('page'),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const tags = pgTable('tags', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  universeId: uuid('universe_id').notNull().references(() => universes.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  color: text('color'),
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const entityTags = pgTable('entity_tags', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  entityId: uuid('entity_id').notNull().references(() => entities.id, { onDelete: 'cascade' }),
+  tagId: uuid('tag_id').notNull().references(() => tags.id, { onDelete: 'cascade' }),
+  taggedBy: uuid('tagged_by').references(() => users.id),
+  taggedAt: timestamp('tagged_at').notNull().defaultNow(),
+});
+
+export const entityMemberships = pgTable('entity_memberships', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  parentEntityId: uuid('parent_entity_id').notNull().references(() => entities.id, { onDelete: 'cascade' }),
+  childEntityId: uuid('child_entity_id').notNull().references(() => entities.id, { onDelete: 'cascade' }),
+  position: real('position').notNull().default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const boards = pgTable('boards', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  universeId: uuid('universe_id').notNull().references(() => universes.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const boardMembers = pgTable('board_members', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  boardId: uuid('board_id').notNull().references(() => boards.id, { onDelete: 'cascade' }),
+  entityId: uuid('entity_id').notNull().references(() => entities.id, { onDelete: 'cascade' }),
+  position: real('position').notNull().default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const perspectives = pgTable('perspectives', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  universeId: uuid('universe_id').notNull().references(() => universes.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  filterDescriptor: jsonb('filter_descriptor').notNull().default({}),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
