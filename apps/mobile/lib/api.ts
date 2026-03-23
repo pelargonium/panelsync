@@ -108,6 +108,7 @@ export interface ApiBibleEntry {
   type: 'character' | 'location' | 'note' | 'group';
   name: string;
   color: string | null;
+  position: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -356,7 +357,7 @@ export const api = {
       }),
     get: (id: string) =>
       request<{ data: ApiBibleEntryDetail }>(`/api/bible/${id}`),
-    update: (id: string, body: { name?: string; type?: ApiBibleEntry['type']; color?: string }) =>
+    update: (id: string, body: { name?: string; type?: ApiBibleEntry['type']; color?: string; position?: number | null }) =>
       request<{ data: ApiBibleEntry }>(`/api/bible/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(body),

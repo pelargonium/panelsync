@@ -30,6 +30,7 @@ interface UniverseContextValue {
   createEntity: (type: ApiBibleEntry['type']) => Promise<ApiBibleEntry>;
   deleteEntity: (id: string) => Promise<void>;
   updateEntityName: (id: string, name: string) => void;
+  updateEntityPosition: (id: string, position: number) => void;
   memberships: ApiMembership[];
   addMembership: (characterId: string, groupId: string) => Promise<void>;
   removeMembership: (characterId: string, groupId: string) => Promise<void>;
@@ -265,6 +266,17 @@ export function UniverseProvider({
     )));
   }
 
+  function updateEntityPosition(id: string, position: number) {
+    setEntities((current) =>
+      current.map((entry) => (
+        entry.id === id
+          ? { ...entry, position }
+          : entry
+      )),
+    );
+    void api.bible.update(id, { position });
+  }
+
   async function loadPages(_containerId: string) {}
 
   return (
@@ -278,6 +290,7 @@ export function UniverseProvider({
         createEntity,
         deleteEntity,
         updateEntityName,
+        updateEntityPosition,
         memberships,
         addMembership,
         removeMembership,

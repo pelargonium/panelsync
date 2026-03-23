@@ -7,6 +7,8 @@
 4. `documents/OPEN_QUESTIONS.md` — open design questions to work through before building
 5. `documents/TASK.md` — if present, a task brief is active (Codex handoff in progress or pending review)
 
+**Critical before writing any code:** Read the "Lenses, Not Containers" section of DESIGN.md. This is the most important design rule in the codebase. Any feature that organizes, groups, or categorizes data must pass the containment test described there before implementation begins.
+
 ---
 
 ## Session Rhythm

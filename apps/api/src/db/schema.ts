@@ -234,6 +234,7 @@ export const bibleEntries = pgTable('bible_entries', {
   type: bibleEntryTypeEnum('type').notNull(),
   name: text('name').notNull(),
   color: text('color'),
+  position: real('position'),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

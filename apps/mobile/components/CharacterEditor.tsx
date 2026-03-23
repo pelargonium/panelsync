@@ -461,8 +461,9 @@ export default function CharacterEditor({
   autoFocusName = false,
   onAutoFocusDone,
 }: CharacterEditorProps) {
-  const { updateEntityName } = useUniverse();
+  const { updateEntityName, deleteEntity } = useUniverse();
   const [loading, setLoading] = useState(true);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [name, setName] = useState('');
   const [color, setColor] = useState<string | null>(null);
   const [blocks, setBlocks] = useState<ApiBibleBlock[]>([]);
@@ -995,59 +996,78 @@ export default function CharacterEditor({
       </ScrollView>
 
       <View
-        className="h-11 flex-row items-center px-4"
+        className="flex-row items-center px-4"
         style={{
           backgroundColor: colors.surface,
           borderTopWidth: 1,
           borderColor: colors.border,
+          minHeight: 44,
         }}
       >
-        <TouchableOpacity onPress={() => void createBlock({ kind: 'field', label: '', value: '' }, 'label')}>
-          <Text className="text-sm font-medium" style={{ color: colors.accent }}>
-            + Field
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={async () => {
-            if (!fieldMode) {
-              setFieldMode(true);
-              await createBlock({ kind: 'field', label: '', value: '' }, 'label');
-            } else {
-              setFieldMode(false);
-            }
-          }}
-          className="ml-4"
-        >
-          <Text
-            className="text-sm font-medium"
-            style={{
-              color: fieldMode ? colors.text : colors.muted,
-              textDecorationLine: fieldMode ? 'underline' : 'none',
-            }}
-          >
-            Fields
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => void createBlock({ kind: 'note', title: '', body: '' }, 'title')} className="ml-4">
-          <Text className="text-sm font-medium" style={{ color: colors.accent }}>
-            + Note
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => void handleConvert()} disabled={!canConvert} className="ml-4">
-          <Text className="text-sm font-medium" style={{ color: canConvert ? colors.text : colors.faint }}>
-            {convertLabel}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleRandomField} className="ml-4">
-          <Text className="text-sm" style={{ color: colors.muted }}>
-            ⚄
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setSortMode((current) => nextSortMode(current))} className="ml-auto">
-          <Text className="text-xs" style={{ color: colors.muted }}>
-            {sortLabel(sortMode)}
-          </Text>
-        </TouchableOpacity>
+        {confirmDelete ? (
+          <>
+            <Text className="text-[13px]" style={{ color: colors.faint }}>Delete?</Text>
+            <TouchableOpacity onPress={() => void deleteEntity(entityId)} className="ml-2">
+              <Text className="text-[13px] font-semibold" style={{ color: '#d14b4b' }}>Yes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setConfirmDelete(false)} className="ml-3">
+              <Text className="text-[13px]" style={{ color: colors.faint }}>No</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity onPress={() => setConfirmDelete(true)} className="mr-3">
+              <Text className="text-[13px]" style={{ color: colors.faint }}>Delete</Text>
+            </TouchableOpacity>
+            <View style={{ width: 1, height: 16, backgroundColor: colors.border, marginRight: 12 }} />
+            <TouchableOpacity onPress={() => void createBlock({ kind: 'field', label: '', value: '' }, 'label')}>
+              <Text className="text-sm font-medium" style={{ color: colors.accent }}>
+                + Field
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={async () => {
+                if (!fieldMode) {
+                  setFieldMode(true);
+                  await createBlock({ kind: 'field', label: '', value: '' }, 'label');
+                } else {
+                  setFieldMode(false);
+                }
+              }}
+              className="ml-4"
+            >
+              <Text
+                className="text-sm font-medium"
+                style={{
+                  color: fieldMode ? colors.text : colors.muted,
+                  textDecorationLine: fieldMode ? 'underline' : 'none',
+                }}
+              >
+                Fields
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => void createBlock({ kind: 'note', title: '', body: '' }, 'title')} className="ml-4">
+              <Text className="text-sm font-medium" style={{ color: colors.accent }}>
+                + Note
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => void handleConvert()} disabled={!canConvert} className="ml-4">
+              <Text className="text-sm font-medium" style={{ color: canConvert ? colors.text : colors.faint }}>
+                {convertLabel}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleRandomField} className="ml-4">
+              <Text className="text-sm" style={{ color: colors.muted }}>
+                ⚄
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setSortMode((current) => nextSortMode(current))} className="ml-auto">
+              <Text className="text-xs" style={{ color: colors.muted }}>
+                {sortLabel(sortMode)}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );

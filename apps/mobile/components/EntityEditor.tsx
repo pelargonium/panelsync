@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { api } from '../lib/api';
 import { useUniverse } from '../context/UniverseContext';
 import { colors } from '../theme';
@@ -11,7 +11,8 @@ interface EntityEditorProps {
 type SaveState = 'saved' | 'saving';
 
 export default function EntityEditor({ entityId }: EntityEditorProps) {
-  const { updateEntityName } = useUniverse();
+  const { updateEntityName, deleteEntity } = useUniverse();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [bodyText, setBodyText] = useState('');
@@ -211,6 +212,24 @@ export default function EntityEditor({ entityId }: EntityEditorProps) {
           lineHeight: 22,
         }}
       />
+
+      <View className="mt-4 flex-row items-center">
+        {confirmDelete ? (
+          <>
+            <Text className="text-[13px]" style={{ color: colors.faint }}>Delete this entry?</Text>
+            <TouchableOpacity onPress={() => void deleteEntity(entityId)} className="ml-3">
+              <Text className="text-[13px] font-semibold" style={{ color: '#d14b4b' }}>Yes, delete</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setConfirmDelete(false)} className="ml-3">
+              <Text className="text-[13px]" style={{ color: colors.faint }}>Cancel</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <TouchableOpacity onPress={() => setConfirmDelete(true)}>
+            <Text className="text-[13px]" style={{ color: colors.faint }}>Delete</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }

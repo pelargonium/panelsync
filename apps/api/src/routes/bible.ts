@@ -32,6 +32,7 @@ function serializeEntry(entry: typeof bibleEntries.$inferSelect) {
     type: entry.type,
     name: entry.name,
     color: entry.color,
+    position: entry.position,
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
   };
@@ -140,12 +141,18 @@ export async function bibleRoutes(server: FastifyInstance) {
         return { error: 'forbidden' };
       }
 
+      const [maxPositionRow] = await db
+        .select({ value: max(bibleEntries.position) })
+        .from(bibleEntries)
+        .where(eq(bibleEntries.universeId, universeId));
+
       const [row] = await db
         .insert(bibleEntries)
         .values({
           universeId,
           type,
           name: name.trim(),
+          position: (maxPositionRow?.value ?? 0) + 1,
           createdBy: userId,
           updatedBy: userId,
         })
@@ -235,7 +242,7 @@ export async function bibleRoutes(server: FastifyInstance) {
     },
   );
 
-  server.patch<{ Params: { id: string }; Body: { name?: string; type?: 'character' | 'location' | 'note' | 'group'; color?: string } }>(
+  server.patch<{ Params: { id: string }; Body: { name?: string; type?: 'character' | 'location' | 'note' | 'group'; color?: string; position?: number | null } }>(
     '/bible/:id',
     async (request, reply) => {
       const { id } = request.params;
@@ -267,6 +274,10 @@ export async function bibleRoutes(server: FastifyInstance) {
 
       if (request.body.color !== undefined) {
         updates.color = request.body.color;
+      }
+
+      if (request.body.position !== undefined) {
+        updates.position = request.body.position;
       }
 
       const [row] = await db.update(bibleEntries).set(updates).where(eq(bibleEntries.id, id)).returning();

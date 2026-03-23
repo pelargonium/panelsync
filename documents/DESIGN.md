@@ -1,5 +1,5 @@
 # PanelSync — Design Principles & Architecture
-*Established across two design sessions, March 2026. This document captures foundational decisions made before Sprint 6. It supersedes any conflicting assumptions in earlier documents or code.*
+*Established across design sessions, March 2026. This document captures foundational decisions and principles. It supersedes any conflicting assumptions in earlier documents or code.*
 
 ---
 
@@ -10,6 +10,164 @@
 The app does not impose a workflow. It does not decide that you must write before you draw, or build characters before you start writing. It makes all data accessible and editable from whatever angle is most useful at any given moment.
 
 **No tool owns the data it works with.** The script editor does not own the page. The binder does not own the series list. The timeline tool does not own the events. Every tool is a view into shared underlying data. Any tool can create, edit, or reference any piece of that data.
+
+---
+
+## Lenses, Not Containers — The Most Important Design Rule
+
+**The closest analogy for what PanelSync is trying to be: Pinterest, but for your own creative output, with a comic book editor inside it.** The data you create — characters, locations, pages, events, notes — just exists. PanelSync's job is to give you the best possible tools to view that data from every angle that is useful to you, to surface connections you didn't see, and to put the right context in front of you at the right moment. You pin things that are useful. You create views that match how you're thinking right now. The data doesn't live in those views — it's just visible through them.
+
+This has a direct consequence for how we design every feature:
+
+### The default question
+
+Before modeling any organizational relationship, ask: **is this containment or is this a view?**
+
+- **A container** owns its contents. The relationship is load-bearing. Deleting the container cascades to its contents. Moving something out of a container changes where it lives. Other parts of the system depend on the ownership. Pages belong to an issue — that's real containment.
+- **A lens** reveals data that already exists elsewhere. Switching lenses doesn't move data. Deleting a lens doesn't delete the entities it was showing. The same entity appears in every lens whose criteria it matches.
+
+**Containers require deliberate justification. If the relationship can be modeled as a property, tag, or filter criterion, prefer that.** The burden of proof is on containment.
+
+### The canonical anti-pattern
+
+**Groups-as-folders** is the pattern to avoid. It takes a viewing relationship — characters associated with a team — and models it as containment — characters living inside a team. This creates immediate problems: a character who belongs to two teams has to live in two places, membership becomes a structural constraint rather than a simple fact, and every other lens that wants to display these characters has to navigate the folder structure to find them.
+
+The correct model: a character has a property that causes them to appear when the X-Men lens is active. Wolverine has both the X-Men tag and the Avengers tag. He appears in both views simultaneously because views don't own him. The X-Men view is a saved query, not a folder.
+
+This pattern recurs constantly in software design. Any time the app needs to "organize" things, the instinct is to reach for folders. Resist it. Ask whether a property on the entity plus a filter is sufficient. It almost always is, and it keeps data flat and viewable from any angle.
+
+### Perspectives
+
+A perspective is a **saved filter with a name**. It has a filter descriptor — type criteria, tags, a series scope, or any combination — and a name the user gives it. Switching perspectives changes what the binder shows, not where the data lives.
+
+Perspectives are not a primary feature. They are a "save this for later" button. A user builds up a filter combination in Everything mode that is worth keeping — "all characters tagged red-eye users" — and saves it so they can return to it without rebuilding it. The primary operations in Everything mode are sort, filter, and tagging. Perspectives are what you create when a filter combination becomes a recurring need.
+
+The natural creation point for a perspective is the staging area (see below) or the filter bar in Everything mode: once you have a filter active that you want to preserve, save it as a named perspective.
+
+### Where containers are correct
+
+Containers are the right model when ownership is genuinely structural:
+- Pages belong to a draft; drafts get assigned to containers (issues). A page has one home at a time. Moving it changes where it lives.
+- Issues belong to a series. The hierarchy is real — deleting an issue removes a structural unit of the published work.
+- The binder's two-zone model (publication structure above, pool below) reflects this correctly.
+
+Even in these cases, the lens principle applies to how data is *viewed* — a character can be viewed in the context of a specific issue without belonging to it.
+
+---
+
+## The Four Binder Modes
+
+The binder is the primary navigation surface. It has four modes. These are not equal tabs — they have a hierarchy. One mode is base reality; the others are lenses imposed on top of it.
+
+### Everything — The Canonical View
+
+**Everything is not a mode. It is what the data actually is.**
+
+All entities in a universe exist as flat, independent objects — like sheets of paper on a table. A character is not "inside" a group or a series. A note is not "under" a folder. Everything just exists. Connections between entities are properties of the entities themselves (tags, links, references), not structural ownership.
+
+Everything mode shows this base reality: a flat, filterable, searchable list of every entity in the universe. There is no hierarchy imposed. The user can sort, filter by type, search by name, filter by tag, or apply a saved perspective. But none of that changes where the data lives — it only changes what the user sees.
+
+**The value of Everything is not just completeness — it is the deliberate absence of organizational context.** A user who works primarily in File mode builds folders, organizes characters into groups, creates content inside that structure. Everything strips all of that away. You see Mr. Evil next to a note you wrote six weeks ago and notice a connection you never would have seen inside the Enemies folder. Everything is anti-silo by design.
+
+An entity created inside a File mode folder has a home in File mode (the folder where it was created) but no home in Everything — it just exists in the pool with everything else. The folder is metadata, not containment.
+
+This is the full binder. When in doubt, an entity lives in Everything.
+
+**Everything mode has three layers:**
+
+1. **Sort/filter bar** — type filter, sort order (last modified, created, name), and search. Always visible. No setup required.
+
+2. **Staging area** — a persistent scratch pad. You search for characters involved in a new storyline, select three, search again, select two more. The staging area holds all five across searches. It persists until you explicitly clear it — designed to be cleared often. Actions on a staged set: apply a tag to all, enclose in a curated folder, add to Workspace. If the filter combination that surfaced these entities is worth keeping, save it as a named perspective from here.
+
+3. **The flat list** — every entity in the universe, ordered by the current sort, filtered by the current filter. No folders, no hierarchy.
+
+**Everything mode is also where tagging happens.** Tags are applied from here, in bulk via the staging area or individually. Tags are how Everything mode becomes useful as a discovery tool — they create connections across entity types and organizational structures that neither File mode nor Publishing mode can see.
+
+### File — A Lens for Structured Organization
+
+File mode is a deliberate, hierarchical view imposed on the flat reality of Everything. It shows the same entities organized into a folder structure. Switching to File mode does not move any data. Removing something from a File view does not delete it — the entity still exists in Everything.
+
+File view is for users who think in hierarchies, or for projects complex enough that unstructured Everything becomes hard to navigate. Many users will do most of their work in File mode — creating content inside folders as they build the project. That is a completely valid workflow. The folders feel like home for those entities in File mode. But Everything is always the ground truth underneath.
+
+**File view has two kinds of groupings:**
+
+- **Auto-generated type folders** — Characters, Locations, Pages, Notes, etc. Always present, no setup required. A structural view of Everything by entity type.
+- **User-created curated folders** — explicitly assembled by the user. Hand-picked, not filter-based. "So-and-so's backstory" might contain a character sheet, a timeline, two notes, and a dos-and-don'ts note — things the user deliberately chose to group together. Created by drag-and-drop organization in File mode, or by selecting items in Everything and choosing "Enclose in folder."
+
+Both are lenses — neither owns its contents. The distinction is how they are populated: type folders are automatic, curated folders are intentional.
+
+**Curated folders vs. perspectives:**
+
+| | How populated | Updates automatically |
+|---|---|---|
+| **Perspective** | Filter-based — any entity matching the criteria appears | Yes |
+| **Curated folder** | Hand-picked — you chose each item explicitly | No |
+
+A curated folder is the right tool when the collection is deliberate and bounded. A perspective is the right tool when the collection should stay current with the data. Both are valid. Neither is a container.
+
+**Deleting a curated folder:**
+
+Deleting a folder always shows a confirmation dialog. The dialog communicates the lens model explicitly — entities are not destroyed when a folder is removed:
+
+> **Delete "Villains Maybe?"**
+> The 3 entities inside will remain in Everything.
+>
+> [Delete folder] [Delete folder and contents] [Cancel]
+
+For folders with nested subfolders, the dialog describes the full scope:
+
+> **Delete "Enemies"**
+> Contains 2 subfolders and 14 entities. The entities will remain in Everything.
+>
+> [Delete folder and subfolders] [Delete everything] [Cancel]
+
+"Delete folder" (or "Delete folder and subfolders") removes the organizational structure only. "Delete everything" removes the structure and all entities inside it. Entities in Everything are unaffected by "delete folder" — the line "will remain in Everything" in the dialog is the mechanism by which users learn that folders are views, not homes.
+
+Auto-generated type folders (Characters, Locations, etc.) cannot be deleted.
+
+### Publishing — A Lens for Production Structure
+
+Publishing mode shows the production hierarchy: the series → issue → page structure defined by the user's hierarchy levels. This is for seeing the work as a finished artifact — what order do things ship, what has been placed, what is still in the pool.
+
+This is the most container-like of the modes, because the publication structure does involve real containment (a page genuinely belongs to one issue at a time). But it is still a lens in the sense that it is one view of the data, not the only valid one.
+
+### The Staging Area vs. The Board
+
+These look similar but serve different purposes:
+
+| | Staging area | Board |
+|---|---|---|
+| **Lives in** | Everything mode | Its own binder mode |
+| **Purpose** | Accumulate entities to act on them collectively | Assemble context for a specific piece of creative work |
+| **Actions** | Tag all, enclose in folder, save as perspective | View together, open in split view |
+| **Cleared** | When the operation is done | When the board is deleted or rebuilt |
+| **Persistence** | Until manually cleared (session-like) | Named, saved, persistent across sessions |
+
+The staging area is a data management tool. The board is a creative context tool.
+
+### Board — A Constructed Personal Panel
+
+Board is a drag-to-build, named, persistent panel. It shows the specific combination of things the user has assembled for a particular piece of work — a character, an issue, a timeline range, a reference image — all in one composed view. Multiple boards can be saved and named. A dropdown at the top of the Board area switches between them. Boards can be deleted and forgotten when no longer needed.
+
+**Adding to a board:** There is no persistent tray UI. Instead, when the user begins dragging an entity anywhere in the binder, drop targets appear dynamically:
+
+- **In the binder area:** two transparent overlay zones appear — "Add to new board" and "Add to existing board." Dropping activates the selected board.
+- **In the content area:** a transparent overlay appears — "Open in split view." The overlay shows where the dragged item will appear and how the content area will split based on where the cursor currently is. Releasing drops it there.
+
+This means the same drag gesture can target either the binder (board management) or the content area (split view), decided at drop time. No permanent tray element clutters the UI at rest.
+
+Dragging to a board does not remove an entity from its source mode — it adds it to the board composition. The entity still exists in Everything, still appears in File mode, still lives wherever it lived before.
+
+### Mode Relationships
+
+| Mode | What it is | Deleting from it... |
+|------|-----------|---------------------|
+| Everything | Base reality | Deletes the entity |
+| File | A structured lens | Removes from this view only |
+| Publishing | A production lens | Removes from production structure only |
+| Board | A personal composition | Removes from this board only |
+
+The binder mode switcher (tabs or segmented control at the top of the binder) should communicate this hierarchy visually — Everything is the home, not a peer of the others.
 
 ---
 
