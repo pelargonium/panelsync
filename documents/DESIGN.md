@@ -653,19 +653,21 @@ Navigation state persists to the database. One row per user per universe, update
 
 ```
 - id
-- universeId      uuid references universes.id
-- userId          uuid references users.id
+- universeId        uuid references universes.id
+- userId            uuid references users.id
 - activeEntityType  text nullable
 - activeEntityId    uuid nullable
-- depthState        text nullable    ('entity_only', 'split', 'dossier_only')
+- depthState        text nullable       ('entity_only', 'split', 'dossier_only')
 - binderOpen        boolean notNull default true
-- warmContexts      jsonb notNull default '[]'   -- array of { entityType, entityId, depthState }, capped ~10
+- warmContexts      jsonb notNull default '[]'  -- array of { entityType, entityId, depthState }, capped ~10
+- stagingArea       jsonb notNull default '[]'  -- array of entity IDs, persistent until cleared
+- everythingDepth   text notNull default 'page' -- 'series' | 'issue' | 'page' | 'panel' | 'block'
 - updatedAt         timestamp notNull defaultNow
 ```
 
 Unique constraint on `(universeId, userId)`.
 
-Written on every navigation action, not on every keystroke. The `warmContexts` array is the binder's recent history — entities the user has visited, preserved so they can resume any of them.
+Written on every navigation action, not on every keystroke. The `warmContexts` array is the binder's recent history — entities the user has visited, preserved so they can resume any of them. `stagingArea` persists the Everything mode staging area across sessions until explicitly cleared. `everythingDepth` is the user's preferred depth setting for Everything mode.
 
 ---
 
@@ -690,14 +692,14 @@ Written on every navigation action, not on every keystroke. The `warmContexts` a
 ## Complete Schema — Revised Table List
 
 ### New (added after initial revision)
-- `workspace_state`
+- `workspace_state` (gains `stagingArea`, `everythingDepth` fields)
 
 ### Staying (simplified)
 - `users`
 - `universes` (adds `updated_by`)
 - `universe_members`
 - `member_series_access`
-- `bible_entries` (stripped to: id, universe_id, type, name, color, created_by, timestamps)
+- `entities` (renamed from `bible_entries`; type field adds `'bible'` and `'folder'`; `'group'` deprecated)
 - `timelines`
 - `timeline_events` (entity connections move to dossier_attachments)
 - `timeline_ranges`
@@ -713,6 +715,12 @@ Written on every navigation action, not on every keystroke. The `warmContexts` a
 - `dossier_attachments`
 - `dossier_canvas_state`
 - `events`
+- `tags` — universe-level tag definitions (id, universe_id, name, color, created_by, timestamps)
+- `entity_tags` — many-to-many entities ↔ tags (entity_id, tag_id, tagged_by, tagged_at)
+- `entity_memberships` — ordered membership for Bibles and curated folders (parent_entity_id, child_entity_id, position float)
+- `boards` — named user-specific entity compositions (id, universe_id, user_id, name, timestamps)
+- `board_members` — ordered board membership (board_id, entity_id, position float)
+- `perspectives` — named saved filter descriptors (id, universe_id, user_id nullable, name, filter_descriptor jsonb, timestamps)
 
 ### Removed
 - `series` → replaced by `containers` + `hierarchy_levels`
@@ -721,11 +729,14 @@ Written on every navigation action, not on every keystroke. The `warmContexts` a
 - `storyboard_pages` → storyboard data lives in dossier_attachments
 - `bible_entry_images` → replaced by dossier_attachments
 - `bible_entry_series_overlays` → replaced by context-scoped dossier_attachments
-- `note_folders` → notes are bible_entries; folder UI is a rendering concern
+- `note_folders` → notes are entities; folder UI handled by entity type `'folder'` + `entity_memberships`
 - `asset_timeline_tags` → replaced by entity_link dossier_attachments
 - `pinned_items` → replaced by entity_link dossier_attachments
 
-**Total: 18 tables.** Down from 20, significantly more capable and flexible.
+**Total: 24 tables.** The 6 additions (tags, entity_tags, entity_memberships, boards, board_members, perspectives) enable the full four-mode binder, tagging system, and Bible artifact — without changing the core entity or dossier models.
+
+### Migration note: `bible_entries` → `entities`
+This rename cascades into API routes, TypeScript types, and client code. It is a meaningful migration — do it deliberately as its own task, not bundled with other changes.
 
 ---
 

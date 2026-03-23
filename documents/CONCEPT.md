@@ -20,7 +20,7 @@
 - CLAUDE.md: "Lenses, Not Containers" read directive added to session start checklist.
 
 ## Next Step
-Work through Publishing mode design, then capture data model implications of the four binder modes before beginning binder rebuild.
+Begin schema migration: rename `bible_entries` → `entities`, add `tags`, `entity_tags`, `entity_memberships`, `boards`, `board_members`, `perspectives` tables, and add `stagingArea`/`everythingDepth` to `workspace_state`.
 
 ---
 
