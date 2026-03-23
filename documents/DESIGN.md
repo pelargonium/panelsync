@@ -77,11 +77,25 @@ This is the full binder. When in doubt, an entity lives in Everything.
 
 1. **Sort/filter bar** — type filter, sort order (last modified, created, name), and search. Always visible. No setup required.
 
-2. **Staging area** — a persistent scratch pad. You search for characters involved in a new storyline, select three, search again, select two more. The staging area holds all five across searches. It persists until you explicitly clear it — designed to be cleared often. Actions on a staged set: apply a tag to all, enclose in a curated folder, add to Workspace. If the filter combination that surfaced these entities is worth keeping, save it as a named perspective from here.
+2. **Staging area** — a persistent scratch pad. You search for characters involved in a new storyline, select three, search again, select two more. The staging area holds all five across searches. It persists until you explicitly clear it — designed to be cleared often. Actions on a staged set: apply a tag to all, enclose in a curated folder, add to Board. If the filter combination that surfaced these entities is worth keeping, save it as a named perspective from here.
 
 3. **The flat list** — every entity in the universe, ordered by the current sort, filtered by the current filter. No folders, no hierarchy.
 
 **Everything mode is also where tagging happens.** Tags are applied from here, in bulk via the staging area or individually. Tags are how Everything mode becomes useful as a discovery tool — they create connections across entity types and organizational structures that neither File mode nor Publishing mode can see.
+
+**Everything shows every discrete unit of work** — not just bible entities, but pages, panels, script blocks, timeline events, notes. The full pile of paper. This is something most digital tools never offer: the ability to see how much you have actually made, all of it, accumulated in one place. Seeing a panel you drew six months ago next to a character note written yesterday can surface connections that no organized view would reveal.
+
+**Depth control ("Show down to...")** — a user setting that controls the smallest unit that appears in Everything. Options from coarsest to finest:
+
+| Setting | What appears |
+|---------|-------------|
+| Series | Top-level containers only |
+| Issue | Issues and above |
+| Page | Pages and above *(default)* |
+| Panel | Panels and above |
+| Block | Individual script blocks and above |
+
+The default is Page — the natural "sheet of paper" unit. Writers who want a high-level view set it to Issue. Deep creative searches set it to Panel or Block. The type filter adapts to the depth setting — types finer than the current depth are not offered as filter options.
 
 ### File — A Lens for Structured Organization
 
@@ -127,9 +141,33 @@ Auto-generated type folders (Characters, Locations, etc.) cannot be deleted.
 
 ### Publishing — A Lens for Production Structure
 
-Publishing mode shows the production hierarchy: the series → issue → page structure defined by the user's hierarchy levels. This is for seeing the work as a finished artifact — what order do things ship, what has been placed, what is still in the pool.
+Publishing mode is **output-oriented** — it is where parts come together into the final artifact. It shows the production hierarchy defined by the user's hierarchy levels (Series → Issue → Page by default).
 
 This is the most container-like of the modes, because the publication structure does involve real containment (a page genuinely belongs to one issue at a time). But it is still a lens in the sense that it is one view of the data, not the only valid one.
+
+**The hierarchy is always nested — never flat.** Publishing mode does not use the depth control from Everything mode. You expand nodes to go deeper:
+
+```
+Series
+  └── Issue
+        └── Page
+              └── Panel         (expandable)
+                    └── Block   (expandable — for draft combination)
+Pool
+  └── Unassigned drafts
+```
+
+Most work happens at Page level — tapping a page opens it in the content area. Panel and Block levels are available for surgical combination work: assembling a final version from parts of multiple drafts.
+
+**Creating structure:** a "+" dropdown in the binder toolbar offers New Page, New Issue, New Series. The default offered option is contextual — if an Issue is selected, New Page is first; if a Series is selected, New Issue is first.
+
+**Status indicators** on issue and series rows (e.g. "3/22 pages complete") — incidental detail, not the primary UI. Exact form not yet designed.
+
+**Block-level drag in Publishing mode** creates new drafts rather than destructive edits. Dragging a panel from one page to another creates a new draft of the destination page where the dragged panel overwrites that position. The associated script block is overwritten in the new draft as well. The original draft is preserved — switching back to it is the undo. This means the draft system is the safety mechanism: no confirmation dialog needed, nothing is ever lost.
+
+**Schema note:** this block-level draft model requires page-level drafts — a page having multiple versions, not just a container having multiple drafts. The current `drafts` table is scoped to containers. Before this feature is built, the schema will need to support drafts scoped to a page (or panel). This is a v2+ consideration — flag it before building the draft-combination feature.
+
+**Pages created in Publishing mode inside an issue also appear in Everything mode** — same rule as everywhere. Everything is always everything. Pages can also be created from Everything mode with no issue assigned — they land in the pool.
 
 ### The Staging Area vs. The Board
 
