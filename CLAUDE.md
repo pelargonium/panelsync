@@ -75,6 +75,33 @@
 
 ---
 
+## Code Standards
+
+### API: Input validation
+Every route must validate its request body/params/query with Typebox schemas before touching the database. Fastify's built-in schema validation does this automatically when you define `schema: { body: Type.Object({...}) }` on the route. No bare `request.body.fieldName` access without a schema.
+
+### API: Error handling
+- Route handlers must use try-catch around database operations. Unhandled Drizzle errors must not crash the endpoint.
+- Return `{ error: string }` with an appropriate HTTP status code on failure. Do not return raw database errors to the client.
+- No silent `.catch(() => {})` anywhere — if an error is caught, it must either log, surface a user-visible state change, or re-throw.
+
+### API: Route file organization
+One domain per route file. If a route file covers more than one resource type (e.g., containers AND workspace state AND drafts), split it. A route file should have a single prefix and a coherent set of endpoints.
+
+### API: Testing
+Every route module must have a corresponding test file at `apps/api/src/routes/__tests__/routeName.test.ts`. At minimum: one happy-path test and one error-case test per endpoint group. Tests hit the real database (Neon branch or local Postgres via test helper). Use Vitest + supertest.
+
+### Mobile: Error boundaries
+The universe workspace must be wrapped in a React error boundary. A crash in one editor must not white-screen the entire app. The error boundary should show a recovery UI with a "go back" option.
+
+### Mobile: No silent failures
+API call failures must produce a visible result — an error message, a status indicator change, or a retry prompt. No `.catch(() => {})` that leaves the user looking at a "Saved" indicator when the save failed.
+
+### Mobile: Keyboard-first design
+Keyboard shortcuts and keyboard navigation are core UX, not polish. When building any editor or navigation surface, the keyboard interaction path must be designed alongside the visual UI, not deferred. The target user is a professional writer with a hardware keyboard — keyboard flow defines whether the app feels like a real tool.
+
+---
+
 ## Communication Style
 
 - Concise. No emojis. No filler.
