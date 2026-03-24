@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  SafeAreaView,
+  Modal,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DraggableFlatList, { ScaleDecorator, type RenderItemParams } from 'react-native-draggable-flatlist';
-import { TouchableOpacity as GestureTouchableOpacity } from 'react-native-gesture-handler';
+import { PanGestureHandler, State, TouchableOpacity as GestureTouchableOpacity } from 'react-native-gesture-handler';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import CharacterEditor from '../../components/CharacterEditor';
 import EntityEditor from '../../components/EntityEditor';
@@ -86,9 +87,11 @@ function compareByPosition(left: ApiEntity, right: ApiEntity) {
 function PrimaryContent({
   justCreatedId,
   onAutoFocusDone,
+  onSaveStateChange,
 }: {
   justCreatedId: string | null;
   onAutoFocusDone: () => void;
+  onSaveStateChange: (state: 'saved' | 'saving') => void;
 }) {
   const { activeEntityType, activeEntityId, universeName, entities } = useUniverse();
 
@@ -103,6 +106,7 @@ function PrimaryContent({
           entityId={activeEntityId}
           autoFocusName={justCreatedId === activeEntityId}
           onAutoFocusDone={onAutoFocusDone}
+          onSaveStateChange={onSaveStateChange}
         />
       );
     }
@@ -115,9 +119,11 @@ function PrimaryContent({
 function ContentArea({
   justCreatedId,
   onAutoFocusDone,
+  onSaveStateChange,
 }: {
   justCreatedId: string | null;
   onAutoFocusDone: () => void;
+  onSaveStateChange: (state: 'saved' | 'saving') => void;
 }) {
   const { depthState } = useUniverse();
 
@@ -129,7 +135,7 @@ function ContentArea({
     return (
       <View className="flex-1 flex-row">
         <View className="flex-1 border-r" style={{ borderColor: colors.border }}>
-          <PrimaryContent justCreatedId={justCreatedId} onAutoFocusDone={onAutoFocusDone} />
+          <PrimaryContent justCreatedId={justCreatedId} onAutoFocusDone={onAutoFocusDone} onSaveStateChange={onSaveStateChange} />
         </View>
         <View className="flex-1">
           <DossierPlaceholder />
@@ -138,7 +144,7 @@ function ContentArea({
     );
   }
 
-  return <PrimaryContent justCreatedId={justCreatedId} onAutoFocusDone={onAutoFocusDone} />;
+  return <PrimaryContent justCreatedId={justCreatedId} onAutoFocusDone={onAutoFocusDone} onSaveStateChange={onSaveStateChange} />;
 }
 
 function SortPicker({
@@ -419,6 +425,9 @@ function UniverseWorkspace() {
   const [creatingType, setCreatingType] = useState<ApiEntity['type'] | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
+  const [editorSaveState, setEditorSaveState] = useState<'saved' | 'saving'>('saved');
+  const [gestureHelpVisible, setGestureHelpVisible] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const sortedEntities = useMemo(
     () => [...entities].sort((left, right) => compareEntities(left, right, sortMode)),
@@ -487,11 +496,14 @@ function UniverseWorkspace() {
 
   async function handleCreate(type: ApiEntity['type']) {
     setCreatingType(type);
+    setCreateError(null);
     try {
       const entry = await createEntity(type);
       activateEntity('entity', entry.id);
       setJustCreatedId(entry.id);
       setTypePickerOpen(false);
+    } catch (e: any) {
+      setCreateError(e.message ?? 'Failed to create entity.');
     } finally {
       setCreatingType(null);
     }
@@ -550,50 +562,106 @@ function UniverseWorkspace() {
   }
 
   return (
-      <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }}>
+    <SafeAreaView edges={['top']} className="flex-1" style={{ backgroundColor: colors.bg }}>
+      {/* Top bar */}
       <View
         className="flex-row items-center px-4"
         style={{ height: 48, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}
       >
-        <TouchableOpacity onPress={() => router.replace('/')} className="flex-1">
-          <Text className="text-[13px] font-semibold" style={{ color: colors.accent }}>
-            ← Universes
-          </Text>
+        <TouchableOpacity onPress={() => router.replace('/')} hitSlop={8} style={{ marginRight: 12 }}>
+          <Text style={{ color: colors.accent, fontSize: 20, lineHeight: 24 }}>‹</Text>
         </TouchableOpacity>
-        <Text className="text-[10px]" style={{ color: colors.faint }}>
-          ● Saved
+        <Text className="flex-1 text-[15px] font-bold" style={{ color: colors.text }} numberOfLines={1}>
+          {universeName}
         </Text>
-        <View className="flex-1" />
+        <View className="flex-row items-center">
+          <View
+            className="mr-1 h-[6px] w-[6px] rounded-full"
+            style={{ backgroundColor: editorSaveState === 'saved' ? colors.bible : colors.accent }}
+          />
+          <Text className="mr-3 text-[11px]" style={{ color: colors.faint }}>
+            {editorSaveState === 'saved' ? 'Saved' : 'Saving…'}
+          </Text>
+          <TouchableOpacity onPress={() => setGestureHelpVisible(true)} hitSlop={8}>
+            <Text style={{ color: colors.muted, fontSize: 15, fontWeight: '600' }}>?</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
+      {/* Gesture legend modal */}
+      <Modal visible={gestureHelpVisible} transparent animationType="fade">
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
+          activeOpacity={1}
+          onPress={() => setGestureHelpVisible(false)}
+        >
+          <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 24, width: 320, borderWidth: 1, borderColor: colors.border }}>
+            <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700', marginBottom: 16 }}>Gestures & Shortcuts</Text>
+            {[
+              ['2-finger swipe right', 'Open binder'],
+              ['2-finger swipe left', 'Close binder'],
+              ['Tab', 'Next block (character editor)'],
+              ['Long press universe', 'Delete universe'],
+            ].map(([gesture, action]) => (
+              <View key={gesture} style={{ flexDirection: 'row', marginBottom: 12 }}>
+                <Text style={{ color: colors.accent, fontSize: 13, fontWeight: '600', width: 180 }}>{gesture}</Text>
+                <Text style={{ color: colors.text, fontSize: 13, flex: 1 }}>{action}</Text>
+              </View>
+            ))}
+            <TouchableOpacity
+              onPress={() => setGestureHelpVisible(false)}
+              style={{ marginTop: 8, alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.bg, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}
+            >
+              <Text style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <PanGestureHandler
+        minPointers={2}
+        maxPointers={2}
+        onHandlerStateChange={({ nativeEvent }) => {
+          if (nativeEvent.state === State.END) {
+            if (nativeEvent.translationX > 60 && !binderOpen) {
+              setBinderOpen(true);
+            } else if (nativeEvent.translationX < -60 && binderOpen) {
+              dismissTransientUi();
+              setBinderOpen(false);
+            }
+          }
+        }}
+      >
       <View className="flex-1 flex-row">
         {binderOpen ? (
           <View
             className="flex-col"
             style={{ width: BINDER_WIDTH, backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border }}
           >
-            <View className="flex-row items-center px-4" style={{ height: 48, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+            <View className="flex-row items-center px-3" style={{ height: 48, borderBottomWidth: 1, borderBottomColor: colors.border }}>
               <Text className="flex-1 text-sm font-bold" style={{ color: colors.text }}>
-                {universeName}
+                Entities
               </Text>
               <TouchableOpacity
                 onPress={() => {
                   setTypePickerOpen(false);
-                                    setSortPickerOpen((current) => !current);
+                  setSortPickerOpen((current) => !current);
                 }}
+                style={{ paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: colors.border, borderRadius: 5 }}
               >
-                <Text className="text-[13px]" style={{ color: colors.text }}>
+                <Text className="text-[12px] font-medium" style={{ color: colors.text }}>
                   Sort
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
                   setSortPickerOpen(false);
-                                    setTypePickerOpen((current) => !current);
+                  setTypePickerOpen((current) => !current);
                 }}
-                className="ml-3"
+                className="ml-2"
+                style={{ paddingHorizontal: 10, paddingVertical: 2 }}
               >
-                <Text className="text-[20px]" style={{ color: colors.accent }}>
+                <Text className="text-[22px]" style={{ color: colors.accent }}>
                   +
                 </Text>
               </TouchableOpacity>
@@ -602,7 +670,8 @@ function UniverseWorkspace() {
                   dismissTransientUi();
                   setBinderOpen(false);
                 }}
-                className="ml-3"
+                className="ml-1"
+                style={{ paddingHorizontal: 8, paddingVertical: 4 }}
               >
                 <Text className="text-xl" style={{ color: colors.muted }}>
                   ‹
@@ -622,6 +691,9 @@ function UniverseWorkspace() {
 
             {typePickerOpen ? (
               <TypePicker creatingType={creatingType} onCreate={handleCreate} />
+            ) : null}
+            {createError ? (
+              <Text className="px-4 py-1 text-xs" style={{ color: '#e05050' }}>{createError}</Text>
             ) : null}
 
             {sortMode === 'manual' ? (
@@ -751,7 +823,7 @@ function UniverseWorkspace() {
           <TouchableOpacity
             onPress={() => setBinderOpen(true)}
             className="items-center justify-center"
-            style={{ width: 22, backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border }}
+            style={{ width: 36, backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border }}
           >
             <Text className="text-xl" style={{ color: colors.muted }}>
               ›
@@ -764,12 +836,17 @@ function UniverseWorkspace() {
           onTouchStart={() => {
             setSortPickerOpen(false);
             setTypePickerOpen(false);
-                      }}
+          }}
         >
-          <ContentArea justCreatedId={justCreatedId} onAutoFocusDone={() => setJustCreatedId(null)} />
+          <ContentArea
+            justCreatedId={justCreatedId}
+            onAutoFocusDone={() => setJustCreatedId(null)}
+            onSaveStateChange={setEditorSaveState}
+          />
         </View>
       </View>
-      </SafeAreaView>
+      </PanGestureHandler>
+    </SafeAreaView>
   );
 }
 

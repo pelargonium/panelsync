@@ -73,7 +73,7 @@ function NewUniverseModal({ visible, onClose, onCreate }: {
   );
 }
 
-function UniverseCard({ universe, onPress }: { universe: ApiUniverse; onPress: () => void }) {
+function UniverseCard({ universe, onPress, onLongPress }: { universe: ApiUniverse; onPress: () => void; onLongPress: () => void }) {
   const edited = new Date(universe.updatedAt);
   const diffMs = Date.now() - edited.getTime();
   const diffH = Math.floor(diffMs / 36e5);
@@ -81,13 +81,65 @@ function UniverseCard({ universe, onPress }: { universe: ApiUniverse; onPress: (
   const lastEdited = diffH < 1 ? 'Just now' : diffH < 24 ? `${diffH}h ago` : diffD === 1 ? 'Yesterday' : `${diffD} days ago`;
 
   return (
-    <TouchableOpacity style={s.card} onPress={onPress}>
+    <TouchableOpacity style={s.card} onPress={onPress} onLongPress={onLongPress} delayLongPress={500}>
       <View style={s.cardCover} />
       <View style={s.cardBody}>
         <Text style={s.cardName}>{universe.name}</Text>
         <Text style={s.cardMeta}>edited {lastEdited}</Text>
       </View>
     </TouchableOpacity>
+  );
+}
+
+function DeleteUniverseModal({ universe, onClose, onDeleted }: {
+  universe: ApiUniverse;
+  onClose: () => void;
+  onDeleted: (id: string) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleDelete() {
+    setLoading(true);
+    setError(null);
+    try {
+      await api.universes.delete(universe.id);
+      onDeleted(universe.id);
+      onClose();
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to delete universe.');
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Modal visible transparent animationType="fade">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={m.overlay}>
+        <TouchableOpacity style={m.backdrop} onPress={onClose} />
+        <View style={m.sheet}>
+          <Text style={m.title}>Delete "{universe.name}"?</Text>
+          <Text style={m.subtitle}>
+            This will permanently delete the universe and all its entities, characters, and content. This cannot be undone.
+          </Text>
+          {error ? <Text style={s.modalError}>{error}</Text> : null}
+          <View style={m.actions}>
+            <TouchableOpacity style={m.cancel} onPress={onClose}>
+              <Text style={m.cancelTxt}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[m.create, { backgroundColor: '#c0392b' }, loading && m.createOff]}
+              onPress={handleDelete}
+              disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color={colors.surface} />
+                : <Text style={m.createTxt}>Delete</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -98,6 +150,7 @@ export default function WorldsDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [pendingDeleteUniverse, setPendingDeleteUniverse] = useState<ApiUniverse | null>(null);
 
   useEffect(() => {
     getToken().then(token => {
@@ -181,6 +234,7 @@ export default function WorldsDashboard() {
               key={u.id}
               universe={u}
               onPress={() => router.push({ pathname: '/universe/[id]', params: { id: u.id, name: u.name } })}
+              onLongPress={() => setPendingDeleteUniverse(u)}
             />
           ))
         )}
@@ -191,6 +245,13 @@ export default function WorldsDashboard() {
         onClose={() => setModalVisible(false)}
         onCreate={handleCreate}
       />
+      {pendingDeleteUniverse ? (
+        <DeleteUniverseModal
+          universe={pendingDeleteUniverse}
+          onClose={() => setPendingDeleteUniverse(null)}
+          onDeleted={(id) => setUniverses(prev => prev.filter(u => u.id !== id))}
+        />
+      ) : null}
     </View>
   );
 }

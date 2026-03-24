@@ -43,6 +43,7 @@ interface CharacterEditorProps {
   entityId: string;
   autoFocusName?: boolean;
   onAutoFocusDone?: () => void;
+  onSaveStateChange?: (state: 'saved' | 'saving') => void;
 }
 
 type TextSelection = {
@@ -109,21 +110,24 @@ function TextBlock({
   onUpdate,
   onFocus,
   onSelectionChange,
+  onTabForward,
   inputRefs,
 }: {
   block: ApiBibleBlock;
   onUpdate: (id: string, patch: BlockPatch) => void;
   onFocus: () => void;
   onSelectionChange: (event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => void;
+  onTabForward: () => void;
   inputRefs: MutableRefObject<Record<string, TextInput | null>>;
 }) {
   return (
     <View className="mb-1 px-4 py-1">
       <TextInput
         value={block.content ?? ''}
-        onChangeText={(content) => onUpdate(block.id, { content })}
+        onChangeText={(content) => onUpdate(block.id, { content: content.replace(/\t/g, '') })}
         onFocus={onFocus}
         onSelectionChange={onSelectionChange}
+        onKeyPress={(e) => { if (e.nativeEvent.key === 'Tab') onTabForward(); }}
         multiline
         textAlignVertical="top"
         ref={(ref) => {
@@ -143,6 +147,7 @@ function FieldBlock({
   inputRefs,
   fieldMode,
   onFieldNext,
+  onTabForward,
 }: {
   block: ApiBibleBlock;
   onUpdate: (id: string, patch: BlockPatch) => void;
@@ -151,6 +156,7 @@ function FieldBlock({
   inputRefs: MutableRefObject<Record<string, TextInput | null>>;
   fieldMode?: boolean;
   onFieldNext?: () => void;
+  onTabForward: () => void;
 }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
@@ -211,6 +217,7 @@ function FieldBlock({
           }}
           onKeyPress={(e) => {
             const key = e.nativeEvent.key;
+            if (key === 'Tab') { onTabForward(); return; }
             if (key === 'ArrowDown') {
               setSelectedSuggestionIndex((prev) => Math.min(prev + 1, filteredSuggestions.length - 1));
             } else if (key === 'ArrowUp') {
@@ -222,7 +229,7 @@ function FieldBlock({
             setShowSuggestions(true);
           }}
           onBlur={() => {
-            blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 150);
+            blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 300);
           }}
           onSubmitEditing={() => {
             if (selectedSuggestionIndex >= 0 && filteredSuggestions[selectedSuggestionIndex]) {
@@ -267,6 +274,7 @@ function FieldBlock({
             onUpdate(block.id, { value: nextValue });
           }}
           onFocus={onFocus}
+          onKeyPress={(e) => { if (e.nativeEvent.key === 'Tab') onTabForward(); }}
           onSubmitEditing={() => {
             if (fieldMode) {
               onFieldNext?.();
@@ -284,23 +292,23 @@ function FieldBlock({
 
         {pendingDelete ? (
           <View className="ml-3 flex-row items-center">
-            <Text className="text-xs" style={{ color: colors.text }}>
+            <Text className="text-sm" style={{ color: colors.text }}>
               Delete?
             </Text>
-            <TouchableOpacity onPress={() => onDelete(block.id)} className="ml-3">
-              <Text className="text-xs font-semibold" style={{ color: '#d14b4b' }}>
+            <TouchableOpacity onPress={() => onDelete(block.id)} className="ml-3" hitSlop={8}>
+              <Text className="text-sm font-semibold" style={{ color: '#d14b4b' }}>
                 Yes
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setPendingDelete(false)} className="ml-3">
-              <Text className="text-xs font-semibold" style={{ color: colors.faint }}>
+            <TouchableOpacity onPress={() => setPendingDelete(false)} className="ml-3" hitSlop={8}>
+              <Text className="text-sm font-semibold" style={{ color: colors.faint }}>
                 No
               </Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity onPress={() => setPendingDelete(true)} className="pl-3">
-            <Text style={{ color: colors.faint, fontSize: 16 }}>
+          <TouchableOpacity onPress={() => setPendingDelete(true)} hitSlop={12} style={{ paddingLeft: 10, paddingVertical: 6 }}>
+            <Text style={{ color: colors.faint, fontSize: 18 }}>
               ×
             </Text>
           </TouchableOpacity>
@@ -349,12 +357,14 @@ function NoteBlock({
   onUpdate,
   onDelete,
   onFocus,
+  onTabForward,
   inputRefs,
 }: {
   block: ApiBibleBlock;
   onUpdate: (id: string, patch: BlockPatch) => void;
   onDelete: (id: string) => void;
   onFocus: () => void;
+  onTabForward: () => void;
   inputRefs: MutableRefObject<Record<string, TextInput | null>>;
 }) {
   const [pendingDelete, setPendingDelete] = useState(false);
@@ -389,6 +399,7 @@ function NoteBlock({
               setIsTitleFocused(true);
             }}
             onBlur={() => setIsTitleFocused(false)}
+            onKeyPress={(e) => { if (e.nativeEvent.key === 'Tab') onTabForward(); }}
             placeholder="Note Title"
             placeholderTextColor={colors.faint}
             ref={(ref) => {
@@ -415,23 +426,23 @@ function NoteBlock({
 
         {pendingDelete ? (
           <View className="ml-3 flex-row items-center">
-            <Text className="text-xs" style={{ color: colors.text }}>
+            <Text className="text-sm" style={{ color: colors.text }}>
               Delete?
             </Text>
-            <TouchableOpacity onPress={() => onDelete(block.id)} className="ml-3">
-              <Text className="text-xs font-semibold" style={{ color: '#d14b4b' }}>
+            <TouchableOpacity onPress={() => onDelete(block.id)} className="ml-3" hitSlop={8}>
+              <Text className="text-sm font-semibold" style={{ color: '#d14b4b' }}>
                 Yes
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setPendingDelete(false)} className="ml-3">
-              <Text className="text-xs font-semibold" style={{ color: colors.faint }}>
+            <TouchableOpacity onPress={() => setPendingDelete(false)} className="ml-3" hitSlop={8}>
+              <Text className="text-sm font-semibold" style={{ color: colors.faint }}>
                 No
               </Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity onPress={() => setPendingDelete(true)} className="pl-3">
-            <Text style={{ color: colors.faint, fontSize: 16 }}>
+          <TouchableOpacity onPress={() => setPendingDelete(true)} hitSlop={12} style={{ paddingLeft: 10, paddingVertical: 6 }}>
+            <Text style={{ color: colors.faint, fontSize: 18 }}>
               ×
             </Text>
           </TouchableOpacity>
@@ -442,9 +453,10 @@ function NoteBlock({
           value={body}
           onChangeText={(nextBody) => {
             setBody(nextBody);
-            onUpdate(block.id, { body: nextBody });
+            onUpdate(block.id, { body: nextBody.replace(/\t/g, '') });
           }}
           onFocus={onFocus}
+          onKeyPress={(e) => { if (e.nativeEvent.key === 'Tab') onTabForward(); }}
           multiline
           textAlignVertical="top"
           ref={(ref) => {
@@ -460,6 +472,7 @@ export default function CharacterEditor({
   entityId,
   autoFocusName = false,
   onAutoFocusDone,
+  onSaveStateChange,
 }: CharacterEditorProps) {
   const { updateEntityName, deleteEntity } = useUniverse();
   const [loading, setLoading] = useState(true);
@@ -485,9 +498,11 @@ export default function CharacterEditor({
   const lastSelectionRef = useRef<TextSelection | null>(null);
   const autoFocusNameRef = useRef(autoFocusName);
   const onAutoFocusDoneRef = useRef(onAutoFocusDone);
+  const onSaveStateChangeRef = useRef(onSaveStateChange);
   useEffect(() => {
     autoFocusNameRef.current = autoFocusName;
     onAutoFocusDoneRef.current = onAutoFocusDone;
+    onSaveStateChangeRef.current = onSaveStateChange;
   });
 
   const sortedBlocks = useMemo(() => sortBlocks(blocks, sortMode), [blocks, sortMode]);
@@ -509,11 +524,9 @@ export default function CharacterEditor({
 
   function syncSaveState() {
     const hasPendingBlockTimers = Object.keys(blockTimersRef.current).length > 0;
-    if (titleTimerRef.current || hasPendingBlockTimers || inFlightSavesRef.current > 0) {
-      setSaveState('saving');
-      return;
-    }
-    setSaveState('saved');
+    const next = (titleTimerRef.current || hasPendingBlockTimers || inFlightSavesRef.current > 0) ? 'saving' : 'saved';
+    setSaveState(next);
+    onSaveStateChangeRef.current?.(next);
   }
 
   async function runSave(task: () => Promise<void>) {
@@ -762,6 +775,22 @@ export default function CharacterEditor({
     await createBlock({ kind: 'field', label: pickedLabel, value: '' }, 'value');
   }
 
+  function focusAdjacentBlock(currentBlockId: string, direction: 'next' | 'prev') {
+    const ordered = sortBlocks(blocksRef.current, 'written');
+    const idx = ordered.findIndex((b) => b.id === currentBlockId);
+    if (idx === -1) return;
+    const target = direction === 'next' ? ordered[idx + 1] : ordered[idx - 1];
+    if (!target) {
+      if (direction === 'next') nameInputRef.current?.focus();
+      return;
+    }
+    const key =
+      target.kind === 'text' ? `${target.id}:content` :
+      target.kind === 'field' ? `${target.id}:label` :
+      `${target.id}:title`;
+    inputRefs.current[key]?.focus();
+  }
+
   async function handleConvert() {
     if (!focusedBlock || (focusedBlock.kind !== 'text' && focusedBlock.kind !== 'note')) {
       return;
@@ -851,16 +880,6 @@ export default function CharacterEditor({
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.bg }}>
-      <View className="flex-row items-center" style={{ position: 'absolute', top: 16, right: 16, zIndex: 10 }}>
-        <View
-          className="mr-2 h-[6px] w-[6px] rounded-full"
-          style={{ backgroundColor: saveState === 'saved' ? colors.bible : colors.accent }}
-        />
-        <Text className="text-xs font-medium" style={{ color: colors.faint }}>
-          {saveState === 'saved' ? 'Saved' : 'Saving…'}
-        </Text>
-      </View>
-
       <View className="px-8 pb-4 pt-10">
         <TextInput
           ref={nameInputRef}
@@ -893,17 +912,19 @@ export default function CharacterEditor({
             {COLOR_PALETTE.map((swatch) => {
               const active = swatch === color;
               return (
-                <TouchableOpacity key={swatch} onPress={() => handleColorChange(swatch)}>
+                <TouchableOpacity key={swatch} onPress={() => handleColorChange(swatch)} hitSlop={4}>
                   <View
-                    className="h-[22px] w-[22px] items-center justify-center rounded-full"
                     style={{
+                      width: 34, height: 34,
+                      alignItems: 'center', justifyContent: 'center',
+                      borderRadius: 17,
                       backgroundColor: active ? colors.pageWhite : 'transparent',
                       borderWidth: active ? 2 : 0,
                       borderColor: active ? colors.pageWhite : 'transparent',
                       transform: [{ scale: active ? 1.08 : 1 }],
                     }}
                   >
-                    <View className="h-[18px] w-[18px] rounded-full" style={{ backgroundColor: swatch }} />
+                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: swatch }} />
                   </View>
                 </TouchableOpacity>
               );
@@ -937,9 +958,7 @@ export default function CharacterEditor({
                 <TextBlock
                   block={block}
                   onUpdate={handleBlockUpdate}
-                  onFocus={() => {
-                    focusBlock(block);
-                  }}
+                  onFocus={() => { focusBlock(block); }}
                   onSelectionChange={(event) => {
                     lastSelectionRef.current = {
                       blockId: block.id,
@@ -947,6 +966,7 @@ export default function CharacterEditor({
                       end: event.nativeEvent.selection.end,
                     };
                   }}
+                  onTabForward={() => focusAdjacentBlock(block.id, 'next')}
                   inputRefs={inputRefs}
                 />
               ) : block.kind === 'field' ? (
@@ -954,23 +974,21 @@ export default function CharacterEditor({
                   block={block}
                   onUpdate={handleBlockUpdate}
                   onDelete={handleBlockDelete}
-                  onFocus={() => {
-                    focusBlock(block);
-                  }}
+                  onFocus={() => { focusBlock(block); }}
                   inputRefs={inputRefs}
                   fieldMode={fieldMode}
                   onFieldNext={async () => {
                     await createBlock({ kind: 'field', label: '', value: '' }, 'label');
                   }}
+                  onTabForward={() => focusAdjacentBlock(block.id, 'next')}
                 />
               ) : (
                 <NoteBlock
                   block={block}
                   onUpdate={handleBlockUpdate}
                   onDelete={handleBlockDelete}
-                  onFocus={() => {
-                    focusBlock(block);
-                  }}
+                  onFocus={() => { focusBlock(block); }}
+                  onTabForward={() => focusAdjacentBlock(block.id, 'next')}
                   inputRefs={inputRefs}
                 />
               )}
@@ -996,35 +1014,53 @@ export default function CharacterEditor({
       </ScrollView>
 
       <View
-        className="flex-row items-center px-4"
         style={{
           backgroundColor: colors.surface,
           borderTopWidth: 1,
           borderColor: colors.border,
-          minHeight: 44,
+          minHeight: 56,
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          flexWrap: 'wrap',
+          gap: 8,
         }}
       >
         {confirmDelete ? (
           <>
-            <Text className="text-[13px]" style={{ color: colors.faint }}>Delete?</Text>
-            <TouchableOpacity onPress={() => void deleteEntity(entityId)} className="ml-2">
-              <Text className="text-[13px] font-semibold" style={{ color: '#d14b4b' }}>Yes</Text>
+            <Text style={{ color: colors.text, fontSize: 14 }}>Delete character?</Text>
+            <TouchableOpacity
+              onPress={() => void deleteEntity(entityId)}
+              style={{ paddingHorizontal: 12, paddingVertical: 7, backgroundColor: '#c0392b', borderRadius: 6 }}
+            >
+              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>Delete</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setConfirmDelete(false)} className="ml-3">
-              <Text className="text-[13px]" style={{ color: colors.faint }}>No</Text>
+            <TouchableOpacity
+              onPress={() => setConfirmDelete(false)}
+              style={{ paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 6 }}
+            >
+              <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600' }}>Cancel</Text>
             </TouchableOpacity>
           </>
         ) : (
           <>
-            <TouchableOpacity onPress={() => setConfirmDelete(true)} className="mr-3">
-              <Text className="text-[13px]" style={{ color: colors.faint }}>Delete</Text>
+            <TouchableOpacity
+              onPress={() => setConfirmDelete(true)}
+              style={{ paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: '#c0392b', borderRadius: 6 }}
+            >
+              <Text style={{ color: '#c0392b', fontSize: 14, fontWeight: '600' }}>Delete</Text>
             </TouchableOpacity>
-            <View style={{ width: 1, height: 16, backgroundColor: colors.border, marginRight: 12 }} />
-            <TouchableOpacity onPress={() => void createBlock({ kind: 'field', label: '', value: '' }, 'label')}>
-              <Text className="text-sm font-medium" style={{ color: colors.accent }}>
-                + Field
-              </Text>
+
+            <View style={{ width: 1, height: 20, backgroundColor: colors.border }} />
+
+            <TouchableOpacity
+              onPress={() => void createBlock({ kind: 'field', label: '', value: '' }, 'label')}
+              style={{ paddingHorizontal: 10, paddingVertical: 7, backgroundColor: colors.accent, borderRadius: 6 }}
+            >
+              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>+ Field</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               onPress={async () => {
                 if (!fieldMode) {
@@ -1034,37 +1070,46 @@ export default function CharacterEditor({
                   setFieldMode(false);
                 }
               }}
-              className="ml-4"
+              style={{
+                paddingHorizontal: 10, paddingVertical: 7,
+                borderWidth: 1,
+                borderColor: fieldMode ? colors.accent : colors.border,
+                borderRadius: 6,
+              }}
             >
-              <Text
-                className="text-sm font-medium"
-                style={{
-                  color: fieldMode ? colors.text : colors.muted,
-                  textDecorationLine: fieldMode ? 'underline' : 'none',
-                }}
-              >
+              <Text style={{ color: fieldMode ? colors.accent : colors.text, fontSize: 14, fontWeight: '600' }}>
                 Fields
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => void createBlock({ kind: 'note', title: '', body: '' }, 'title')} className="ml-4">
-              <Text className="text-sm font-medium" style={{ color: colors.accent }}>
-                + Note
-              </Text>
+
+            <TouchableOpacity
+              onPress={() => void createBlock({ kind: 'note', title: '', body: '' }, 'title')}
+              style={{ paddingHorizontal: 10, paddingVertical: 7, backgroundColor: colors.accent, borderRadius: 6 }}
+            >
+              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>+ Note</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => void handleConvert()} disabled={!canConvert} className="ml-4">
-              <Text className="text-sm font-medium" style={{ color: canConvert ? colors.text : colors.faint }}>
-                {convertLabel}
-              </Text>
+
+            {canConvert ? (
+              <TouchableOpacity
+                onPress={() => void handleConvert()}
+                style={{ paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 6 }}
+              >
+                <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600' }}>{convertLabel}</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            <TouchableOpacity
+              onPress={handleRandomField}
+              style={{ paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 6 }}
+            >
+              <Text style={{ color: colors.text, fontSize: 16 }}>⚄</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleRandomField} className="ml-4">
-              <Text className="text-sm" style={{ color: colors.muted }}>
-                ⚄
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setSortMode((current) => nextSortMode(current))} className="ml-auto">
-              <Text className="text-xs" style={{ color: colors.muted }}>
-                {sortLabel(sortMode)}
-              </Text>
+
+            <TouchableOpacity
+              onPress={() => setSortMode((current) => nextSortMode(current))}
+              style={{ marginLeft: 'auto', paddingHorizontal: 8, paddingVertical: 7 }}
+            >
+              <Text style={{ color: colors.muted, fontSize: 13 }}>{sortLabel(sortMode)}</Text>
             </TouchableOpacity>
           </>
         )}
