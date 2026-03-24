@@ -97,6 +97,7 @@ function defaultNameForType(type: ApiEntity['type']) {
   if (type === 'character') return 'Untitled Character';
   if (type === 'location') return 'Untitled Location';
   if (type === 'group') return 'Untitled Group';
+  if (type === 'folder') return 'Untitled Folder';
   return 'Untitled Note';
 }
 

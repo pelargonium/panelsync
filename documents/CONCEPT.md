@@ -12,10 +12,11 @@
 - `UniverseContext.tsx`: fetches entity list + workspace state in parallel on mount. Entity CRUD: createEntity, deleteEntity, updateEntityName.
 - **Minimal UI strip (step 1 complete):** ThemeContext with light/dark toggle, monospace font, minimal palette (bg, text, muted, border, selection, error). ErrorBoundary wraps editor panel. Dashboard, workspace, EntityEditor, GroupEditor all stripped to functional minimalism. No silent `.catch(() => {})` — save failures surface as 'error' state. DraggableFlatList and PanGestureHandler removed from workspace. Binder shows flat entity list with type labels (C/L/N/G).
 - `CharacterEditor.tsx`: stripped to minimal theme (1119 → 752 lines). Block model, sort, create, delete, convert, field suggestions, autocomplete, tab nav all preserved. Color picker removed. No silent `.catch(() => {})`. Save failures surface as error state.
+- **File mode binder (step 3 complete):** `Binder.tsx` component replaces inline flat entity list. Auto type sections (Characters, Locations, Notes, Groups) — collapsible, default open. Curated folders at top level via `buildFolderTree()` using entity_memberships. Recursive `FolderContents` for arbitrary nesting depth. Folder/group expand/collapse with v/> indicators. Create picker includes folder type. `[id].tsx` workspace simplified from 295 to 185 lines — all binder logic moved to Binder component.
 - DESIGN.md: fully updated. "Lenses, Not Containers" foregrounded. Four binder modes designed: Everything, File, Publishing, Board. Bible as entity type specified. Staging area, perspectives, folder deletion dialog, depth control, Publishing mode all specified. Content model section added: entity pages as nested documents, block types (text, field, note, script) as universal atoms, promotion-from-selection pattern, starter fields as prompts. Dossier clarified as freeform spatial canvas (v1 = linear scroll; target = infinite canvas with coordinates on every item). Block types valid in any entity page including script blocks.
 
 ## Next Step
-Build File mode binder with auto type sections and curated folders.
+Add binder keyboard navigation: arrow keys, Enter to open, expand/collapse, type-to-filter, Cmd+N inline creation.
 
 ---
 
@@ -73,8 +74,8 @@ Build File mode binder with auto type sections and curated folders.
 ### Build Sequence
 
 1. ~~**Strip + dark mode**~~ ✅ — ThemeContext, minimal palette, monospace, ErrorBoundary, no silent failures
-2. **Strip CharacterEditor** — migrate to minimal theme, same block model
-3. **File mode binder** — auto type sections (Characters, Locations, Notes), curated folders via entity_memberships, nesting, indentation
+2. ~~**Strip CharacterEditor**~~ ✅ — migrated to minimal theme, same block model
+3. ~~**File mode binder**~~ ✅ — auto type sections (Characters, Locations, Notes, Groups), curated folders via entity_memberships, recursive nesting, depth indentation, Binder component extracted
 4. **Binder keyboard nav** — arrow keys, Enter, expand/collapse, type-to-filter, Cmd+N inline creation
 5. **Editor keyboard flow** — Tab between blocks, Cmd+Enter new block, block type labels, focus indicator
 6. **Unified editor** — merge CharacterEditor/EntityEditor/GroupEditor into one. Any block type on any entity type. Members section with role-based hierarchy (requires `role` text column on `entity_memberships`).

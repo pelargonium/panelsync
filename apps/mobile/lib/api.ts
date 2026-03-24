@@ -105,7 +105,7 @@ export interface ApiScriptBlock {
 export interface ApiEntity {
   id: string;
   universeId: string;
-  type: 'character' | 'location' | 'note' | 'group';
+  type: 'character' | 'location' | 'note' | 'group' | 'folder';
   name: string;
   color: string | null;
   position: number | null;
