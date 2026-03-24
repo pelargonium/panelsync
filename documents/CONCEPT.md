@@ -2,25 +2,21 @@
 
 ## Current Build State
 - Expo Router + NativeWind wired up. App runs on web and iPad. Navigation: `/` (Universes Dashboard) → `/universe/[id]`.
-- Revised Drizzle schema: 18 tables. Flexible publication hierarchy via `hierarchy_levels` + `containers` (replaces hardcoded series/issues). Dossier foundation: `dossier_attachments`, `dossier_canvas_state`. Supporting: `drafts`, `files`, `events`, `workspace_state`. Removed 9 tables (series, issues, panels, storyboard_pages, bible_entry_images, bible_entry_series_overlays, note_folders, asset_timeline_tags, pinned_items).
+- API deployed to Railway at `https://panelsyncapi-production.up.railway.app`. Neon DATABASE_URL and JWT_SECRET set as Railway env vars. Railway runs `npm run build && npm run start` via `railway.json` (fixes stale dist/ problem).
+- Schema: 24 tables. `bible_entries` renamed to `entities`, `bibleEntryTypeEnum` → `entityTypeEnum` (added 'bible' and 'folder' values), `dossier_attachments.entity_type` value `'bible_entry'` → `'entity'`. New tables: `tags`, `entity_tags`, `entity_memberships`, `boards`, `board_members`, `perspectives`. `workspace_state` has `stagingArea jsonb` and `everythingDepth text` fields. Migrations 0005–0007 applied to Neon.
+- Entity routes: `/api/universes/:id/entities`, `/api/entities/:id`, `/api/entities/:id/content`. All auth-gated.
 - Real auth: `POST /api/auth/register` and `POST /api/auth/login` with scrypt + JWT.
-- Container routes at `/api/containers`, `/api/hierarchy`, `/api/drafts`, `/api/pages`. All auth-gated, universe-membership-checked.
 - Workspace state routes: `GET /api/workspace-state`, `PUT /api/workspace-state` — per-user per-universe nav persistence.
-- Bible API: `GET/POST /api/universes/:id/bible`, `GET/PATCH /api/bible/:id`, `PATCH /api/bible/:id/content`, `DELETE /api/bible/:id`. Backed by `bible_entries` + `dossier_attachments` (type='text'). All auth-gated.
-- `UniverseContext.tsx`: fetches entity list + workspace state in parallel on mount. Entity CRUD: createEntity, deleteEntity, updateEntityName. pagesByContainer/loadPages shims kept for ScriptEditor typecheck compatibility.
-- `universe/[id].tsx`: binder shows flat entity list only (no hierarchy). Binder header: universe name + Sort + + + collapse. Sort picker (A-Z / Type / Recent). Type picker (Character / Location / Note) on + tap. Entity rows: border-bottom demarcation, left accent bar + bg tint on active row, type color dot. Manual sort mode (DraggableFlatList) with position stored on bible_entries. Delete removed from binder rows — now lives in entity editors only.
-- `EntityEditor.tsx`, `CharacterEditor.tsx`, `GroupEditor.tsx`: delete button + confirmation at bottom of editor. Two-step confirm: tap Delete → "Delete? Yes / No" inline.
-- Script editor: `ScriptEditor.tsx` still present. Final Draft-style visual design. Not currently routed to from the new binder (hierarchy removed), but component is intact.
 - Block CRUD API: `GET/POST /api/pages/:pageId/blocks`, `PATCH/DELETE /api/pages/:pageId/blocks/:blockId`.
-- All migrations applied to Neon including 0004 (bible_entries.position real column).
-- CharacterEditor: holistic text model — TextBlocks have no delete button (select+backspace to delete). Deleting a field/note between two text blocks auto-merges them. Trailing InsertZone appends at true end. New character creation auto-focuses name input. Toolbar: + Field, Fields, + Note, → Note/→ Text (convert), ⚄, sort (Document/Type/A–Z).
-- Groups: bible entries with type='group'. Membership stored in dossier_attachments. Binder shows expandable group rows. GroupEditor: name, color, body, members list + add/remove. NOTE: groups are scaffolding — the binder will be redesigned per the four-mode model before groups are built out further.
-- `GestureHandlerRootView` moved to `_layout.tsx` (app root). `import 'react-native-gesture-handler'` side-effect import added. `activationDistance={0}` on DraggableFlatList. DnD trigger uses `TouchableOpacity` from gesture handler. Web DnD fix applied — browser testing still needed to confirm.
-- DESIGN.md: major update. "Lenses, Not Containers" section added and foregrounded. Four binder modes fully designed: Everything (canonical base reality), File (structured lens with auto-generated type folders + user-created curated folders), Publishing (production hierarchy lens), Board (drag-to-build named panels, replaces "Workspace" mode name). Staging area, perspectives, folder deletion behavior all specified.
-- CLAUDE.md: "Lenses, Not Containers" read directive added to session start checklist.
+- EAS configured: `eas.json` has preview profile with `EXPO_PUBLIC_API_URL` baked in. iPad UDID registered, provisioning profile covers device. App installs and runs on iPad.
+- `UniverseContext.tsx`: fetches entity list + workspace state in parallel on mount. Entity CRUD: createEntity, deleteEntity, updateEntityName.
+- `universe/[id].tsx`: binder shows flat entity list. Type picker (Character / Location / Note) on + tap. Entity rows with accent bar + bg tint. Manual sort via DraggableFlatList.
+- `CharacterEditor.tsx`: holistic text model, FieldBlocks with autocomplete suggestions (keyboard arrow-key navigation), random generator (⚄), toolbar actions (+ Field, Fields, + Note, convert, sort). **Known iPad issues — see Deferred.**
+- `EntityEditor.tsx`, `GroupEditor.tsx`: delete + two-step inline confirmation.
+- DESIGN.md: fully updated. "Lenses, Not Containers" foregrounded. Four binder modes designed: Everything, File, Publishing, Board. Bible as entity type specified. Staging area, perspectives, folder deletion dialog, depth control, Publishing mode all specified. Content model section added: entity pages as nested documents, block types (text, field, note, script) as universal atoms, promotion-from-selection pattern, starter fields as prompts. Dossier clarified as freeform spatial canvas (v1 = linear scroll; target = infinite canvas with coordinates on every item). Block types valid in any entity page including script blocks.
 
 ## Next Step
-Deploy the API to Railway so the app can be tested on iPad with real persistence.
+iPad polish pass — work through the full list in Deferred below.
 
 ---
 
@@ -28,6 +24,50 @@ Deploy the API to Railway so the app can be tested on iPad with real persistence
 - `packages/types` shared package — wait until schema is written, then extract shared interfaces
 - `apps/api/.env` is gitignored — Neon DATABASE_URL must be re-entered if repo is cloned fresh
 - Rename "Universe" → "World" in codebase — spec uses "Universe" now confirmed; codebase matches
+
+### iPad Polish (full list)
+
+**CharacterEditor toolbar**
+- Delete is `colors.faint` text — not a recognizable button; make it a proper bold button with visual weight
+- + Field, + Note, Fields, → Note/→ Text too small and text-link styled — make them proper button components with clear demarcation
+- ⚄ random field too small — needs a larger tap target
+- All toolbar items crowded in a single `minHeight: 44` row — needs more breathing room
+
+**CharacterEditor blocks**
+- Field and note block × delete button too small (fontSize 16, pl-3 only) — increase tap target
+- `Delete? Yes / No` inline confirm is `text-xs` — nearly unreadable
+- Autocomplete blur timer (150ms) may dismiss suggestions before tap registers on iPad — increase or restructure
+
+**CharacterEditor header**
+- Color swatches are 22×22px — marginal touch target
+
+**Binder**
+- Collapsed binder strip is 22px wide — nearly untappable; widen or replace with a gesture
+- Two-finger swipe right on content area → open binder; two-finger swipe left on binder → close binder
+- "Sort" in binder header has no button affordance
+
+**Top bar**
+- Replace "← Universes" with universe name as the prominent element; use a small `‹` or "All" for the back action
+- Remove hardcoded `● Saved` from top bar; move CharacterEditor's live save state indicator into the top bar so there is exactly one save indicator in one consistent location
+
+**Safe area**
+- Bottom of app is clipped above home bar — use `edges={['top']}` on SafeAreaView so background fills to true screen edge
+
+**Navigation**
+- Back-to-universes animation slides right (back feel) — should slide left (forward feel); configure stack animation
+
+**Keyboard navigation (hardware keyboard)**
+- Tab does nothing useful in the character editor — intercept Tab in `onKeyPress` to move focus to next block, Shift+Tab for previous block
+
+**Gesture legend**
+- No gesture/shortcut reference anywhere — add a `?` button in the chrome that shows a popover listing available gestures and keyboard shortcuts
+
+**Universe dashboard**
+- No way to delete a universe — add `DELETE /api/universes/:id` server route (client already has `api.universes.delete`), plus long-press → confirm affordance on universe cards
+
+**Error handling**
+- `handleCreate` in `universe/[id].tsx` silently swallows entity creation errors — add visible error state
+- Block saves fail silently (`.catch(() => {})`) — save state dot returns to Saved even on failure
 ---
 
 ## Active Decisions
@@ -50,7 +90,8 @@ Pivoted from sprint-by-feature model. Focus: make the universe workspace feel re
 | ✅ Foundation | Expo monorepo, NativeWind, Expo Router, auth, Drizzle schema, workspace shell |
 | ✅ Script editor | Block-based editor, Final Draft visual style, block CRUD API |
 | ✅ Entity list + editor | Flat entity list in binder, freeform text editor, persists to DB |
-| Next | Deploy to Railway + EAS build → iPad |
+| ✅ Railway + iPad | API on Railway, EAS build, app running on iPad |
+| Next | CharacterEditor iPad polish (tappable autocomplete, button sizing) |
 | After | Global chrome (top bar), Universe Home screen |
 | After | Bible entity types (structured fields for characters, locations) |
 | After | Binder full feature set (search, sections, tear-off) |

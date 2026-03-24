@@ -246,6 +246,62 @@ These questions surface edge cases and reveal connections that fixed-schema thin
 
 ---
 
+## The Content Model
+
+### The Dossier Is a Spatial Canvas
+
+The end state for every entity that "IS" a dossier (Character, Location, Note, Bible, Timeline Event) is a **freeform infinite canvas** — like Apple Freeform or a physical corkboard. Content items are placed anywhere. Text can be written anywhere. Drawings can go anywhere. Things can be connected by lines, clustered by proximity, arranged in whatever spatial logic makes sense to the author. There is no imposed order.
+
+This is not a v1 feature — it is the direction everything is heading. Every design decision about entity pages should be evaluated against this destination.
+
+**v1 approximation:** Until the canvas renderer is built, entity pages render content as a linear vertical scroll — a document. This is the right v1 shape because it is buildable now and maps cleanly onto the final data model. Nothing built in v1 needs to be thrown away.
+
+### Block Types — The Underlying Atoms
+
+Whether rendered linearly (v1) or spatially (canvas), the content atoms are the same:
+
+- **Text** — freeform prose. In v1: a text block in the scroll. On canvas: a card placed anywhere, with x/y coordinates.
+- **Field** — a named attribute with a value (Role, Age, Appearance, etc.). In v1: a label/value row. On canvas: a small card.
+- **Note** — a titled sub-document with its own content. In v1: nested in the scroll. On canvas: a card that can be opened or expanded in place.
+- **Script block** — typed content in Final Draft format (dialogue, caption, description, panel, sfx). Valid in any entity page, not just script pages.
+- **Image** — imported reference. In v1: inline. On canvas: freely positioned.
+- **Drawing** — created in-app via Skia. In v1: inline. On canvas: freely placed.
+- **Entity reference** — a live link card to another entity. In v1: a reference row. On canvas: a card you can pull to any position.
+- **Timeline pin** — a live slice of timeline data. In v1: a row. On canvas: a card.
+
+All of these are stored in `dossier_attachments`. The payload carries `canvas_x`, `canvas_y`, `canvas_w`, `canvas_h` for every item — the canvas coordinates are stored from day one even when the linear renderer ignores them.
+
+**In File mode's binder (v1)**, an entity page can be expanded to show its top-level notes and sub-documents as children. Grab, reorder, or open them directly without opening the full parent document.
+
+### Script Blocks Everywhere
+
+A script block is not exclusive to the script editor. A character page for Kenshiro can contain a dialogue block: *"You don't even know you're about to die."* A location page can contain a caption describing its establishing shot.
+
+Script blocks in entity pages are draft and brainstorm content. They do not automatically appear in the script editor's continuous scroll — but they can be promoted to a script page or referenced from the script. Character pages are where ideas live before they have a home. The script is where the work is finalized.
+
+### Promotion from Selection
+
+Any selected content, anywhere in the app, can be promoted into a new entity. Long-press (or right-click) on a selection reveals a context menu:
+
+- **New character from selection**
+- **New location from selection**
+- **New note from selection**
+- **New script page from selection**
+
+The selected content is **copied** into the new entity as its opening block. The new entity opens immediately for naming. The original is untouched — delete it if it is no longer needed where it was.
+
+This means entity creation does not have to start in the binder. Write freely, promote when something earns its own page.
+
+### Starter Fields as Prompts
+
+When a new Character is created, a small set of starter fields are pre-populated on the page — Role, Age, and one or two more. These are there because most characters have them and they give a new user something to engage with immediately.
+
+The rest of the field suggestions (Motivation, Fears, Desires, Pronouns, Speech Patterns, etc.) are discoverable — a menu of things to think about — but not pre-populated.
+
+The principle: a character page should never feel like a form. It should feel like a blank page with a few helpful labels on it, ready to become whatever this character needs to be. Ideas can be added at any time — nothing needs to be filled in upfront.
+
+---
+
 ## Data Types and What We Know About Them
 
 ### The Universal Pattern
@@ -320,7 +376,7 @@ A character is a **living dossier** — not a static record with fixed fields.
 
 **Series overlays:** Series-specific context stored as dossier attachments with `context: { "container_id": "..." }` scoped to the relevant series container. They layer on top of universal facts without replacing them.
 
-**Minimum fixed fields:** Only `name`, `type`, `color`. Everything else — appearance, backstory, personality, custom fields, images, sketches, waypoints, series overlays — is a dossier attachment. There are no prescribed fields beyond the minimum. A writer making a comic of two people waiting for nobody needs to fill nothing in.
+**Minimum fixed fields:** Only `name`, `type`, `color`. Everything else — appearance, backstory, personality, custom fields, images, sketches, waypoints, series overlays — is a dossier attachment or a content block on the entity page. There are no prescribed fields beyond the minimum. A writer making a comic of two people waiting for nobody needs to fill nothing in. See Content Model → Starter Fields as Prompts for how the editor handles this on first open.
 
 **Key fact:** A character page IS a dossier — it is the primary interface for that entity. There is no separate "character screen."
 
@@ -482,19 +538,24 @@ All entry points call the same underlying operation — updating `container_id` 
 
 ### What a Dossier Is
 
-A dossier is a **permanent, creative, living collection of context** attached to an entity. It is part of the work itself, not communication about it.
+A dossier is a **freeform spatial canvas** attached to an entity — the permanent, living creative context for that thing. It is part of the work itself, not communication about it.
 
-A dossier can contain:
-- Text fields and freeform notes
+In v1, dossiers render as linear vertical scrolls (a document). The end state is an infinite canvas where every item has x/y coordinates and can be placed anywhere — text, drawings, images, reference cards, entity links, timeline pins. Content is arranged spatially in whatever logic makes sense to the author, not in an imposed order.
+
+**The physical analogy:** a corkboard covered in index cards, sticky notes, printouts, and sketches — but live, connected, and infinite. The connections between cards are real data links, not just visual proximity.
+
+A dossier can contain (see Content Model for full block type definitions):
+- Text — freeform prose or notes, written anywhere
+- Fields — named attributes
+- Notes — titled sub-documents, nestable
+- Script blocks — dialogue, captions, descriptions
 - Images (imported)
-- Drawings and sketches (created in-app using the Skia drawing engine)
-- Handwritten notes (same drawing engine)
-- Script references — links to specific blocks or pages
-- Timeline connections — pinned slices of timeline data, live and connected
-- Links to other entities
+- Drawings and sketches (created in-app via Skia)
+- Entity references — live link cards to other entities
+- Timeline pins — live slices of timeline data
 - Any view of any data — a filtered character list, a timeline range, an issue map — pinned as a living reference
 
-**The Pinterest analogy:** A dossier is like Pinterest but for your own creative output. You curate pieces of your own work and arrange them in a way that gives you the context you need. The connections are live, not static.
+**The Pinterest analogy:** A dossier is like Pinterest but for your own creative output. You arrange pieces of your own work spatially in a way that gives you the context you need. The connections are live, not static.
 
 ### Two Relationships: IS and HAS
 
@@ -506,12 +567,13 @@ Page, Script Block, Container (Issue/Series), Universe. The primary interface is
 
 ### Dossier Layout
 
-The user can set layout per dossier:
-- **Vertical scroll** (v1)
-- **Horizontal scroll** (v1)
-- **Freeform canvas** (v2 — Freeform-style, items have x/y/w/h positions)
+Rendering modes:
+- **Vertical scroll** (v1 default) — linear document, items ordered by position float
+- **Freeform canvas** (target) — infinite canvas, items have x/y/w/h, placed freely
 
-Layout preference is stored in `dossier_canvas_state`. The data structure supports canvas positioning now (payload can carry `canvas_x`, `canvas_y`, `canvas_w`, `canvas_h`) even though the canvas renderer ships in v2.
+Canvas coordinates are stored in every `dossier_attachments` payload from day one. When the canvas renderer ships, no migration is needed — items without coordinates get auto-placed, items with coordinates render where they were last positioned.
+
+Layout preference is stored in `dossier_canvas_state`.
 
 ### Dossier Navigation — The Interaction Model
 
