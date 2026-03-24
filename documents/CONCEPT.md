@@ -16,7 +16,70 @@
 - DESIGN.md: fully updated. "Lenses, Not Containers" foregrounded. Four binder modes designed: Everything, File, Publishing, Board. Bible as entity type specified. Staging area, perspectives, folder deletion dialog, depth control, Publishing mode all specified. Content model section added: entity pages as nested documents, block types (text, field, note, script) as universal atoms, promotion-from-selection pattern, starter fields as prompts. Dossier clarified as freeform spatial canvas (v1 = linear scroll; target = infinite canvas with coordinates on every item). Block types valid in any entity page including script blocks.
 
 ## Next Step
-iPad polish pass — work through the full list in Deferred below.
+Strip UI to functional minimalism and build the File mode binder with keyboard-first navigation.
+
+---
+
+## Direction: Keyboard-First Minimal Prototype
+
+**Goal:** Get the app to a place where it feels good to brainstorm — create entities, organize them, connect them, generate content rapidly. Not scripts yet. World-building.
+
+**Approach:**
+- Strip all visual decoration. Monospace font, no icons, no color except state (selected, active, saved/unsaved). Dark mode from the start (light/dark toggle).
+- File mode binder as the primary navigation surface, keyboard-navigable.
+- Keyboard shortcuts are core UX, designed alongside every feature.
+- Build the creation environment first (File mode). Generate real content. Then build the discovery environment (Everything mode) and test it against real data.
+
+**Minimum visible UI:**
+- Top: universe name (left), save state (right)
+- Left panel: binder — filter field, collapsible type sections, curated folders with nesting, selection highlight
+- Right panel: editor — entity name, blocks with type labels, focus indicator on active block
+- Bottom: "Cmd+/ for shortcuts" hint
+- Rows ~44pt for tap fallback. No toolbar, no icons, no chrome beyond this.
+
+### Keyboard Map
+
+**Focus**
+- Escape — context-dependent retreat (dismiss autocomplete → deselect block → focus binder → clear filter → collapse folder)
+- Cmd+B — toggle binder
+- Cmd+K — quick switcher (fuzzy search, Enter to jump)
+
+**Binder (when focused)**
+- Up/Down — move selection
+- Enter — open selected entity in editor
+- Right — expand folder/section
+- Left — collapse folder/section, or select parent
+- Start typing — live filter
+- Escape — clear filter, or deselect
+- Cmd+N — new entity (inline type picker, name field, Enter to create)
+- Cmd+Shift+N — new folder
+- Delete/Cmd+Backspace — delete selected (inline y/n confirm)
+- F2 — rename selected inline
+
+**Editor (when focused)**
+- Tab/Shift+Tab — next/previous block
+- Cmd+Enter — new block below
+- Cmd+Shift+Enter — new block above
+- Cmd+Backspace — delete block (inline confirm)
+- @ — entity mention autocomplete
+- / — block type picker (at start of empty block)
+- Cmd+Shift+T — cycle block type
+- Escape — deselect block, focus binder
+
+**App-level**
+- Cmd+D — toggle dark/light
+- Cmd+S — force save
+- Cmd+/ — shortcut reference
+
+### Build Sequence
+
+1. **Strip + dark mode** — replace existing styled UI with minimal monospace theme, ThemeContext with light/dark toggle
+2. **File mode binder** — auto type sections (Characters, Locations, Notes), curated folders via entity_memberships, nesting, indentation
+3. **Binder keyboard nav** — arrow keys, Enter, expand/collapse, type-to-filter, Cmd+N inline creation
+4. **Editor keyboard flow** — Tab between blocks, Cmd+Enter new block, block type labels, focus indicator
+5. **@-mention linking** — autocomplete in text blocks, creates entity_link dossier attachment
+6. **Generate real content** — use the app to brainstorm a world
+7. **Everything mode** — flat view, strip folder context, see what the unstructured pile looks like
 
 ---
 
@@ -24,66 +87,29 @@ iPad polish pass — work through the full list in Deferred below.
 - `packages/types` shared package — wait until schema is written, then extract shared interfaces
 - `apps/api/.env` is gitignored — Neon DATABASE_URL must be re-entered if repo is cloned fresh
 - Rename "Universe" → "World" in codebase — spec uses "Universe" now confirmed; codebase matches
+- iPad visual polish (tap targets, button styling, color swatches, toolbar layout) — revisit after keyboard-first prototype validates the interaction model
+- Gesture navigation (two-finger swipe for binder toggle) — deferred, keyboard handles this
+- Storyboard canvas, Timeline tool, Collaboration, Export — later phases
+- API route splitting (containers.ts) — do when touching those routes next
+- API input validation (Typebox) — apply as routes are modified
+- Test infrastructure (Vitest + supertest) — set up with first route refactor
 
-### iPad Polish (full list)
-
-**CharacterEditor toolbar**
-- Delete is `colors.faint` text — not a recognizable button; make it a proper bold button with visual weight
-- + Field, + Note, Fields, → Note/→ Text too small and text-link styled — make them proper button components with clear demarcation
-- ⚄ random field too small — needs a larger tap target
-- All toolbar items crowded in a single `minHeight: 44` row — needs more breathing room
-
-**CharacterEditor blocks**
-- Field and note block × delete button too small (fontSize 16, pl-3 only) — increase tap target
-- `Delete? Yes / No` inline confirm is `text-xs` — nearly unreadable
-- Autocomplete blur timer (150ms) may dismiss suggestions before tap registers on iPad — increase or restructure
-
-**CharacterEditor header**
-- Color swatches are 22×22px — marginal touch target
-
-**Binder**
-- Collapsed binder strip is 22px wide — nearly untappable; widen or replace with a gesture
-- Two-finger swipe right on content area → open binder; two-finger swipe left on binder → close binder
-- "Sort" in binder header has no button affordance
-
-**Top bar**
-- Replace "← Universes" with universe name as the prominent element; use a small `‹` or "All" for the back action
-- Remove hardcoded `● Saved` from top bar; move CharacterEditor's live save state indicator into the top bar so there is exactly one save indicator in one consistent location
-
-**Safe area**
-- Bottom of app is clipped above home bar — use `edges={['top']}` on SafeAreaView so background fills to true screen edge
-
-**Navigation**
-- Back-to-universes animation slides right (back feel) — should slide left (forward feel); configure stack animation
-
-**Keyboard navigation (hardware keyboard)**
-- Tab does nothing useful in the character editor — intercept Tab in `onKeyPress` to move focus to next block, Shift+Tab for previous block
-
-**Gesture legend**
-- No gesture/shortcut reference anywhere — add a `?` button in the chrome that shows a popover listing available gestures and keyboard shortcuts
-
-**Universe dashboard**
-- No way to delete a universe — add `DELETE /api/universes/:id` server route (client already has `api.universes.delete`), plus long-press → confirm affordance on universe cards
-
-**Error handling**
-- `handleCreate` in `universe/[id].tsx` silently swallows entity creation errors — add visible error state
-- Block saves fail silently (`.catch(() => {})`) — save state dot returns to Saved even on failure
 ---
 
 ## Active Decisions
 - ORM: Drizzle (schema is TypeScript, easy to change)
 - Hosting: Railway (API + Postgres), Cloudflare Pages (web), Cloudflare R2 (files)
 - Monorepo: npm workspaces — Metro already configured with watchFolders
-- Mockups: Expo screens in `apps/mobile/app/mockups/` (not HTML), so they're directly portable
 - Auth: JWT (email + password). OAuth deferred to v2.
 - Sync: REST polling, last-write-wins. Yjs CRDT deferred to v2.
-- Script editor: custom rich text engine, ProseMirror adapter. Single component, iPad + web.
-- Drawing canvas: React Native Skia, iPad only in v1.
+- UI: functional minimalism, monospace, dark/light mode, keyboard-first
+- Script editor: deferred until world-building loop feels good
+- Drawing canvas: React Native Skia, deferred
 
 ---
 
 ## Sprint Position
-Pivoted from sprint-by-feature model. Focus: make the universe workspace feel real and usable before deepening individual features.
+Pivoted from feature sprints to interaction-first prototyping. Build the keyboard-first brainstorming loop, validate with real content, then layer visual design and additional features.
 
 | Phase | Deliverable |
 |-------|-------------|
@@ -91,8 +117,8 @@ Pivoted from sprint-by-feature model. Focus: make the universe workspace feel re
 | ✅ Script editor | Block-based editor, Final Draft visual style, block CRUD API |
 | ✅ Entity list + editor | Flat entity list in binder, freeform text editor, persists to DB |
 | ✅ Railway + iPad | API on Railway, EAS build, app running on iPad |
-| Next | CharacterEditor iPad polish (tappable autocomplete, button sizing) |
-| After | Global chrome (top bar), Universe Home screen |
-| After | Bible entity types (structured fields for characters, locations) |
-| After | Binder full feature set (search, sections, tear-off) |
+| Next | Minimal UI strip + dark mode + File mode binder + keyboard navigation |
+| After | @-mention linking, quick switcher, editor keyboard flow |
+| After | Generate real content, evaluate, build Everything mode |
+| Later | Visual design pass, Publishing mode, script editor integration |
 | Later | Storyboard canvas (Skia), Timeline tool, Collaboration, Export |
