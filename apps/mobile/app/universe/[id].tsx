@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Platform,
+  ScrollView,
   Text,
   TouchableOpacity,
   View,
@@ -56,6 +57,25 @@ function PrimaryContent({
   return <EmptyContent />;
 }
 
+function ShortcutSection({ mono, colors, title, items }: {
+  mono: string;
+  colors: { text: string; muted: string; border: string };
+  title: string;
+  items: [string, string][];
+}) {
+  return (
+    <View style={{ marginBottom: 16 }}>
+      <Text style={{ fontFamily: mono, fontSize: 10, color: colors.muted, letterSpacing: 1, marginBottom: 6 }}>{title}</Text>
+      {items.map(([key, desc]) => (
+        <View key={key} style={{ flexDirection: 'row', paddingVertical: 3 }}>
+          <Text style={{ fontFamily: mono, fontSize: 11, color: colors.text, width: 120 }}>{key}</Text>
+          <Text style={{ fontFamily: mono, fontSize: 11, color: colors.muted, flex: 1 }}>{desc}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function UniverseWorkspace() {
   const router = useRouter();
   const { colors, mono, toggle, mode } = useTheme();
@@ -70,8 +90,9 @@ function UniverseWorkspace() {
   const [creatingType, setCreatingType] = useState<ApiEntity['type'] | null>(null);
   const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
   const [editorSaveState, setEditorSaveState] = useState<'saved' | 'saving'>('saved');
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
-  // App-level keyboard shortcuts (Cmd+B toggle binder, Cmd+D toggle theme)
+  // App-level keyboard shortcuts
   const appKeyRef = useRef<(e: KeyboardEvent) => void>(undefined);
   appKeyRef.current = (e: KeyboardEvent) => {
     if (e.metaKey && e.key === 'b') {
@@ -81,6 +102,14 @@ function UniverseWorkspace() {
     if (e.metaKey && e.key === 'd') {
       e.preventDefault();
       toggle();
+    }
+    if (e.key === '/' && e.metaKey) {
+      e.preventDefault();
+      setShortcutsOpen((v) => !v);
+    }
+    if (e.key === 'Escape' && shortcutsOpen) {
+      e.preventDefault();
+      setShortcutsOpen(false);
     }
   };
 
@@ -142,6 +171,9 @@ function UniverseWorkspace() {
             {mode === 'dark' ? 'light' : 'dark'}
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => setShortcutsOpen((v) => !v)} style={{ marginLeft: 12 }}>
+          <Text style={{ fontFamily: mono, fontSize: 11, color: shortcutsOpen ? colors.text : colors.muted }}>?</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={{ flex: 1, flexDirection: 'row' }}>
@@ -179,6 +211,57 @@ function UniverseWorkspace() {
             />
           </ErrorBoundary>
         </View>
+
+        {/* Shortcut reference overlay */}
+        {shortcutsOpen && (
+          <View style={{
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: 280,
+            backgroundColor: colors.bg,
+            borderLeftWidth: 1,
+            borderLeftColor: colors.border,
+            zIndex: 20,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, height: 36, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+              <Text style={{ fontFamily: mono, fontSize: 12, color: colors.text, flex: 1 }}>shortcuts</Text>
+              <TouchableOpacity onPress={() => setShortcutsOpen(false)}>
+                <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>x</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ flex: 1, padding: 12 }}>
+              <ShortcutSection mono={mono} colors={colors} title="BINDER" items={[
+                ['Up/Down', 'move selection'],
+                ['Shift+Up/Down', 'extend selection'],
+                ['Enter', 'open entity'],
+                ['Right', 'expand'],
+                ['Left', 'collapse / parent'],
+                ['Escape', 'clear selection / filter'],
+                ['type', 'filter'],
+                ['Cmd+N', 'new entity'],
+                ['Cmd+Shift+N', 'new folder'],
+                ['Cmd+M', 'move to folder'],
+                ['F2', 'rename'],
+                ['Delete', 'delete (y/n)'],
+              ]} />
+              <ShortcutSection mono={mono} colors={colors} title="EDITOR" items={[
+                ['Tab', 'next block'],
+                ['Shift+Tab', 'previous block'],
+                ['Cmd+Enter', 'new block below'],
+                ['Cmd+Shift+Enter', 'new block above'],
+                ['Cmd+Backspace', 'delete block (y/n)'],
+                ['Escape', 'deselect block'],
+              ]} />
+              <ShortcutSection mono={mono} colors={colors} title="APP" items={[
+                ['Cmd+B', 'toggle binder'],
+                ['Cmd+D', 'toggle dark/light'],
+                ['Cmd+/', 'this panel'],
+              ]} />
+            </ScrollView>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );

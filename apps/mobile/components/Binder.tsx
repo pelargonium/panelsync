@@ -147,6 +147,7 @@ function BinderEntityRow({
   depth,
   isActive,
   isFocused,
+  isSelected,
   isRenaming,
   renameValue,
   onRenameChange,
@@ -158,6 +159,7 @@ function BinderEntityRow({
   depth: number;
   isActive: boolean;
   isFocused: boolean;
+  isSelected: boolean;
   isRenaming: boolean;
   renameValue: string;
   onRenameChange: (text: string) => void;
@@ -181,7 +183,7 @@ function BinderEntityRow({
         paddingLeft: 12 + depth * 16,
         paddingRight: 12,
         paddingVertical: 10,
-        backgroundColor: isActive ? colors.selection : 'transparent',
+        backgroundColor: isSelected ? colors.selection : isActive ? colors.selection : 'transparent',
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
         borderLeftWidth: isFocused ? 2 : 0,
@@ -222,6 +224,7 @@ function BinderFolderRow({
   depth,
   isActive,
   isFocused,
+  isSelected,
   isExpanded,
   childCount,
   isRenaming,
@@ -235,6 +238,7 @@ function BinderFolderRow({
   depth: number;
   isActive: boolean;
   isFocused: boolean;
+  isSelected: boolean;
   isExpanded: boolean;
   childCount: number;
   isRenaming: boolean;
@@ -260,7 +264,7 @@ function BinderFolderRow({
         paddingLeft: 12 + depth * 16,
         paddingRight: 12,
         paddingVertical: 10,
-        backgroundColor: isActive ? colors.selection : 'transparent',
+        backgroundColor: isSelected ? colors.selection : isActive ? colors.selection : 'transparent',
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
         borderLeftWidth: isFocused ? 2 : 0,
@@ -348,6 +352,7 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType }:
   const {
     entities, memberships, loadingEntities,
     activeEntityId, activateEntity, updateEntityName, deleteEntity,
+    addMembership, removeMembership,
   } = useUniverse();
 
   // ── State ──────────────────────────────────────────────────────────────
@@ -359,6 +364,9 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType }:
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectionAnchorIndex, setSelectionAnchorIndex] = useState<number | null>(null);
+  const [movePickerOpen, setMovePickerOpen] = useState(false);
+  const [movePickerIndex, setMovePickerIndex] = useState(0);
 
   const scrollViewRef = useRef<ScrollView>(null);
   const filterInputRef = useRef<TextInput>(null);
@@ -396,10 +404,39 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType }:
     [navItems, focusedId],
   );
 
+  // Multi-select: computed range between anchor and focus
+  const selectedIds = useMemo(() => {
+    if (selectionAnchorIndex === null || focusedIndex < 0) return new Set<string>();
+    const start = Math.min(selectionAnchorIndex, focusedIndex);
+    const end = Math.max(selectionAnchorIndex, focusedIndex);
+    const ids = new Set<string>();
+    for (let i = start; i <= end; i++) {
+      const item = navItems[i];
+      if (item.kind !== 'section') ids.add(item.id);
+    }
+    return ids;
+  }, [selectionAnchorIndex, focusedIndex, navItems]);
+
+  // All folders for the move picker
+  const allFolders = useMemo(
+    () => entities.filter((e) => e.type === 'folder').sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    [entities],
+  );
+
+  // Move picker options: "(root)" + all folders, excluding entities being moved
+  const moveTargets = useMemo(() => {
+    const movingIds = selectedIds.size > 0 ? selectedIds : new Set(focusedId ? [focusedId] : []);
+    return [
+      { id: '__root__', name: '(root)' },
+      ...allFolders.filter((f) => !movingIds.has(f.id)),
+    ];
+  }, [allFolders, selectedIds, focusedId]);
+
   // Clear focused item if it's no longer in the list
   useEffect(() => {
     if (focusedId && focusedIndex < 0) {
       setFocusedId(null);
+      setSelectionAnchorIndex(null);
     }
   }, [focusedId, focusedIndex]);
 
@@ -564,6 +601,71 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType }:
     setDeletingId(null);
   }
 
+  // ── Move to folder ────────────────────────────────────────────────────
+
+  function startMove() {
+    const ids = selectedIds.size > 0 ? selectedIds : new Set(focusedId ? [focusedId] : []);
+    if (ids.size === 0) return;
+    // Don't allow moving sections
+    for (const id of ids) {
+      if (id.startsWith('section:')) return;
+    }
+    setMovePickerOpen(true);
+    setMovePickerIndex(0);
+    setDeletingId(null);
+    setRenamingId(null);
+    setCreatePickerOpen(false);
+  }
+
+  async function handleMoveConfirm(targetIndex: number) {
+    const target = moveTargets[targetIndex];
+    if (!target) return;
+    const targetFolderId = target.id === '__root__' ? null : target.id;
+    const ids = selectedIds.size > 0 ? [...selectedIds] : focusedId ? [focusedId] : [];
+
+    for (const id of ids) {
+      const currentParent = parentOf[id];
+      if (currentParent) {
+        await removeMembership(id, currentParent);
+      }
+      if (targetFolderId) {
+        await addMembership(id, targetFolderId);
+      }
+    }
+
+    setMovePickerOpen(false);
+    setSelectionAnchorIndex(null);
+  }
+
+  function cancelMove() {
+    setMovePickerOpen(false);
+  }
+
+  // ── Bulk delete ───────────────────────────────────────────────────────
+
+  function startBulkDelete() {
+    if (selectedIds.size === 0) return;
+    setDeletingId('__bulk__');
+  }
+
+  async function confirmBulkDelete() {
+    const ids = [...selectedIds];
+    setDeletingId(null);
+    setSelectionAnchorIndex(null);
+    // Move focus to first item after selection
+    const maxIdx = Math.max(...ids.map((id) => navItems.findIndex((n) => n.id === id)));
+    const next = navItems[maxIdx + 1] ?? navItems[0];
+    setFocusedId(next?.id ?? null);
+
+    for (const id of ids) {
+      try {
+        await deleteEntity(id);
+      } catch (e: unknown) {
+        console.error('Failed to delete entity:', e);
+      }
+    }
+  }
+
   // ── Create picker ──────────────────────────────────────────────────────
 
   function openCreatePicker() {
@@ -619,11 +721,32 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType }:
     // Any other input (editor text fields) — don't interfere
     if (isInInput) return;
 
-    // Delete confirmation mode
+    // Delete confirmation mode (single or bulk)
     if (deletingId) {
       e.preventDefault();
-      if (e.key === 'y' || e.key === 'Y') { confirmDeleteAction(); return; }
+      if (e.key === 'y' || e.key === 'Y') {
+        if (deletingId === '__bulk__') confirmBulkDelete();
+        else confirmDeleteAction();
+        return;
+      }
       if (e.key === 'n' || e.key === 'N' || e.key === 'Escape') { cancelDelete(); return; }
+      return;
+    }
+
+    // Move picker mode
+    if (movePickerOpen) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMovePickerIndex((i) => Math.min(moveTargets.length - 1, i + 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMovePickerIndex((i) => Math.max(0, i - 1));
+        return;
+      }
+      if (e.key === 'Enter') { e.preventDefault(); void handleMoveConfirm(movePickerIndex); return; }
+      if (e.key === 'Escape') { e.preventDefault(); cancelMove(); return; }
       return;
     }
 
@@ -644,25 +767,49 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType }:
       return;
     }
 
-    // Normal navigation
-    if (e.key === 'ArrowDown') { e.preventDefault(); moveFocus(1); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); moveFocus(-1); }
-    else if (e.key === 'Enter') { e.preventDefault(); activateFocused(); }
+    // Cmd+M — move to folder
+    if (e.metaKey && e.key === 'm') {
+      e.preventDefault();
+      startMove();
+      return;
+    }
+
+    // Shift+Arrow — extend selection
+    if (e.key === 'ArrowDown' && e.shiftKey) {
+      e.preventDefault();
+      if (selectionAnchorIndex === null) setSelectionAnchorIndex(focusedIndex >= 0 ? focusedIndex : 0);
+      moveFocus(1);
+      return;
+    }
+    if (e.key === 'ArrowUp' && e.shiftKey) {
+      e.preventDefault();
+      if (selectionAnchorIndex === null) setSelectionAnchorIndex(focusedIndex >= 0 ? focusedIndex : 0);
+      moveFocus(-1);
+      return;
+    }
+
+    // Normal navigation (clears selection)
+    if (e.key === 'ArrowDown') { e.preventDefault(); setSelectionAnchorIndex(null); moveFocus(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setSelectionAnchorIndex(null); moveFocus(-1); }
+    else if (e.key === 'Enter') { e.preventDefault(); setSelectionAnchorIndex(null); activateFocused(); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); expandFocused(); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); collapseFocused(); }
     else if (e.key === 'Escape') {
       e.preventDefault();
-      if (filterText) clearFilter();
+      if (selectionAnchorIndex !== null) { setSelectionAnchorIndex(null); }
+      else if (filterText) clearFilter();
       else setFocusedId(null);
     }
     else if (e.key === 'F2') { e.preventDefault(); startRename(); }
     else if (e.key === 'Delete' || (e.metaKey && e.key === 'Backspace')) {
       e.preventDefault();
-      startDelete();
+      if (selectedIds.size > 0) startBulkDelete();
+      else startDelete();
     }
     // Type-to-filter: any single printable character
     else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
+      setSelectionAnchorIndex(null);
       startFilter(e.key);
     }
   };
@@ -724,6 +871,37 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType }:
               }
             </TouchableOpacity>
           ))}
+        </View>
+      )}
+
+      {/* Move picker */}
+      {movePickerOpen && (
+        <View style={{
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+          maxHeight: 200,
+        }}>
+          <Text style={{ fontFamily: mono, fontSize: 10, color: colors.muted, paddingHorizontal: 12, paddingTop: 6, paddingBottom: 4, letterSpacing: 1 }}>
+            MOVE TO {selectedIds.size > 1 ? `(${selectedIds.size} items)` : ''}
+          </Text>
+          <ScrollView nestedScrollEnabled>
+            {moveTargets.map((target, i) => (
+              <TouchableOpacity
+                key={target.id}
+                onPress={() => void handleMoveConfirm(i)}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  backgroundColor: movePickerIndex === i ? colors.selection : 'transparent',
+                }}
+              >
+                <Text style={{
+                  fontFamily: mono, fontSize: 12,
+                  color: movePickerIndex === i ? colors.text : colors.muted,
+                }}>{target.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       )}
 
@@ -797,6 +975,7 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType }:
                 depth={item.depth}
                 isActive={activeEntityId === entity.id}
                 isFocused={focusedId === entity.id}
+                isSelected={selectedIds.has(entity.id)}
                 isExpanded={isExp}
                 childCount={count}
                 isRenaming={renamingId === entity.id}
@@ -816,11 +995,12 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType }:
               depth={item.depth}
               isActive={activeEntityId === entity.id}
               isFocused={focusedId === entity.id}
+              isSelected={selectedIds.has(entity.id)}
               isRenaming={renamingId === entity.id}
               renameValue={renameValue}
               onRenameChange={setRenameValue}
               onRenameSubmit={confirmRename}
-              isDeleting={deletingId === entity.id}
+              isDeleting={deletingId === entity.id || (deletingId === '__bulk__' && selectedIds.has(entity.id))}
               onPress={() => handleSelect(entity.id)}
             />
           );
