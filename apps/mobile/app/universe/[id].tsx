@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
+  Platform,
   Text,
   TouchableOpacity,
   View,
@@ -78,6 +79,26 @@ function UniverseWorkspace() {
   const [creatingType, setCreatingType] = useState<ApiEntity['type'] | null>(null);
   const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
   const [editorSaveState, setEditorSaveState] = useState<'saved' | 'saving'>('saved');
+
+  // App-level keyboard shortcuts (Cmd+B toggle binder, Cmd+D toggle theme)
+  const appKeyRef = useRef<(e: KeyboardEvent) => void>(undefined);
+  appKeyRef.current = (e: KeyboardEvent) => {
+    if (e.metaKey && e.key === 'b') {
+      e.preventDefault();
+      setBinderOpen(!binderOpen);
+    }
+    if (e.metaKey && e.key === 'd') {
+      e.preventDefault();
+      toggle();
+    }
+  };
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    function onKeyDown(e: KeyboardEvent) { appKeyRef.current?.(e); }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   async function handleCreateEntity(type: ApiEntity['type']) {
     setCreatingType(type);

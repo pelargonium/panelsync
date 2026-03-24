@@ -13,10 +13,11 @@
 - **Minimal UI strip (step 1 complete):** ThemeContext with light/dark toggle, monospace font, minimal palette (bg, text, muted, border, selection, error). ErrorBoundary wraps editor panel. Dashboard, workspace, EntityEditor, GroupEditor all stripped to functional minimalism. No silent `.catch(() => {})` — save failures surface as 'error' state. DraggableFlatList and PanGestureHandler removed from workspace. Binder shows flat entity list with type labels (C/L/N/G).
 - `CharacterEditor.tsx`: stripped to minimal theme (1119 → 752 lines). Block model, sort, create, delete, convert, field suggestions, autocomplete, tab nav all preserved. Color picker removed. No silent `.catch(() => {})`. Save failures surface as error state.
 - **File mode binder (step 3 complete):** `Binder.tsx` component replaces inline flat entity list. Auto type sections (Characters, Locations, Notes, Groups) — collapsible, default open. Curated folders at top level via `buildFolderTree()` using entity_memberships. Recursive `FolderContents` for arbitrary nesting depth. Folder/group expand/collapse with v/> indicators. Create picker includes folder type. `[id].tsx` workspace simplified from 295 to 185 lines — all binder logic moved to Binder component.
+- **Binder keyboard nav (step 4 complete):** Full keyboard navigation on web. Flat `navItems` list computed from binder tree for consistent Up/Down traversal. Arrow keys move focus (left border indicator), Enter opens entity, Right/Left expand/collapse sections and folders (Left also jumps to parent). Type-to-filter: any printable key opens filter input, live-filters entities by name. Cmd+N opens create picker (arrow-navigable), Cmd+Shift+N creates folder. F2 renames inline. Delete/Cmd+Backspace triggers inline "y/n" delete confirm. Escape context-chains: clear filter → deselect. App-level: Cmd+B toggles binder, Cmd+D toggles dark/light. All via stable `useRef` handler pattern to avoid stale closures.
 - DESIGN.md: fully updated. "Lenses, Not Containers" foregrounded. Four binder modes designed: Everything, File, Publishing, Board. Bible as entity type specified. Staging area, perspectives, folder deletion dialog, depth control, Publishing mode all specified. Content model section added: entity pages as nested documents, block types (text, field, note, script) as universal atoms, promotion-from-selection pattern, starter fields as prompts. Dossier clarified as freeform spatial canvas (v1 = linear scroll; target = infinite canvas with coordinates on every item). Block types valid in any entity page including script blocks.
 
 ## Next Step
-Add binder keyboard navigation: arrow keys, Enter to open, expand/collapse, type-to-filter, Cmd+N inline creation.
+Add editor keyboard flow: Tab/Shift+Tab between blocks, Cmd+Enter new block, block type labels, focus indicator on active block.
 
 ---
 
@@ -76,7 +77,7 @@ Add binder keyboard navigation: arrow keys, Enter to open, expand/collapse, type
 1. ~~**Strip + dark mode**~~ ✅ — ThemeContext, minimal palette, monospace, ErrorBoundary, no silent failures
 2. ~~**Strip CharacterEditor**~~ ✅ — migrated to minimal theme, same block model
 3. ~~**File mode binder**~~ ✅ — auto type sections (Characters, Locations, Notes, Groups), curated folders via entity_memberships, recursive nesting, depth indentation, Binder component extracted
-4. **Binder keyboard nav** — arrow keys, Enter, expand/collapse, type-to-filter, Cmd+N inline creation
+4. ~~**Binder keyboard nav**~~ ✅ — arrow keys, Enter, expand/collapse, type-to-filter, Cmd+N, F2 rename, Delete confirm, Cmd+B/D app shortcuts
 5. **Editor keyboard flow** — Tab between blocks, Cmd+Enter new block, block type labels, focus indicator
 6. **Unified editor** — merge CharacterEditor/EntityEditor/GroupEditor into one. Any block type on any entity type. Members section with role-based hierarchy (requires `role` text column on `entity_memberships`).
 7. **@-mention linking** — autocomplete in text blocks, creates entity_link dossier attachment
