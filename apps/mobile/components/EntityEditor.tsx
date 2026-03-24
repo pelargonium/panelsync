@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { api } from '../lib/api';
 import { useUniverse } from '../context/UniverseContext';
-import { colors } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 
 interface EntityEditorProps {
   entityId: string;
 }
 
-type SaveState = 'saved' | 'saving';
+type SaveState = 'saved' | 'saving' | 'error';
 
 export default function EntityEditor({ entityId }: EntityEditorProps) {
   const { updateEntityName, deleteEntity } = useUniverse();
+  const { colors, mono } = useTheme();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
@@ -27,14 +28,8 @@ export default function EntityEditor({ entityId }: EntityEditorProps) {
   const savedBodyRef = useRef('');
 
   function clearTimers() {
-    if (titleTimerRef.current) {
-      clearTimeout(titleTimerRef.current);
-      titleTimerRef.current = null;
-    }
-    if (bodyTimerRef.current) {
-      clearTimeout(bodyTimerRef.current);
-      bodyTimerRef.current = null;
-    }
+    if (titleTimerRef.current) { clearTimeout(titleTimerRef.current); titleTimerRef.current = null; }
+    if (bodyTimerRef.current) { clearTimeout(bodyTimerRef.current); bodyTimerRef.current = null; }
   }
 
   function syncSaveState() {
@@ -42,7 +37,7 @@ export default function EntityEditor({ entityId }: EntityEditorProps) {
       setSaveState('saving');
       return;
     }
-    setSaveState('saved');
+    setSaveState((prev) => prev === 'error' ? 'error' : 'saved');
   }
 
   async function runSave(task: () => Promise<void>) {
@@ -50,6 +45,10 @@ export default function EntityEditor({ entityId }: EntityEditorProps) {
     syncSaveState();
     try {
       await task();
+      setSaveState('saved');
+    } catch (e) {
+      setSaveState('error');
+      console.error('[EntityEditor] save failed:', e);
     } finally {
       inFlightSavesRef.current -= 1;
       syncSaveState();
@@ -62,6 +61,7 @@ export default function EntityEditor({ entityId }: EntityEditorProps) {
     clearTimers();
     inFlightSavesRef.current = 0;
     setSaveState('saved');
+    setConfirmDelete(false);
     setLoading(true);
 
     api.entities.get(entityId)
@@ -75,158 +75,102 @@ export default function EntityEditor({ entityId }: EntityEditorProps) {
         savedBodyRef.current = res.data.bodyText;
         hydratedRef.current = true;
       })
-      .finally(() => {
+      .catch((e) => {
         if (!cancelled) {
-          setLoading(false);
+          console.error('[EntityEditor] load failed:', e);
+          setSaveState('error');
         }
-      });
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
 
-    return () => {
-      cancelled = true;
-      clearTimers();
-      inFlightSavesRef.current = 0;
-    };
+    return () => { cancelled = true; clearTimers(); inFlightSavesRef.current = 0; };
   }, [entityId]);
 
   useEffect(() => {
     latestNameRef.current = name;
     if (!hydratedRef.current) return;
-
-    if (titleTimerRef.current) {
-      clearTimeout(titleTimerRef.current);
-    }
-
-    if (name === savedNameRef.current) {
-      syncSaveState();
-      return;
-    }
+    if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
+    if (name === savedNameRef.current) { syncSaveState(); return; }
 
     titleTimerRef.current = setTimeout(() => {
       titleTimerRef.current = null;
       const nextName = latestNameRef.current.trim();
-
-      if (!nextName) {
-        syncSaveState();
-        return;
-      }
-
+      if (!nextName) { syncSaveState(); return; }
       runSave(async () => {
         await api.entities.update(entityId, { name: nextName });
         savedNameRef.current = nextName;
         updateEntityName(entityId, nextName);
-      }).catch(() => {});
+      });
     }, 600);
-
     syncSaveState();
-
-    return () => {
-      if (titleTimerRef.current) {
-        clearTimeout(titleTimerRef.current);
-        titleTimerRef.current = null;
-      }
-    };
+    return () => { if (titleTimerRef.current) { clearTimeout(titleTimerRef.current); titleTimerRef.current = null; } };
   }, [entityId, name, updateEntityName]);
 
   useEffect(() => {
     latestBodyRef.current = bodyText;
     if (!hydratedRef.current) return;
-
-    if (bodyTimerRef.current) {
-      clearTimeout(bodyTimerRef.current);
-    }
-
-    if (bodyText === savedBodyRef.current) {
-      syncSaveState();
-      return;
-    }
+    if (bodyTimerRef.current) clearTimeout(bodyTimerRef.current);
+    if (bodyText === savedBodyRef.current) { syncSaveState(); return; }
 
     bodyTimerRef.current = setTimeout(() => {
       bodyTimerRef.current = null;
-      const nextBody = latestBodyRef.current;
-
       runSave(async () => {
-        await api.entities.updateContent(entityId, nextBody);
-        savedBodyRef.current = nextBody;
-      }).catch(() => {});
+        await api.entities.updateContent(entityId, latestBodyRef.current);
+        savedBodyRef.current = latestBodyRef.current;
+      });
     }, 600);
-
     syncSaveState();
-
-    return () => {
-      if (bodyTimerRef.current) {
-        clearTimeout(bodyTimerRef.current);
-        bodyTimerRef.current = null;
-      }
-    };
+    return () => { if (bodyTimerRef.current) { clearTimeout(bodyTimerRef.current); bodyTimerRef.current = null; } };
   }, [bodyText, entityId]);
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center" style={{ backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.accent} />
+      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.muted} />
       </View>
     );
   }
 
   return (
-    <View className="flex-1 px-8 pb-8 pt-10" style={{ backgroundColor: colors.bg }}>
-      <View
-        className="flex-row items-center"
-        style={{ position: 'absolute', top: 16, right: 16 }}
-      >
-        <View
-          className="mr-2 h-[6px] w-[6px] rounded-full"
-          style={{ backgroundColor: saveState === 'saved' ? colors.bible : colors.accent }}
-        />
-        <Text className="text-xs font-medium" style={{ color: colors.faint }}>
-          {saveState === 'saved' ? 'Saved' : 'Saving…'}
-        </Text>
-      </View>
+    <View style={{ flex: 1, backgroundColor: colors.bg, paddingHorizontal: 24, paddingTop: 32, paddingBottom: 24 }}>
+      <Text style={{ fontFamily: mono, fontSize: 11, color: saveState === 'error' ? colors.error : colors.muted, position: 'absolute', top: 12, right: 16 }}>
+        {saveState === 'saved' ? 'saved' : saveState === 'saving' ? 'saving...' : 'save failed'}
+      </Text>
 
       <TextInput
         value={name}
         onChangeText={setName}
-        placeholder="Untitled"
-        placeholderTextColor={colors.faint}
-        style={{
-          color: colors.text,
-          fontSize: 28,
-          fontWeight: '700',
-          paddingVertical: 0,
-        }}
+        placeholder="untitled"
+        placeholderTextColor={colors.muted}
+        style={{ fontFamily: mono, fontSize: 18, fontWeight: '700', color: colors.text, paddingVertical: 0 }}
       />
 
-      <View className="mt-4 h-px" style={{ backgroundColor: colors.border }} />
+      <View style={{ height: 1, backgroundColor: colors.border, marginTop: 12, marginBottom: 16 }} />
 
       <TextInput
         value={bodyText}
         onChangeText={setBodyText}
-        placeholder="Write something…"
-        placeholderTextColor={colors.faint}
+        placeholder="write..."
+        placeholderTextColor={colors.muted}
         multiline
         textAlignVertical="top"
-        className="mt-5 flex-1"
-        style={{
-          color: colors.text,
-          fontSize: 15,
-          lineHeight: 22,
-        }}
+        style={{ fontFamily: mono, fontSize: 13, lineHeight: 20, color: colors.text, flex: 1 }}
       />
 
-      <View className="mt-4 flex-row items-center">
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
         {confirmDelete ? (
           <>
-            <Text className="text-[13px]" style={{ color: colors.faint }}>Delete this entry?</Text>
-            <TouchableOpacity onPress={() => void deleteEntity(entityId)} className="ml-3">
-              <Text className="text-[13px] font-semibold" style={{ color: '#d14b4b' }}>Yes, delete</Text>
+            <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>delete?</Text>
+            <TouchableOpacity onPress={() => void deleteEntity(entityId)} style={{ marginLeft: 12 }}>
+              <Text style={{ fontFamily: mono, fontSize: 12, color: colors.error }}>yes</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setConfirmDelete(false)} className="ml-3">
-              <Text className="text-[13px]" style={{ color: colors.faint }}>Cancel</Text>
+            <TouchableOpacity onPress={() => setConfirmDelete(false)} style={{ marginLeft: 12 }}>
+              <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>no</Text>
             </TouchableOpacity>
           </>
         ) : (
           <TouchableOpacity onPress={() => setConfirmDelete(true)}>
-            <Text className="text-[13px]" style={{ color: colors.faint }}>Delete</Text>
+            <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>delete</Text>
           </TouchableOpacity>
         )}
       </View>

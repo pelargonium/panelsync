@@ -10,13 +10,12 @@
 - Block CRUD API: `GET/POST /api/pages/:pageId/blocks`, `PATCH/DELETE /api/pages/:pageId/blocks/:blockId`.
 - EAS configured: `eas.json` has preview profile with `EXPO_PUBLIC_API_URL` baked in. iPad UDID registered, provisioning profile covers device. App installs and runs on iPad.
 - `UniverseContext.tsx`: fetches entity list + workspace state in parallel on mount. Entity CRUD: createEntity, deleteEntity, updateEntityName.
-- `universe/[id].tsx`: binder shows flat entity list. Type picker (Character / Location / Note) on + tap. Entity rows with accent bar + bg tint. Manual sort via DraggableFlatList.
-- `CharacterEditor.tsx`: holistic text model, FieldBlocks with autocomplete suggestions (keyboard arrow-key navigation), random generator (⚄), toolbar actions (+ Field, Fields, + Note, convert, sort). **Known iPad issues — see Deferred.**
-- `EntityEditor.tsx`, `GroupEditor.tsx`: delete + two-step inline confirmation.
+- **Minimal UI strip (step 1 complete):** ThemeContext with light/dark toggle, monospace font, minimal palette (bg, text, muted, border, selection, error). ErrorBoundary wraps editor panel. Dashboard, workspace, EntityEditor, GroupEditor all stripped to functional minimalism. No silent `.catch(() => {})` — save failures surface as 'error' state. DraggableFlatList and PanGestureHandler removed from workspace. Binder shows flat entity list with type labels (C/L/N/G).
+- `CharacterEditor.tsx`: still uses old theme.ts — not yet stripped. Needs its own focused pass.
 - DESIGN.md: fully updated. "Lenses, Not Containers" foregrounded. Four binder modes designed: Everything, File, Publishing, Board. Bible as entity type specified. Staging area, perspectives, folder deletion dialog, depth control, Publishing mode all specified. Content model section added: entity pages as nested documents, block types (text, field, note, script) as universal atoms, promotion-from-selection pattern, starter fields as prompts. Dossier clarified as freeform spatial canvas (v1 = linear scroll; target = infinite canvas with coordinates on every item). Block types valid in any entity page including script blocks.
 
 ## Next Step
-Strip UI to functional minimalism and build the File mode binder with keyboard-first navigation.
+Strip CharacterEditor to minimal theme, then build File mode binder with auto type sections and curated folders.
 
 ---
 

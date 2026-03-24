@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Modal, TextInput, KeyboardAvoidingView,
+  Modal, TextInput, KeyboardAvoidingView,
   Platform, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { colors } from '../theme';
-import { modalStyles as m } from '../components/modalStyles';
+import { useTheme } from '../context/ThemeContext';
 import { api, getToken, clearToken, type ApiUniverse } from '../lib/api';
 
 function NewUniverseModal({ visible, onClose, onCreate }: {
@@ -14,6 +13,7 @@ function NewUniverseModal({ visible, onClose, onCreate }: {
   onClose: () => void;
   onCreate: (name: string) => Promise<void>;
 }) {
+  const { colors, mono } = useTheme();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,35 +35,32 @@ function NewUniverseModal({ visible, onClose, onCreate }: {
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={m.overlay}>
-        <TouchableOpacity style={m.backdrop} onPress={onClose} />
-        <View style={m.sheet}>
-          <Text style={m.title}>New Universe</Text>
-          <Text style={m.subtitle}>
-            A Universe contains all your series, characters, locations, and timelines.
-          </Text>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={onClose} />
+        <View style={{ backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border, padding: 24, width: '90%', maxWidth: 480 }}>
+          <Text style={{ fontFamily: mono, fontSize: 14, color: colors.text, marginBottom: 16 }}>New Universe</Text>
           <TextInput
-            style={m.input}
-            placeholder="Universe name..."
-            placeholderTextColor={colors.faint}
+            style={{ fontFamily: mono, fontSize: 14, color: colors.text, borderWidth: 1, borderColor: colors.border, padding: 8, marginBottom: 8, backgroundColor: 'transparent' }}
+            placeholder="name..."
+            placeholderTextColor={colors.muted}
             value={name}
             onChangeText={setName}
             autoFocus
             onSubmitEditing={handleCreate}
           />
-          {error && <Text style={s.modalError}>{error}</Text>}
-          <View style={m.actions}>
-            <TouchableOpacity style={m.cancel} onPress={onClose}>
-              <Text style={m.cancelTxt}>Cancel</Text>
+          {error && <Text style={{ fontFamily: mono, fontSize: 12, color: colors.error, marginBottom: 8 }}>{error}</Text>}
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
+            <TouchableOpacity onPress={onClose} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
+              <Text style={{ fontFamily: mono, fontSize: 13, color: colors.muted }}>cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[m.create, (!name.trim() || loading) && m.createOff]}
               onPress={handleCreate}
-              disabled={loading}
+              disabled={!name.trim() || loading}
+              style={{ paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: !name.trim() || loading ? colors.border : colors.text }}
             >
               {loading
-                ? <ActivityIndicator color={colors.surface} />
-                : <Text style={m.createTxt}>Create</Text>
+                ? <ActivityIndicator color={colors.text} size="small" />
+                : <Text style={{ fontFamily: mono, fontSize: 13, color: !name.trim() ? colors.muted : colors.text }}>create</Text>
               }
             </TouchableOpacity>
           </View>
@@ -73,29 +70,12 @@ function NewUniverseModal({ visible, onClose, onCreate }: {
   );
 }
 
-function UniverseCard({ universe, onPress, onLongPress }: { universe: ApiUniverse; onPress: () => void; onLongPress: () => void }) {
-  const edited = new Date(universe.updatedAt);
-  const diffMs = Date.now() - edited.getTime();
-  const diffH = Math.floor(diffMs / 36e5);
-  const diffD = Math.floor(diffMs / 864e5);
-  const lastEdited = diffH < 1 ? 'Just now' : diffH < 24 ? `${diffH}h ago` : diffD === 1 ? 'Yesterday' : `${diffD} days ago`;
-
-  return (
-    <TouchableOpacity style={s.card} onPress={onPress} onLongPress={onLongPress} delayLongPress={500}>
-      <View style={s.cardCover} />
-      <View style={s.cardBody}>
-        <Text style={s.cardName}>{universe.name}</Text>
-        <Text style={s.cardMeta}>edited {lastEdited}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 function DeleteUniverseModal({ universe, onClose, onDeleted }: {
   universe: ApiUniverse;
   onClose: () => void;
   onDeleted: (id: string) => void;
 }) {
+  const { colors, mono } = useTheme();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -114,26 +94,26 @@ function DeleteUniverseModal({ universe, onClose, onDeleted }: {
 
   return (
     <Modal visible transparent animationType="fade">
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={m.overlay}>
-        <TouchableOpacity style={m.backdrop} onPress={onClose} />
-        <View style={m.sheet}>
-          <Text style={m.title}>Delete "{universe.name}"?</Text>
-          <Text style={m.subtitle}>
-            This will permanently delete the universe and all its entities, characters, and content. This cannot be undone.
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={onClose} />
+        <View style={{ backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border, padding: 24, width: '90%', maxWidth: 480 }}>
+          <Text style={{ fontFamily: mono, fontSize: 14, color: colors.text, marginBottom: 8 }}>Delete "{universe.name}"?</Text>
+          <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted, marginBottom: 16 }}>
+            This will permanently delete the universe and all its content.
           </Text>
-          {error ? <Text style={s.modalError}>{error}</Text> : null}
-          <View style={m.actions}>
-            <TouchableOpacity style={m.cancel} onPress={onClose}>
-              <Text style={m.cancelTxt}>Cancel</Text>
+          {error && <Text style={{ fontFamily: mono, fontSize: 12, color: colors.error, marginBottom: 8 }}>{error}</Text>}
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
+            <TouchableOpacity onPress={onClose} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
+              <Text style={{ fontFamily: mono, fontSize: 13, color: colors.muted }}>cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[m.create, { backgroundColor: '#c0392b' }, loading && m.createOff]}
               onPress={handleDelete}
               disabled={loading}
+              style={{ paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: colors.error }}
             >
               {loading
-                ? <ActivityIndicator color={colors.surface} />
-                : <Text style={m.createTxt}>Delete</Text>
+                ? <ActivityIndicator color={colors.error} size="small" />
+                : <Text style={{ fontFamily: mono, fontSize: 13, color: colors.error }}>delete</Text>
               }
             </TouchableOpacity>
           </View>
@@ -145,6 +125,7 @@ function DeleteUniverseModal({ universe, onClose, onDeleted }: {
 
 export default function WorldsDashboard() {
   const router = useRouter();
+  const { colors, mono, toggle, mode } = useTheme();
   const [universes, setUniverses] = useState<ApiUniverse[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -198,45 +179,58 @@ export default function WorldsDashboard() {
 
   if (!authChecked || loading) {
     return (
-      <View style={s.centered}>
-        <ActivityIndicator color={colors.accent} />
+      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.muted} />
       </View>
     );
   }
 
   return (
-    <View style={s.container}>
-      <View style={s.header}>
-        <Text style={s.logo}>PANELSYNC</Text>
-        <View style={s.headerRight}>
-          <TouchableOpacity style={s.newButton} onPress={() => setModalVisible(true)}>
-            <Text style={s.newButtonText}>+ New Universe</Text>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 48, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+        <Text style={{ fontFamily: mono, fontSize: 13, color: colors.text, letterSpacing: 2 }}>PANELSYNC</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+          <TouchableOpacity onPress={toggle}>
+            <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>{mode === 'dark' ? 'light' : 'dark'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.signOutButton} onPress={handleSignOut}>
-            <Text style={s.signOutText}>Sign Out</Text>
+          <TouchableOpacity onPress={() => setModalVisible(true)}>
+            <Text style={{ fontFamily: mono, fontSize: 13, color: colors.text }}>+ new</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSignOut}>
+            <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>sign out</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView
-        contentContainerStyle={s.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />}
+        contentContainerStyle={{ padding: 24 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.muted} />}
       >
-        <Text style={s.sectionLabel}>YOUR UNIVERSES</Text>
         {universes.length === 0 ? (
-          <View style={s.empty}>
-            <Text style={s.emptyText}>No universes yet.</Text>
-            <Text style={s.emptyHint}>Tap "+ New Universe" to create your first one.</Text>
-          </View>
+          <Text style={{ fontFamily: mono, fontSize: 13, color: colors.muted, marginTop: 24 }}>
+            No universes yet. Tap "+ new" to create one.
+          </Text>
         ) : (
-          universes.map(u => (
-            <UniverseCard
-              key={u.id}
-              universe={u}
-              onPress={() => router.push({ pathname: '/universe/[id]', params: { id: u.id, name: u.name } })}
-              onLongPress={() => setPendingDeleteUniverse(u)}
-            />
-          ))
+          universes.map(u => {
+            const edited = new Date(u.updatedAt);
+            const diffMs = Date.now() - edited.getTime();
+            const diffH = Math.floor(diffMs / 36e5);
+            const diffD = Math.floor(diffMs / 864e5);
+            const lastEdited = diffH < 1 ? 'just now' : diffH < 24 ? `${diffH}h ago` : diffD === 1 ? 'yesterday' : `${diffD}d ago`;
+
+            return (
+              <TouchableOpacity
+                key={u.id}
+                onPress={() => router.push({ pathname: '/universe/[id]', params: { id: u.id, name: u.name } })}
+                onLongPress={() => setPendingDeleteUniverse(u)}
+                delayLongPress={500}
+                style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}
+              >
+                <Text style={{ fontFamily: mono, fontSize: 14, color: colors.text }}>{u.name}</Text>
+                <Text style={{ fontFamily: mono, fontSize: 11, color: colors.muted, marginTop: 2 }}>{lastEdited}</Text>
+              </TouchableOpacity>
+            );
+          })
         )}
       </ScrollView>
 
@@ -245,36 +239,13 @@ export default function WorldsDashboard() {
         onClose={() => setModalVisible(false)}
         onCreate={handleCreate}
       />
-      {pendingDeleteUniverse ? (
+      {pendingDeleteUniverse && (
         <DeleteUniverseModal
           universe={pendingDeleteUniverse}
           onClose={() => setPendingDeleteUniverse(null)}
           onDeleted={(id) => setUniverses(prev => prev.filter(u => u.id !== id))}
         />
-      ) : null}
+      )}
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  container:     { flex: 1, backgroundColor: colors.bg },
-  centered:      { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 48, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
-  logo:          { color: colors.accent, fontSize: 16, fontWeight: '700', letterSpacing: 3 },
-  headerRight:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  newButton:     { backgroundColor: colors.text, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 4 },
-  newButtonText: { color: colors.surface, fontSize: 13, fontWeight: '700' },
-  signOutButton: { paddingHorizontal: 10, paddingVertical: 8 },
-  signOutText:   { color: colors.muted, fontSize: 13 },
-  list:          { padding: 24 },
-  sectionLabel:  { color: colors.muted, fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 16 },
-  card:          { backgroundColor: colors.surface, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
-  cardCover:     { height: 80, backgroundColor: colors.border },
-  cardBody:      { padding: 16 },
-  cardName:      { color: colors.text, fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  cardMeta:      { color: colors.muted, fontSize: 12 },
-  empty:         { alignItems: 'center', paddingTop: 60 },
-  emptyText:     { color: colors.muted, fontSize: 16, fontWeight: '600', marginBottom: 8 },
-  emptyHint:     { color: colors.faint, fontSize: 13 },
-  modalError:    { color: '#e05050', fontSize: 12, marginBottom: 8 },
-});

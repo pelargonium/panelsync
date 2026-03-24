@@ -2,11 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { api } from '../lib/api';
 import { useUniverse } from '../context/UniverseContext';
-import { colors } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 
-const COLOR_PALETTE = ['#c8a768', '#1E6B3C', '#1B4FD8', '#6B2D8B', '#C41E1E', '#4A4A5A'];
-
-type SaveState = 'saved' | 'saving';
+type SaveState = 'saved' | 'saving' | 'error';
 
 interface GroupEditorProps {
   entityId: string;
@@ -14,12 +12,11 @@ interface GroupEditorProps {
 
 export default function GroupEditor({ entityId }: GroupEditorProps) {
   const { memberships, entities, addMembership, removeMembership, updateEntityName, deleteEntity } = useUniverse();
+  const { colors, mono } = useTheme();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
-  const [color, setColor] = useState<string | null>(null);
   const [body, setBody] = useState('');
-  const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const hydratedRef = useRef(false);
@@ -46,14 +43,8 @@ export default function GroupEditor({ entityId }: GroupEditorProps) {
   }, [memberships, entityId, entities]);
 
   function clearTimers() {
-    if (nameTimerRef.current) {
-      clearTimeout(nameTimerRef.current);
-      nameTimerRef.current = null;
-    }
-    if (bodyTimerRef.current) {
-      clearTimeout(bodyTimerRef.current);
-      bodyTimerRef.current = null;
-    }
+    if (nameTimerRef.current) { clearTimeout(nameTimerRef.current); nameTimerRef.current = null; }
+    if (bodyTimerRef.current) { clearTimeout(bodyTimerRef.current); bodyTimerRef.current = null; }
   }
 
   function syncSaveState() {
@@ -61,7 +52,7 @@ export default function GroupEditor({ entityId }: GroupEditorProps) {
       setSaveState('saving');
       return;
     }
-    setSaveState('saved');
+    setSaveState((prev) => prev === 'error' ? 'error' : 'saved');
   }
 
   async function runSave(task: () => Promise<void>) {
@@ -69,6 +60,10 @@ export default function GroupEditor({ entityId }: GroupEditorProps) {
     syncSaveState();
     try {
       await task();
+      setSaveState('saved');
+    } catch (e) {
+      setSaveState('error');
+      console.error('[GroupEditor] save failed:', e);
     } finally {
       inFlightSavesRef.current -= 1;
       syncSaveState();
@@ -81,15 +76,14 @@ export default function GroupEditor({ entityId }: GroupEditorProps) {
     clearTimers();
     inFlightSavesRef.current = 0;
     setSaveState('saved');
-    setColorPickerOpen(false);
     setAddMemberOpen(false);
+    setConfirmDelete(false);
     setLoading(true);
 
     api.entities.get(entityId)
       .then((res) => {
         if (cancelled) return;
         setName(res.data.name);
-        setColor(res.data.color);
         setBody(res.data.bodyText);
         latestNameRef.current = res.data.name;
         latestBodyRef.current = res.data.bodyText;
@@ -97,256 +91,158 @@ export default function GroupEditor({ entityId }: GroupEditorProps) {
         savedBodyRef.current = res.data.bodyText;
         hydratedRef.current = true;
       })
-      .finally(() => {
+      .catch((e) => {
         if (!cancelled) {
-          setLoading(false);
+          console.error('[GroupEditor] load failed:', e);
+          setSaveState('error');
         }
-      });
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
 
-    return () => {
-      cancelled = true;
-      clearTimers();
-      inFlightSavesRef.current = 0;
-    };
+    return () => { cancelled = true; clearTimers(); inFlightSavesRef.current = 0; };
   }, [entityId]);
 
   useEffect(() => {
     latestNameRef.current = name;
     if (!hydratedRef.current) return;
-
-    if (nameTimerRef.current) {
-      clearTimeout(nameTimerRef.current);
-    }
-
-    if (name === savedNameRef.current) {
-      syncSaveState();
-      return;
-    }
+    if (nameTimerRef.current) clearTimeout(nameTimerRef.current);
+    if (name === savedNameRef.current) { syncSaveState(); return; }
 
     nameTimerRef.current = setTimeout(() => {
       nameTimerRef.current = null;
       const nextName = latestNameRef.current.trim();
-
-      if (!nextName) {
-        syncSaveState();
-        return;
-      }
-
+      if (!nextName) { syncSaveState(); return; }
       runSave(async () => {
         await api.entities.update(entityId, { name: nextName });
         savedNameRef.current = nextName;
         updateEntityName(entityId, nextName);
-      }).catch(() => {});
+      });
     }, 600);
-
     syncSaveState();
-
-    return () => {
-      if (nameTimerRef.current) {
-        clearTimeout(nameTimerRef.current);
-        nameTimerRef.current = null;
-      }
-    };
+    return () => { if (nameTimerRef.current) { clearTimeout(nameTimerRef.current); nameTimerRef.current = null; } };
   }, [entityId, name, updateEntityName]);
 
   useEffect(() => {
     latestBodyRef.current = body;
     if (!hydratedRef.current) return;
-
-    if (bodyTimerRef.current) {
-      clearTimeout(bodyTimerRef.current);
-    }
-
-    if (body === savedBodyRef.current) {
-      syncSaveState();
-      return;
-    }
+    if (bodyTimerRef.current) clearTimeout(bodyTimerRef.current);
+    if (body === savedBodyRef.current) { syncSaveState(); return; }
 
     bodyTimerRef.current = setTimeout(() => {
       bodyTimerRef.current = null;
-      const nextBody = latestBodyRef.current;
-
       runSave(async () => {
-        await api.entities.updateContent(entityId, nextBody);
-        savedBodyRef.current = nextBody;
-      }).catch(() => {});
+        await api.entities.updateContent(entityId, latestBodyRef.current);
+        savedBodyRef.current = latestBodyRef.current;
+      });
     }, 600);
-
     syncSaveState();
-
-    return () => {
-      if (bodyTimerRef.current) {
-        clearTimeout(bodyTimerRef.current);
-        bodyTimerRef.current = null;
-      }
-    };
+    return () => { if (bodyTimerRef.current) { clearTimeout(bodyTimerRef.current); bodyTimerRef.current = null; } };
   }, [body, entityId]);
-
-  async function handleColorChange(nextColor: string) {
-    setColor(nextColor);
-    setColorPickerOpen(false);
-    await runSave(async () => {
-      await api.entities.update(entityId, { color: nextColor });
-    }).catch(() => {});
-  }
 
   async function handleAddMember(characterId: string) {
     setAddMemberOpen(false);
     await runSave(async () => {
       await addMembership(characterId, entityId);
-    }).catch(() => {});
+    });
   }
 
   async function handleRemoveMember(characterId: string) {
     await runSave(async () => {
       await removeMembership(characterId, entityId);
-    }).catch(() => {});
+    });
   }
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center" style={{ backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.accent} />
+      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.muted} />
       </View>
     );
   }
 
   return (
-    <View className="flex-1" style={{ backgroundColor: colors.bg }}>
-      <View className="flex-row items-center" style={{ position: 'absolute', top: 16, right: 16, zIndex: 10 }}>
-        <View
-          className="mr-2 h-[6px] w-[6px] rounded-full"
-          style={{ backgroundColor: saveState === 'saved' ? colors.bible : colors.accent }}
-        />
-        <Text className="text-xs font-medium" style={{ color: colors.faint }}>
-          {saveState === 'saved' ? 'Saved' : 'Saving…'}
-        </Text>
-      </View>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Text style={{ fontFamily: mono, fontSize: 11, color: saveState === 'error' ? colors.error : colors.muted, position: 'absolute', top: 12, right: 16, zIndex: 10 }}>
+        {saveState === 'saved' ? 'saved' : saveState === 'saving' ? 'saving...' : 'save failed'}
+      </Text>
 
-      <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
-        <View className="px-8 pb-4 pt-10">
+      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+        <View style={{ paddingHorizontal: 24, paddingTop: 32, paddingBottom: 16 }}>
           <TextInput
             value={name}
             onChangeText={setName}
-            placeholder="Untitled Group"
-            placeholderTextColor={colors.faint}
-            style={{ color: colors.text, fontSize: 28, fontWeight: '700', paddingVertical: 0 }}
+            placeholder="untitled group"
+            placeholderTextColor={colors.muted}
+            style={{ fontFamily: mono, fontSize: 18, fontWeight: '700', color: colors.text, paddingVertical: 0 }}
           />
-
-          <View className="mt-2 flex-row items-center">
-            <TouchableOpacity onPress={() => setColorPickerOpen((current) => !current)}>
-              <View className="h-[14px] w-[14px] rounded-full" style={{ backgroundColor: color ?? '#9B7FD4' }} />
-            </TouchableOpacity>
-            <View className="ml-3 rounded-full border px-2 py-1" style={{ borderColor: colors.border }}>
-              <Text className="text-[11px]" style={{ color: colors.muted }}>
-                Group
-              </Text>
-            </View>
-          </View>
-
-          {colorPickerOpen ? (
-            <View className="mt-2 flex-row items-center justify-between">
-              {COLOR_PALETTE.map((swatch) => {
-                const active = swatch === color;
-                return (
-                  <TouchableOpacity key={swatch} onPress={() => handleColorChange(swatch)}>
-                    <View
-                      className="h-[22px] w-[22px] items-center justify-center rounded-full"
-                      style={{
-                        backgroundColor: active ? colors.pageWhite : 'transparent',
-                        borderWidth: active ? 2 : 0,
-                        borderColor: active ? colors.pageWhite : 'transparent',
-                        transform: [{ scale: active ? 1.08 : 1 }],
-                      }}
-                    >
-                      <View className="h-[18px] w-[18px] rounded-full" style={{ backgroundColor: swatch }} />
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          ) : null}
+          <Text style={{ fontFamily: mono, fontSize: 11, color: colors.muted, marginTop: 4 }}>group</Text>
         </View>
 
-        <View className="px-8 pt-4">
+        <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: 24 }} />
+
+        <View style={{ paddingHorizontal: 24, paddingTop: 16 }}>
           <TextInput
             value={body}
             onChangeText={setBody}
             multiline
             textAlignVertical="top"
-            placeholder="Notes about this group…"
-            placeholderTextColor={colors.faint}
-            style={{ color: colors.text, fontSize: 15, lineHeight: 22, minHeight: 140 }}
+            placeholder="notes about this group..."
+            placeholderTextColor={colors.muted}
+            style={{ fontFamily: mono, fontSize: 13, lineHeight: 20, color: colors.text, minHeight: 100 }}
           />
         </View>
 
-        <View className="mt-6 px-8 pb-10">
-          <Text
-            className="mb-2 text-[11px] font-bold"
-            style={{ color: colors.muted, letterSpacing: 1.5 }}
-          >
-            MEMBERS
-          </Text>
+        <View style={{ paddingHorizontal: 24, marginTop: 24, paddingBottom: 32 }}>
+          <Text style={{ fontFamily: mono, fontSize: 11, color: colors.muted, letterSpacing: 1, marginBottom: 8 }}>MEMBERS</Text>
 
           {members.map((member) => (
-            <View key={member.id} className="mb-2 flex-row items-center">
-              <View className="mr-2 h-2 w-2 rounded-full" style={{ backgroundColor: colors.accent }} />
-              <Text className="flex-1 text-sm" style={{ color: colors.text }}>
-                {member.name}
-              </Text>
+            <View key={member.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
+              <Text style={{ fontFamily: mono, fontSize: 13, color: colors.text, flex: 1 }}>{member.name}</Text>
               <TouchableOpacity onPress={() => handleRemoveMember(member.id)}>
-                <Text style={{ color: colors.faint, fontSize: 16 }}>
-                  ×
-                </Text>
+                <Text style={{ fontFamily: mono, fontSize: 13, color: colors.muted }}>x</Text>
               </TouchableOpacity>
             </View>
           ))}
 
-          {addMemberOpen ? (
-            <View
-              className="mt-2 max-h-[200px] rounded-lg border"
-              style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-            >
+          {addMemberOpen && (
+            <View style={{ marginTop: 8, borderWidth: 1, borderColor: colors.border, maxHeight: 200 }}>
               <ScrollView nestedScrollEnabled>
-                {availableCharacters.map((character, index) => (
+                {availableCharacters.map((character) => (
                   <TouchableOpacity
                     key={character.id}
                     onPress={() => handleAddMember(character.id)}
-                    className="px-4 py-2.5"
-                    style={{
-                      borderBottomWidth: index === availableCharacters.length - 1 ? 0 : 1,
-                      borderBottomColor: colors.border,
-                    }}
+                    style={{ paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}
                   >
-                    <Text className="text-sm" style={{ color: colors.text }}>
-                      {character.name}
-                    </Text>
+                    <Text style={{ fontFamily: mono, fontSize: 13, color: colors.text }}>{character.name}</Text>
                   </TouchableOpacity>
                 ))}
+                {availableCharacters.length === 0 && (
+                  <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted, padding: 12 }}>no characters available</Text>
+                )}
               </ScrollView>
             </View>
-          ) : null}
+          )}
 
-          <TouchableOpacity onPress={() => setAddMemberOpen((current) => !current)} className="mt-2">
-            <Text className="text-sm" style={{ color: colors.accent }}>
-              {addMemberOpen ? 'Cancel' : '+ Add Member'}
+          <TouchableOpacity onPress={() => setAddMemberOpen((c) => !c)} style={{ marginTop: 8 }}>
+            <Text style={{ fontFamily: mono, fontSize: 12, color: colors.text }}>
+              {addMemberOpen ? 'cancel' : '+ add member'}
             </Text>
           </TouchableOpacity>
 
-          <View className="mt-6 flex-row items-center">
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24 }}>
             {confirmDelete ? (
               <>
-                <Text className="text-[13px]" style={{ color: colors.faint }}>Delete this group?</Text>
-                <TouchableOpacity onPress={() => void deleteEntity(entityId)} className="ml-3">
-                  <Text className="text-[13px] font-semibold" style={{ color: '#d14b4b' }}>Yes, delete</Text>
+                <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>delete group?</Text>
+                <TouchableOpacity onPress={() => void deleteEntity(entityId)} style={{ marginLeft: 12 }}>
+                  <Text style={{ fontFamily: mono, fontSize: 12, color: colors.error }}>yes</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setConfirmDelete(false)} className="ml-3">
-                  <Text className="text-[13px]" style={{ color: colors.faint }}>Cancel</Text>
+                <TouchableOpacity onPress={() => setConfirmDelete(false)} style={{ marginLeft: 12 }}>
+                  <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>no</Text>
                 </TouchableOpacity>
               </>
             ) : (
               <TouchableOpacity onPress={() => setConfirmDelete(true)}>
-                <Text className="text-[13px]" style={{ color: colors.faint }}>Delete</Text>
+                <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>delete</Text>
               </TouchableOpacity>
             )}
           </View>
