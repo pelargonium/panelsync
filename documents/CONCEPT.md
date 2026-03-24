@@ -11,11 +11,11 @@
 - EAS configured: `eas.json` has preview profile with `EXPO_PUBLIC_API_URL` baked in. iPad UDID registered, provisioning profile covers device. App installs and runs on iPad.
 - `UniverseContext.tsx`: fetches entity list + workspace state in parallel on mount. Entity CRUD: createEntity, deleteEntity, updateEntityName.
 - **Minimal UI strip (step 1 complete):** ThemeContext with light/dark toggle, monospace font, minimal palette (bg, text, muted, border, selection, error). ErrorBoundary wraps editor panel. Dashboard, workspace, EntityEditor, GroupEditor all stripped to functional minimalism. No silent `.catch(() => {})` — save failures surface as 'error' state. DraggableFlatList and PanGestureHandler removed from workspace. Binder shows flat entity list with type labels (C/L/N/G).
-- `CharacterEditor.tsx`: still uses old theme.ts — not yet stripped. Needs its own focused pass.
+- `CharacterEditor.tsx`: stripped to minimal theme (1119 → 752 lines). Block model, sort, create, delete, convert, field suggestions, autocomplete, tab nav all preserved. Color picker removed. No silent `.catch(() => {})`. Save failures surface as error state.
 - DESIGN.md: fully updated. "Lenses, Not Containers" foregrounded. Four binder modes designed: Everything, File, Publishing, Board. Bible as entity type specified. Staging area, perspectives, folder deletion dialog, depth control, Publishing mode all specified. Content model section added: entity pages as nested documents, block types (text, field, note, script) as universal atoms, promotion-from-selection pattern, starter fields as prompts. Dossier clarified as freeform spatial canvas (v1 = linear scroll; target = infinite canvas with coordinates on every item). Block types valid in any entity page including script blocks.
 
 ## Next Step
-Strip CharacterEditor to minimal theme, then build File mode binder with auto type sections and curated folders.
+Build File mode binder with auto type sections and curated folders.
 
 ---
 
@@ -72,13 +72,15 @@ Strip CharacterEditor to minimal theme, then build File mode binder with auto ty
 
 ### Build Sequence
 
-1. **Strip + dark mode** — replace existing styled UI with minimal monospace theme, ThemeContext with light/dark toggle
-2. **File mode binder** — auto type sections (Characters, Locations, Notes), curated folders via entity_memberships, nesting, indentation
-3. **Binder keyboard nav** — arrow keys, Enter, expand/collapse, type-to-filter, Cmd+N inline creation
-4. **Editor keyboard flow** — Tab between blocks, Cmd+Enter new block, block type labels, focus indicator
-5. **@-mention linking** — autocomplete in text blocks, creates entity_link dossier attachment
-6. **Generate real content** — use the app to brainstorm a world
-7. **Everything mode** — flat view, strip folder context, see what the unstructured pile looks like
+1. ~~**Strip + dark mode**~~ ✅ — ThemeContext, minimal palette, monospace, ErrorBoundary, no silent failures
+2. **Strip CharacterEditor** — migrate to minimal theme, same block model
+3. **File mode binder** — auto type sections (Characters, Locations, Notes), curated folders via entity_memberships, nesting, indentation
+4. **Binder keyboard nav** — arrow keys, Enter, expand/collapse, type-to-filter, Cmd+N inline creation
+5. **Editor keyboard flow** — Tab between blocks, Cmd+Enter new block, block type labels, focus indicator
+6. **Unified editor** — merge CharacterEditor/EntityEditor/GroupEditor into one. Any block type on any entity type. Members section with role-based hierarchy (requires `role` text column on `entity_memberships`).
+7. **@-mention linking** — autocomplete in text blocks, creates entity_link dossier attachment
+8. **Generate real content** — use the app to brainstorm a world
+9. **Everything mode** — flat view, strip folder context, see what the unstructured pile looks like
 
 ---
 
@@ -102,6 +104,8 @@ Strip CharacterEditor to minimal theme, then build File mode binder with auto ty
 - Auth: JWT (email + password). OAuth deferred to v2.
 - Sync: REST polling, last-write-wins. Yjs CRDT deferred to v2.
 - UI: functional minimalism, monospace, dark/light mode, keyboard-first
+- Editor: one unified editor for all entity types. Block types (text, field, note) available on any entity. Entity type is a starting label, not a capability gate.
+- Members: any entity can have a members section. Memberships carry a freeform `role` label (leader, father, ally, etc.) — members section groups by role. Hierarchy is semantic, not structural.
 - Script editor: deferred until world-building loop feels good
 - Drawing canvas: React Native Skia, deferred
 
