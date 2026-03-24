@@ -43,34 +43,34 @@ Add @-mention linking: autocomplete in text blocks triggered by @, creates entit
 ### Keyboard Map
 
 **Focus**
-- Escape — context-dependent retreat (dismiss autocomplete → deselect block → focus binder → clear filter → collapse folder)
-- Cmd+B — toggle binder
+- Escape — context-dependent retreat (dismiss autocomplete → deselect block → clear selection → clear filter → deselect)
+- Cmd+\\ — toggle binder
 - Cmd+K — quick switcher (fuzzy search, Enter to jump)
 
 **Binder (when focused)**
 - Up/Down — move selection
+- Shift+Up/Down — extend selection range
 - Enter — open selected entity in editor
 - Right — expand folder/section
 - Left — collapse folder/section, or select parent
 - Start typing — live filter
-- Escape — clear filter, or deselect
-- Cmd+N — new entity (inline type picker, name field, Enter to create)
-- Cmd+Shift+N — new folder
-- Delete/Cmd+Backspace — delete selected (inline y/n confirm)
+- Escape — clear selection, or clear filter, or deselect
+- Cmd+Shift+A — new entity (inline type picker)
+- Cmd+Shift+M — move to folder (picker)
+- Backspace/Delete — delete selected (inline y/n confirm)
 - F2 — rename selected inline
 
 **Editor (when focused)**
 - Tab/Shift+Tab — next/previous block
 - Cmd+Enter — new block below
 - Cmd+Shift+Enter — new block above
-- Cmd+Backspace — delete block (inline confirm)
+- Cmd+Shift+Backspace — delete block (inline confirm)
 - @ — entity mention autocomplete
 - / — block type picker (at start of empty block)
 - Cmd+Shift+T — cycle block type
-- Escape — deselect block, focus binder
+- Escape — deselect block
 
 **App-level**
-- Cmd+D — toggle dark/light
 - Cmd+S — force save
 - Cmd+/ — shortcut reference
 

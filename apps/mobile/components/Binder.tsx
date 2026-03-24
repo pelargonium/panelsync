@@ -691,15 +691,10 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType }:
     const active = document.activeElement as HTMLElement;
     const isInInput = active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA';
 
-    // Cmd+N / Cmd+Shift+N — always handle
-    if (e.metaKey && e.key === 'n' && !e.shiftKey) {
+    // Cmd+Shift+A — open create picker
+    if (e.metaKey && e.shiftKey && e.key === 'a') {
       e.preventDefault();
       openCreatePicker();
-      return;
-    }
-    if (e.metaKey && e.key === 'n' && e.shiftKey) {
-      e.preventDefault();
-      onCreateFolder();
       return;
     }
 
@@ -767,8 +762,8 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType }:
       return;
     }
 
-    // Cmd+M — move to folder
-    if (e.metaKey && e.key === 'm') {
+    // Cmd+Shift+M — move to folder
+    if (e.metaKey && e.shiftKey && (e.key === 'm' || e.key === 'M')) {
       e.preventDefault();
       startMove();
       return;
@@ -801,7 +796,7 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType }:
       else setFocusedId(null);
     }
     else if (e.key === 'F2') { e.preventDefault(); startRename(); }
-    else if (e.key === 'Delete' || (e.metaKey && e.key === 'Backspace')) {
+    else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
       if (selectedIds.size > 0) startBulkDelete();
       else startDelete();

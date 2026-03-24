@@ -778,8 +778,8 @@ export default function Editor({
       return;
     }
 
-    // Cmd+Backspace — delete focused block (with confirmation)
-    if (e.key === 'Backspace' && e.metaKey) {
+    // Cmd+Shift+Backspace — delete focused block (with confirmation)
+    if (e.key === 'Backspace' && e.metaKey && e.shiftKey) {
       e.preventDefault();
       const blockId = focusedBlockId ?? lastFocusedBlockIdRef.current;
       if (blockId) setDeletingBlockId(blockId);

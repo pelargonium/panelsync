@@ -95,13 +95,9 @@ function UniverseWorkspace() {
   // App-level keyboard shortcuts
   const appKeyRef = useRef<(e: KeyboardEvent) => void>(undefined);
   appKeyRef.current = (e: KeyboardEvent) => {
-    if (e.metaKey && e.key === 'b') {
+    if (e.metaKey && e.key === '\\') {
       e.preventDefault();
       setBinderOpen(!binderOpen);
-    }
-    if (e.metaKey && e.key === 'd') {
-      e.preventDefault();
-      toggle();
     }
     if (e.key === '/' && e.metaKey) {
       e.preventDefault();
@@ -240,23 +236,21 @@ function UniverseWorkspace() {
                 ['Left', 'collapse / parent'],
                 ['Escape', 'clear selection / filter'],
                 ['type', 'filter'],
-                ['Cmd+N', 'new entity'],
-                ['Cmd+Shift+N', 'new folder'],
-                ['Cmd+M', 'move to folder'],
+                ['Cmd+Shift+A', 'new entity'],
+                ['Cmd+Shift+M', 'move to folder'],
                 ['F2', 'rename'],
-                ['Delete', 'delete (y/n)'],
+                ['Backspace', 'delete (y/n)'],
               ]} />
               <ShortcutSection mono={mono} colors={colors} title="EDITOR" items={[
                 ['Tab', 'next block'],
                 ['Shift+Tab', 'previous block'],
                 ['Cmd+Enter', 'new block below'],
                 ['Cmd+Shift+Enter', 'new block above'],
-                ['Cmd+Backspace', 'delete block (y/n)'],
+                ['Cmd+Shift+Bksp', 'delete block (y/n)'],
                 ['Escape', 'deselect block'],
               ]} />
               <ShortcutSection mono={mono} colors={colors} title="APP" items={[
-                ['Cmd+B', 'toggle binder'],
-                ['Cmd+D', 'toggle dark/light'],
+                ['Cmd+\\', 'toggle binder'],
                 ['Cmd+/', 'this panel'],
               ]} />
             </ScrollView>
