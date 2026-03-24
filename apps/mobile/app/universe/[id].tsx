@@ -7,9 +7,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import CharacterEditor from '../../components/CharacterEditor';
-import EntityEditor from '../../components/EntityEditor';
-import GroupEditor from '../../components/GroupEditor';
+import Editor from '../../components/Editor';
 import Binder from '../../components/Binder';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { UniverseProvider, useUniverse } from '../../context/UniverseContext';
@@ -42,24 +40,17 @@ function PrimaryContent({
   onAutoFocusDone: () => void;
   onSaveStateChange: (state: 'saved' | 'saving') => void;
 }) {
-  const { activeEntityType, activeEntityId, entities } = useUniverse();
+  const { activeEntityType, activeEntityId } = useUniverse();
 
   if (activeEntityType === 'entity' && activeEntityId) {
-    const entity = entities.find((item) => item.id === activeEntityId);
-    if (entity?.type === 'group') {
-      return <GroupEditor entityId={activeEntityId} />;
-    }
-    if (entity?.type === 'character') {
-      return (
-        <CharacterEditor
-          entityId={activeEntityId}
-          autoFocusName={justCreatedId === activeEntityId}
-          onAutoFocusDone={onAutoFocusDone}
-          onSaveStateChange={onSaveStateChange}
-        />
-      );
-    }
-    return <EntityEditor entityId={activeEntityId} />;
+    return (
+      <Editor
+        entityId={activeEntityId}
+        autoFocusName={justCreatedId === activeEntityId}
+        onAutoFocusDone={onAutoFocusDone}
+        onSaveStateChange={onSaveStateChange}
+      />
+    );
   }
 
   return <EmptyContent />;

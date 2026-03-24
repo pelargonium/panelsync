@@ -9,7 +9,7 @@ import {
   type NativeSyntheticEvent,
   type TextInputSelectionChangeEventData,
 } from 'react-native';
-import { api, type ApiBibleBlock } from '../lib/api';
+import { api, type ApiBibleBlock, type ApiEntity } from '../lib/api';
 import { useUniverse } from '../context/UniverseContext';
 import { useTheme } from '../context/ThemeContext';
 
@@ -36,7 +36,7 @@ type BlockPatch = {
   content?: string;
 };
 
-interface CharacterEditorProps {
+interface EditorProps {
   entityId: string;
   autoFocusName?: boolean;
   onAutoFocusDone?: () => void;
@@ -82,6 +82,8 @@ function sortLabel(mode: SortMode) {
 function updateLocalBlock(blocks: ApiBibleBlock[], id: string, patch: Partial<ApiBibleBlock>) {
   return blocks.map((b) => (b.id === id ? { ...b, ...patch } : b));
 }
+
+// ── Block sub-components ────────────────────────────────────────────────────
 
 function TextBlock({
   block, onUpdate, onFocus, onSelectionChange, onTabForward, inputRefs,
@@ -308,17 +310,121 @@ function NoteBlock({
   );
 }
 
-export default function CharacterEditor({
+// ── Members section (groups only) ───────────────────────────────────────────
+
+function MembersSection({
+  entityId,
+  onSaveStart,
+  onSaveEnd,
+  onSaveError,
+}: {
+  entityId: string;
+  onSaveStart: () => void;
+  onSaveEnd: () => void;
+  onSaveError: () => void;
+}) {
+  const { memberships, entities, addMembership, removeMembership } = useUniverse();
+  const { colors, mono } = useTheme();
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+
+  const members = useMemo(() => {
+    const memberIds = new Set(
+      memberships.filter((item) => item.groupId === entityId).map((item) => item.characterId),
+    );
+    return entities.filter((entity) => memberIds.has(entity.id));
+  }, [memberships, entityId, entities]);
+
+  const availableEntities = useMemo(() => {
+    const memberIds = new Set(
+      memberships.filter((item) => item.groupId === entityId).map((item) => item.characterId),
+    );
+    return entities.filter((entity) => entity.type === 'character' && !memberIds.has(entity.id));
+  }, [memberships, entityId, entities]);
+
+  async function handleAddMember(characterId: string) {
+    setAddMemberOpen(false);
+    onSaveStart();
+    try {
+      await addMembership(characterId, entityId);
+      onSaveEnd();
+    } catch {
+      onSaveError();
+    }
+  }
+
+  async function handleRemoveMember(characterId: string) {
+    onSaveStart();
+    try {
+      await removeMembership(characterId, entityId);
+      onSaveEnd();
+    } catch {
+      onSaveError();
+    }
+  }
+
+  return (
+    <View style={{ paddingHorizontal: 24, marginTop: 24, paddingBottom: 16 }}>
+      <Text style={{ fontFamily: mono, fontSize: 11, color: colors.muted, letterSpacing: 1, marginBottom: 8 }}>MEMBERS</Text>
+
+      {members.map((member) => (
+        <View key={member.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
+          <Text style={{ fontFamily: mono, fontSize: 13, color: colors.text, flex: 1 }}>{member.name}</Text>
+          <TouchableOpacity onPress={() => handleRemoveMember(member.id)}>
+            <Text style={{ fontFamily: mono, fontSize: 13, color: colors.muted }}>x</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+
+      {addMemberOpen && (
+        <View style={{ marginTop: 8, borderWidth: 1, borderColor: colors.border, maxHeight: 200 }}>
+          <ScrollView nestedScrollEnabled>
+            {availableEntities.map((entity) => (
+              <TouchableOpacity
+                key={entity.id}
+                onPress={() => handleAddMember(entity.id)}
+                style={{ paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}
+              >
+                <Text style={{ fontFamily: mono, fontSize: 13, color: colors.text }}>{entity.name}</Text>
+              </TouchableOpacity>
+            ))}
+            {availableEntities.length === 0 && (
+              <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted, padding: 12 }}>no characters available</Text>
+            )}
+          </ScrollView>
+        </View>
+      )}
+
+      <TouchableOpacity onPress={() => setAddMemberOpen((c) => !c)} style={{ marginTop: 8 }}>
+        <Text style={{ fontFamily: mono, fontSize: 12, color: colors.text }}>
+          {addMemberOpen ? 'cancel' : '+ add member'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ── Main editor ─────────────────────────────────────────────────────────────
+
+function entityTypeLabel(type: ApiEntity['type']): string {
+  if (type === 'character') return 'character';
+  if (type === 'location') return 'location';
+  if (type === 'group') return 'group';
+  if (type === 'folder') return 'folder';
+  return 'note';
+}
+
+export default function Editor({
   entityId,
   autoFocusName = false,
   onAutoFocusDone,
   onSaveStateChange,
-}: CharacterEditorProps) {
-  const { updateEntityName, deleteEntity } = useUniverse();
+}: EditorProps) {
+  const { entities, updateEntityName, deleteEntity } = useUniverse();
   const { colors, mono } = useTheme();
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [name, setName] = useState('');
+  const [entityType, setEntityType] = useState<ApiEntity['type']>('note');
   const [blocks, setBlocks] = useState<ApiBibleBlock[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>('written');
   const [saveState, setSaveState] = useState<SaveState>('saved');
@@ -350,6 +456,9 @@ export default function CharacterEditor({
   const canConvert = focusedBlock?.kind === 'text' || focusedBlock?.kind === 'note';
   const convertLabel = focusedBlock?.kind === 'note' ? '-> text' : '-> note';
 
+  const entity = entities.find((e) => e.id === entityId);
+  const isGroup = entityType === 'group';
+
   function clearTimers() {
     if (titleTimerRef.current) { clearTimeout(titleTimerRef.current); titleTimerRef.current = null; }
     Object.values(blockTimersRef.current).forEach(clearTimeout);
@@ -372,7 +481,7 @@ export default function CharacterEditor({
       onSaveStateChangeRef.current?.('saved');
     } catch (e) {
       setSaveState('error');
-      console.error('[CharacterEditor] save failed:', e);
+      console.error('[Editor] save failed:', e);
     } finally {
       inFlightSavesRef.current -= 1;
       syncSaveState();
@@ -402,6 +511,8 @@ export default function CharacterEditor({
 
   useEffect(() => { blocksRef.current = blocks; }, [blocks]);
 
+  // ── Load entity + blocks ────────────────────────────────────────────────
+
   useEffect(() => {
     let cancelled = false;
     hydratedRef.current = false;
@@ -417,12 +528,34 @@ export default function CharacterEditor({
     setBlocks([]);
 
     Promise.all([api.entities.get(entityId), api.entities.blocks.list(entityId)])
-      .then(([entryRes, blocksRes]) => {
+      .then(async ([entryRes, blocksRes]) => {
         if (cancelled) return;
+
         setName(entryRes.data.name);
-        setBlocks(blocksRes.data);
+        setEntityType(entryRes.data.type as ApiEntity['type']);
         latestNameRef.current = entryRes.data.name;
         savedNameRef.current = entryRes.data.name;
+
+        // bodyText migration: if entity has bodyText but no blocks, create a text block
+        if (blocksRes.data.length === 0 && entryRes.data.bodyText.trim()) {
+          try {
+            const migrated = await api.entities.blocks.create(entityId, {
+              kind: 'text',
+              content: entryRes.data.bodyText,
+              position: 1.0,
+            });
+            // Clear the old bodyText
+            await api.entities.updateContent(entityId, '');
+            setBlocks([migrated.data]);
+          } catch (e) {
+            console.error('[Editor] bodyText migration failed:', e);
+            // Fall back to empty blocks — bodyText is still there if we retry
+            setBlocks([]);
+          }
+        } else {
+          setBlocks(blocksRes.data);
+        }
+
         hydratedRef.current = true;
         if (autoFocusNameRef.current) {
           setName('');
@@ -430,12 +563,14 @@ export default function CharacterEditor({
         }
       })
       .catch((e) => {
-        if (!cancelled) { console.error('[CharacterEditor] load failed:', e); setSaveState('error'); }
+        if (!cancelled) { console.error('[Editor] load failed:', e); setSaveState('error'); }
       })
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; clearTimers(); inFlightSavesRef.current = 0; };
   }, [entityId]);
+
+  // ── Name auto-save ──────────────────────────────────────────────────────
 
   useEffect(() => {
     latestNameRef.current = name;
@@ -456,6 +591,8 @@ export default function CharacterEditor({
     syncSaveState();
     return () => { if (titleTimerRef.current) { clearTimeout(titleTimerRef.current); titleTimerRef.current = null; } };
   }, [entityId, name, updateEntityName]);
+
+  // ── Block operations ────────────────────────────────────────────────────
 
   function handleBlockUpdate(id: string, patch: BlockPatch) {
     setBlocks((cur) => updateLocalBlock(cur, id, patch));
@@ -588,6 +725,8 @@ export default function CharacterEditor({
     });
   }
 
+  // ── Render ──────────────────────────────────────────────────────────────
+
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
@@ -611,7 +750,7 @@ export default function CharacterEditor({
           placeholderTextColor={colors.muted}
           style={{ fontFamily: mono, fontSize: 18, fontWeight: '700', color: colors.text, paddingVertical: 0 }}
         />
-        <Text style={{ fontFamily: mono, fontSize: 10, color: colors.muted, marginTop: 4 }}>character</Text>
+        <Text style={{ fontFamily: mono, fontSize: 10, color: colors.muted, marginTop: 4 }}>{entityTypeLabel(entityType)}</Text>
       </View>
 
       <View style={{ height: 1, backgroundColor: colors.border }} />
@@ -675,6 +814,19 @@ export default function CharacterEditor({
           );
         })}
 
+        {/* Members section for groups */}
+        {isGroup && (
+          <>
+            <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: 16, marginTop: 16 }} />
+            <MembersSection
+              entityId={entityId}
+              onSaveStart={() => { inFlightSavesRef.current += 1; syncSaveState(); }}
+              onSaveEnd={() => { inFlightSavesRef.current -= 1; setSaveState('saved'); onSaveStateChangeRef.current?.('saved'); syncSaveState(); }}
+              onSaveError={() => { inFlightSavesRef.current -= 1; setSaveState('error'); syncSaveState(); }}
+            />
+          </>
+        )}
+
         {/* Trailing insert zone */}
         <TouchableOpacity
           onPress={() => {
@@ -707,7 +859,7 @@ export default function CharacterEditor({
       }}>
         {confirmDelete ? (
           <>
-            <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>delete?</Text>
+            <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>delete {entityTypeLabel(entityType)}?</Text>
             <TouchableOpacity onPress={() => void deleteEntity(entityId)}>
               <Text style={{ fontFamily: mono, fontSize: 12, color: colors.error }}>yes</Text>
             </TouchableOpacity>
