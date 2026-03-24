@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -430,6 +431,8 @@ export default function Editor({
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [fieldMode, setFieldMode] = useState(false);
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
+  const [deletingBlockId, setDeletingBlockId] = useState<string | null>(null);
+  const editorRef = useRef<View>(null);
   const hydratedRef = useRef(false);
   const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blockTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -523,6 +526,7 @@ export default function Editor({
     setSaveState('saved');
     setFieldMode(false);
     setFocusedBlockId(null);
+    setDeletingBlockId(null);
     setConfirmDelete(false);
     setLoading(true);
     setBlocks([]);
@@ -602,6 +606,7 @@ export default function Editor({
   function focusBlock(block: ApiBibleBlock) {
     lastFocusedBlockIdRef.current = block.id;
     setFocusedBlockId(block.id);
+    setDeletingBlockId(null);
   }
 
   function focusFirstBlockInput() {
@@ -640,6 +645,7 @@ export default function Editor({
     body: { kind: 'field' | 'note' | 'text'; label?: string; value?: string; title?: string; body?: string; content?: string },
     focusKey: string,
     explicitPosition?: number,
+    direction: 'below' | 'above' = 'below',
   ) {
     let position = explicitPosition;
     if (position === undefined) {
@@ -648,8 +654,13 @@ export default function Editor({
         const sorted = sortBlocks(blocksRef.current, 'written');
         const idx = sorted.findIndex((b) => b.id === lastId);
         if (idx !== -1) {
-          const after = sorted[idx + 1];
-          position = after ? (sorted[idx].position + after.position) / 2 : sorted[idx].position + 1.0;
+          if (direction === 'below') {
+            const after = sorted[idx + 1];
+            position = after ? (sorted[idx].position + after.position) / 2 : sorted[idx].position + 1.0;
+          } else {
+            const before = sorted[idx - 1];
+            position = before ? (before.position + sorted[idx].position) / 2 : sorted[idx].position - 1.0;
+          }
         }
       }
     }
@@ -670,7 +681,7 @@ export default function Editor({
     const idx = ordered.findIndex((b) => b.id === currentId);
     if (idx === -1) return;
     const target = direction === 'next' ? ordered[idx + 1] : ordered[idx - 1];
-    if (!target) { if (direction === 'next') nameInputRef.current?.focus(); return; }
+    if (!target) { nameInputRef.current?.focus(); return; }
     const key = target.kind === 'text' ? `${target.id}:content` : target.kind === 'field' ? `${target.id}:label` : `${target.id}:title`;
     inputRefs.current[key]?.focus();
   }
@@ -725,6 +736,73 @@ export default function Editor({
     });
   }
 
+  // ── Editor keyboard shortcuts (web only) ─────────────────────────────
+
+  const editorKeyRef = useRef<(e: KeyboardEvent) => void>(undefined);
+  editorKeyRef.current = (e: KeyboardEvent) => {
+    const editorEl = editorRef.current as unknown as HTMLElement;
+    if (!editorEl?.contains(document.activeElement)) return;
+
+    // Delete confirmation mode: y confirms, n/Escape cancels
+    if (deletingBlockId) {
+      if (e.key === 'y' || e.key === 'Y') {
+        e.preventDefault();
+        void handleBlockDelete(deletingBlockId);
+        setDeletingBlockId(null);
+      } else if (e.key === 'n' || e.key === 'N' || e.key === 'Escape') {
+        e.preventDefault();
+        setDeletingBlockId(null);
+      }
+      return;
+    }
+
+    // Shift+Tab — previous block
+    if (e.key === 'Tab' && e.shiftKey) {
+      e.preventDefault();
+      const blockId = focusedBlockId ?? lastFocusedBlockIdRef.current;
+      if (blockId) focusAdjacentBlock(blockId, 'prev');
+      return;
+    }
+
+    // Cmd+Enter — new text block below
+    if (e.key === 'Enter' && e.metaKey && !e.shiftKey) {
+      e.preventDefault();
+      void createBlock({ kind: 'text', content: '' }, 'content', undefined, 'below');
+      return;
+    }
+
+    // Cmd+Shift+Enter — new text block above
+    if (e.key === 'Enter' && e.metaKey && e.shiftKey) {
+      e.preventDefault();
+      void createBlock({ kind: 'text', content: '' }, 'content', undefined, 'above');
+      return;
+    }
+
+    // Cmd+Backspace — delete focused block (with confirmation)
+    if (e.key === 'Backspace' && e.metaKey) {
+      e.preventDefault();
+      const blockId = focusedBlockId ?? lastFocusedBlockIdRef.current;
+      if (blockId) setDeletingBlockId(blockId);
+      return;
+    }
+
+    // Escape — deselect block
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      (document.activeElement as HTMLElement)?.blur?.();
+      setFocusedBlockId(null);
+      lastFocusedBlockIdRef.current = null;
+      return;
+    }
+  };
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    function onKeyDown(e: KeyboardEvent) { editorKeyRef.current?.(e); }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   // ── Render ──────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -736,14 +814,14 @@ export default function Editor({
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View ref={editorRef} style={{ flex: 1, backgroundColor: colors.bg }}>
       {/* Header */}
       <View style={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 12 }}>
         <TextInput
           ref={nameInputRef}
           value={name}
           onChangeText={setName}
-          onFocus={() => setFocusedBlockId(null)}
+          onFocus={() => { setFocusedBlockId(null); setDeletingBlockId(null); }}
           onSubmitEditing={focusFirstBlockInput}
           returnKeyType="next"
           placeholder="untitled"
@@ -767,6 +845,9 @@ export default function Editor({
           const needsZone = block.kind !== 'text' && (i === 0 || prev.kind !== 'text');
           const zonePos = i === 0 ? block.position - 1.0 : (prev.position + block.position) / 2;
 
+          const isFocused = focusedBlockId === block.id;
+          const isDeleting = deletingBlockId === block.id;
+
           return (
             <View key={block.id}>
               {needsZone && (
@@ -777,6 +858,12 @@ export default function Editor({
                   <View style={{ flex: 1 }} />
                 </TouchableOpacity>
               )}
+
+              {/* Focus indicator + delete confirmation */}
+              <View style={{ borderLeftWidth: 2, borderLeftColor: isDeleting ? colors.error : isFocused ? colors.text : 'transparent' }}>
+                {isDeleting && (
+                  <Text style={{ fontFamily: mono, fontSize: 10, color: colors.error, paddingHorizontal: 16, paddingTop: 2 }}>delete block? y/n</Text>
+                )}
 
               {block.kind === 'text' ? (
                 <TextBlock
@@ -810,6 +897,7 @@ export default function Editor({
                   inputRefs={inputRefs}
                 />
               )}
+              </View>
             </View>
           );
         })}
