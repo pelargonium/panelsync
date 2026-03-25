@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   Modal, TextInput, KeyboardAvoidingView,
@@ -132,6 +132,7 @@ export default function WorldsDashboard() {
   const [modalVisible, setModalVisible] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [pendingDeleteUniverse, setPendingDeleteUniverse] = useState<ApiUniverse | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   useEffect(() => {
     getToken().then(token => {
@@ -160,6 +161,42 @@ export default function WorldsDashboard() {
     setLoading(true);
     loadUniverses().finally(() => setLoading(false));
   }, [authChecked]);
+
+  // Keyboard navigation for universe list
+  const keyRef = useRef<(e: KeyboardEvent) => void>(undefined);
+  keyRef.current = (e: KeyboardEvent) => {
+    if (modalVisible || pendingDeleteUniverse) return;
+    if (universes.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(i => Math.min(universes.length - 1, i + 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(i => Math.max(0, i - 1));
+    } else if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      const u = universes[selectedIndex];
+      if (u) router.push({ pathname: '/universe/[id]', params: { id: u.id, name: u.name } });
+    } else if (e.key === 'Backspace' && !e.metaKey) {
+      const u = universes[selectedIndex];
+      if (u) setPendingDeleteUniverse(u);
+    }
+  };
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    function onKeyDown(e: KeyboardEvent) { keyRef.current?.(e); }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  // Keep selectedIndex in bounds when list changes
+  useEffect(() => {
+    if (selectedIndex >= universes.length && universes.length > 0) {
+      setSelectedIndex(universes.length - 1);
+    }
+  }, [universes.length, selectedIndex]);
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -211,20 +248,21 @@ export default function WorldsDashboard() {
             No universes yet. Tap "+ new" to create one.
           </Text>
         ) : (
-          universes.map(u => {
+          universes.map((u, idx) => {
             const edited = new Date(u.updatedAt);
             const diffMs = Date.now() - edited.getTime();
             const diffH = Math.floor(diffMs / 36e5);
             const diffD = Math.floor(diffMs / 864e5);
             const lastEdited = diffH < 1 ? 'just now' : diffH < 24 ? `${diffH}h ago` : diffD === 1 ? 'yesterday' : `${diffD}d ago`;
+            const isSelected = idx === selectedIndex;
 
             return (
               <TouchableOpacity
                 key={u.id}
-                onPress={() => router.push({ pathname: '/universe/[id]', params: { id: u.id, name: u.name } })}
+                onPress={() => { setSelectedIndex(idx); router.push({ pathname: '/universe/[id]', params: { id: u.id, name: u.name } }); }}
                 onLongPress={() => setPendingDeleteUniverse(u)}
                 delayLongPress={500}
-                style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                style={{ paddingVertical: 12, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: isSelected ? colors.selection : 'transparent' }}
               >
                 <Text style={{ fontFamily: mono, fontSize: 14, color: colors.text }}>{u.name}</Text>
                 <Text style={{ fontFamily: mono, fontSize: 11, color: colors.muted, marginTop: 2 }}>{lastEdited}</Text>

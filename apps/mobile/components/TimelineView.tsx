@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
+import { generateId } from './ScriptView';
 
 export interface TimelineEvent {
   id: string;
@@ -28,7 +29,7 @@ export default function TimelineView({ events, onEventsChange, isFocused, nameIn
 
   // Event mutation helpers
   function addEvent(afterIndex?: number) {
-    const newEvent = { id: crypto.randomUUID(), title: '', description: '', dateline: '' };
+    const newEvent = { id: generateId(), title: '', description: '', dateline: '' };
     const next = [...events];
     const insertAt = afterIndex !== undefined ? afterIndex + 1 : events.length;
     next.splice(insertAt, 0, newEvent);
@@ -46,7 +47,7 @@ export default function TimelineView({ events, onEventsChange, isFocused, nameIn
     const next = events.filter((_, i) => i !== index);
     setDeleteConfirmIndex(null);
     if (next.length === 0) {
-      const blank = { id: crypto.randomUUID(), title: '', description: '', dateline: '' };
+      const blank = { id: generateId(), title: '', description: '', dateline: '' };
       onEventsChange([blank]);
       setSpineMode(false);
       setFocusedIndex(0);

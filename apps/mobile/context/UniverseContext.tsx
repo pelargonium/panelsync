@@ -105,6 +105,7 @@ function defaultNameForType(type: ApiEntity['type']) {
   if (type === 'group') return 'Untitled Group';
   if (type === 'folder') return 'Untitled Folder';
   if (type === 'timeline') return 'Untitled Timeline';
+  if (type === 'script') return 'Untitled Script';
   return 'Untitled Note';
 }
 

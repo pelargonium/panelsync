@@ -12,7 +12,7 @@ import { api, type ApiEntity } from '../lib/api';
 import { useUniverse } from '../context/UniverseContext';
 import { useTheme } from '../context/ThemeContext';
 import TimelineView, { type TimelineEvent } from './TimelineView';
-
+import ScriptView, { type ScriptElement, generateId } from './ScriptView';
 type SaveState = 'saved' | 'saving' | 'error';
 
 interface EditorProps {
@@ -29,6 +29,7 @@ function entityTypeLabel(type: ApiEntity['type']): string {
   if (type === 'group') return 'group';
   if (type === 'folder') return 'folder';
   if (type === 'timeline') return 'timeline';
+  if (type === 'script') return 'script';
   return 'note';
 }
 
@@ -141,6 +142,7 @@ export default function Editor({
   const [entityType, setEntityType] = useState<ApiEntity['type']>('note');
   const [text, setText] = useState('');
   const [events, setEvents] = useState<TimelineEvent[]>([]);
+  const [scriptElements, setScriptElements] = useState<ScriptElement[]>([]);
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -151,6 +153,9 @@ export default function Editor({
   const selectionRef = useRef({ start: 0, end: 0 });
   const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scriptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestScriptRef = useRef<string>('[]');
+  const savedScriptRef = useRef<string>('[]');
   const eventsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(0);
   const latestNameRef = useRef('');
@@ -179,7 +184,7 @@ export default function Editor({
   }
 
   function hasPending() {
-    return !!(titleTimerRef.current || textTimerRef.current || eventsTimerRef.current || inFlightRef.current > 0);
+    return !!(titleTimerRef.current || textTimerRef.current || eventsTimerRef.current || scriptTimerRef.current || inFlightRef.current > 0);
   }
 
   async function runSave(task: () => Promise<void>) {
@@ -203,9 +208,11 @@ export default function Editor({
     hydratedRef.current = false;
     if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
     if (textTimerRef.current) clearTimeout(textTimerRef.current);
+    if (scriptTimerRef.current) clearTimeout(scriptTimerRef.current);
     if (eventsTimerRef.current) clearTimeout(eventsTimerRef.current);
     titleTimerRef.current = null;
     textTimerRef.current = null;
+    scriptTimerRef.current = null;
     eventsTimerRef.current = null;
     inFlightRef.current = 0;
     setSaveState('saved');
@@ -226,10 +233,21 @@ export default function Editor({
           let parsed: TimelineEvent[] = [];
           try { parsed = JSON.parse(content); } catch { parsed = []; }
           if (!Array.isArray(parsed)) parsed = [];
-          if (parsed.length === 0) parsed = [{ id: crypto.randomUUID(), title: '', description: '', dateline: '' }];
+          if (parsed.length === 0) parsed = [{ id: generateId(), title: '', description: '', dateline: '' }];
           setEvents(parsed);
           latestEventsRef.current = JSON.stringify(parsed);
           savedEventsRef.current = content || '[]';
+        } else if (entryRes.data.type === 'script') {
+          let parsed: ScriptElement[] = [];
+          try { parsed = JSON.parse(content); } catch { parsed = []; }
+          if (!Array.isArray(parsed)) parsed = [];
+          if (parsed.length === 0) parsed = [
+            { id: generateId(), type: 'page', text: '' },
+            { id: generateId(), type: 'panel', text: '' },
+          ];
+          setScriptElements(parsed);
+          latestScriptRef.current = JSON.stringify(parsed);
+          savedScriptRef.current = content || '[]';
         } else {
           setText(content);
           latestTextRef.current = content;
@@ -251,6 +269,7 @@ export default function Editor({
       cancelled = true;
       if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
       if (textTimerRef.current) clearTimeout(textTimerRef.current);
+      if (scriptTimerRef.current) clearTimeout(scriptTimerRef.current);
       if (eventsTimerRef.current) clearTimeout(eventsTimerRef.current);
     };
   }, [entityId]);
@@ -319,10 +338,31 @@ export default function Editor({
     return () => { if (eventsTimerRef.current) { clearTimeout(eventsTimerRef.current); eventsTimerRef.current = null; } };
   }, [entityId, entityType, events]);
 
+  // ── Script auto-save ────────────────────────────────────────────────
+  useEffect(() => {
+    if (entityType !== 'script') return;
+    const serialized = JSON.stringify(scriptElements);
+    latestScriptRef.current = serialized;
+    if (!hydratedRef.current) return;
+    if (scriptTimerRef.current) clearTimeout(scriptTimerRef.current);
+    if (serialized === savedScriptRef.current) return;
+
+    notifySaveState('saving');
+    scriptTimerRef.current = setTimeout(() => {
+      scriptTimerRef.current = null;
+      runSave(async () => {
+        await api.entities.updateContent(entityId, latestScriptRef.current);
+        savedScriptRef.current = latestScriptRef.current;
+      });
+    }, 600);
+
+    return () => { if (scriptTimerRef.current) { clearTimeout(scriptTimerRef.current); scriptTimerRef.current = null; } };
+  }, [entityId, entityType, scriptElements]);
+
   // ── Auto-focus when panel becomes active ────────────────────────────
 
   useEffect(() => {
-    if (isFocused && hydratedRef.current && entityType !== 'timeline') {
+    if (isFocused && hydratedRef.current && entityType !== 'timeline' && entityType !== 'script') {
       textInputRef.current?.focus();
     }
   }, [isFocused, entityType]);
@@ -332,7 +372,7 @@ export default function Editor({
   const keyRef = useRef<(e: KeyboardEvent) => void>(undefined);
   keyRef.current = (e: KeyboardEvent) => {
     if (!isFocused) return;
-    if (entityType === 'timeline') return;  // TimelineView has its own handler
+    if (entityType === 'timeline' || entityType === 'script') return;  // TimelineView and ScriptView have their own handlers
 
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -376,7 +416,14 @@ export default function Editor({
           ref={nameInputRef}
           value={name}
           onChangeText={setName}
-          onSubmitEditing={() => textInputRef.current?.focus()}
+          onSubmitEditing={() => {
+            if (entityType === 'script' || entityType === 'timeline') {
+              // Let the sub-view handle focus — just blur the name input
+              (nameInputRef.current as any)?.blur?.();
+            } else {
+              textInputRef.current?.focus();
+            }
+          }}
           returnKeyType="next"
           placeholder="untitled"
           placeholderTextColor={colors.muted}
@@ -398,6 +445,13 @@ export default function Editor({
           <TimelineView
             events={events}
             onEventsChange={setEvents}
+            isFocused={isFocused}
+            nameInputRef={nameInputRef}
+          />
+        ) : entityType === 'script' ? (
+          <ScriptView
+            elements={scriptElements}
+            onElementsChange={setScriptElements}
             isFocused={isFocused}
             nameInputRef={nameInputRef}
           />

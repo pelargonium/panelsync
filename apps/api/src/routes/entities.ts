@@ -124,9 +124,10 @@ export async function entityRoutes(server: FastifyInstance) {
     },
   );
 
-  server.post<{ Params: { universeId: string }; Body: { name: string; type: 'character' | 'location' | 'note' | 'group' | 'folder' | 'bible' | 'timeline' } }>(
+  server.post<{ Params: { universeId: string }; Body: { name: string; type: 'character' | 'location' | 'note' | 'group' | 'folder' | 'bible' | 'timeline' | 'script' } }>(
     '/universes/:universeId/entities',
     async (request, reply) => {
+      try {
       const { universeId } = request.params;
       const { name, type } = request.body;
       const userId = request.user.sub;
@@ -157,6 +158,11 @@ export async function entityRoutes(server: FastifyInstance) {
           updatedBy: userId,
         })
         .returning();
+
+      if (!row) {
+        reply.code(500);
+        return { error: 'Failed to create entity' };
+      }
 
       if (type === 'character') {
         await db.insert(dossierAttachments).values([
@@ -205,6 +211,11 @@ export async function entityRoutes(server: FastifyInstance) {
 
       reply.code(201);
       return { data: serializeEntry(row) };
+      } catch (e) {
+        console.error('[API] Create entity failed:', e);
+        reply.code(500);
+        return { error: e instanceof Error ? e.message : 'Internal Server Error' };
+      }
     },
   );
 
@@ -242,7 +253,7 @@ export async function entityRoutes(server: FastifyInstance) {
     },
   );
 
-  server.patch<{ Params: { id: string }; Body: { name?: string; type?: 'character' | 'location' | 'note' | 'group' | 'folder' | 'bible' | 'timeline'; color?: string; position?: number | null } }>(
+  server.patch<{ Params: { id: string }; Body: { name?: string; type?: 'character' | 'location' | 'note' | 'group' | 'folder' | 'bible' | 'timeline' | 'script'; color?: string; position?: number | null } }>(
     '/entities/:id',
     async (request, reply) => {
       const { id } = request.params;

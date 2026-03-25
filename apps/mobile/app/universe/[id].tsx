@@ -367,6 +367,16 @@ function UniverseWorkspace() {
                 ['Delete (spine)', 'delete event'],
                 ['Escape', 'exit spine / blur'],
               ]} />
+              <ShortcutSection mono={mono} colors={colors} title="SCRIPT" items={[
+                ['Enter', 'next element (context-aware)'],
+                ['Tab / Shift+Tab', 'cycle element type (empty)'],
+                ['Backspace (empty)', 'delete element'],
+                ['Alt+Up/Down', 'jump to content'],
+                ['Alt+Left/Right', 'navigate dialogue group'],
+                ['( in character', 'insert parenthetical'],
+                ['ArrowUp (from top)', 'name input'],
+                ['Escape', 'blur'],
+              ]} />
               <ShortcutSection mono={mono} colors={colors} title="APP" items={[
                 ['Cmd+;', 'cycle panels'],
                 ['Cmd+\\', 'toggle binder'],

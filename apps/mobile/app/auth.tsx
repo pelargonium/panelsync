@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { colors } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 import { api, saveToken } from '../lib/api';
 
 type Mode = 'login' | 'register';
 
 export default function AuthScreen() {
   const router = useRouter();
+  const { colors, mono } = useTheme();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,32 +43,26 @@ export default function AuthScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={s.container}
+      style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }}
     >
-      <View style={s.card}>
-        <Text style={s.logo}>PANELSYNC</Text>
-        <Text style={s.tagline}>Your comic universe, organized.</Text>
+      <View style={{ width: '100%', maxWidth: 360 }}>
+        <Text style={{ fontFamily: mono, fontSize: 13, color: colors.text, letterSpacing: 2, marginBottom: 4 }}>PANELSYNC</Text>
+        <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted, marginBottom: 32 }}>your comic universe, organized.</Text>
 
-        <View style={s.tabs}>
-          <TouchableOpacity
-            style={[s.tab, mode === 'login' && s.tabActive]}
-            onPress={() => { setMode('login'); setError(null); }}
-          >
-            <Text style={[s.tabText, mode === 'login' && s.tabTextActive]}>Sign In</Text>
+        <View style={{ flexDirection: 'row', marginBottom: 24, gap: 16 }}>
+          <TouchableOpacity onPress={() => { setMode('login'); setError(null); }}>
+            <Text style={{ fontFamily: mono, fontSize: 12, color: mode === 'login' ? colors.text : colors.muted }}>sign in</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.tab, mode === 'register' && s.tabActive]}
-            onPress={() => { setMode('register'); setError(null); }}
-          >
-            <Text style={[s.tabText, mode === 'register' && s.tabTextActive]}>Create Account</Text>
+          <TouchableOpacity onPress={() => { setMode('register'); setError(null); }}>
+            <Text style={{ fontFamily: mono, fontSize: 12, color: mode === 'register' ? colors.text : colors.muted }}>create account</Text>
           </TouchableOpacity>
         </View>
 
         {mode === 'register' && (
           <TextInput
-            style={s.input}
-            placeholder="Display name (optional)"
-            placeholderTextColor={colors.faint}
+            style={{ fontFamily: mono, fontSize: 13, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 8, marginBottom: 16 }}
+            placeholder="display name"
+            placeholderTextColor={colors.muted}
             value={displayName}
             onChangeText={setDisplayName}
             autoCapitalize="words"
@@ -75,9 +70,9 @@ export default function AuthScreen() {
         )}
 
         <TextInput
-          style={s.input}
-          placeholder="Email"
-          placeholderTextColor={colors.faint}
+          style={{ fontFamily: mono, fontSize: 13, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 8, marginBottom: 16 }}
+          placeholder="email"
+          placeholderTextColor={colors.muted}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -86,9 +81,9 @@ export default function AuthScreen() {
         />
 
         <TextInput
-          style={s.input}
-          placeholder="Password"
-          placeholderTextColor={colors.faint}
+          style={{ fontFamily: mono, fontSize: 13, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 8, marginBottom: 16 }}
+          placeholder="password"
+          placeholderTextColor={colors.muted}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -97,36 +92,19 @@ export default function AuthScreen() {
           returnKeyType="go"
         />
 
-        {error && <Text style={s.error}>{error}</Text>}
+        {error && <Text style={{ fontFamily: mono, fontSize: 12, color: colors.error, marginBottom: 12 }}>{error}</Text>}
 
         <TouchableOpacity
-          style={[s.button, loading && s.buttonDisabled]}
           onPress={handleSubmit}
           disabled={loading}
+          style={{ borderWidth: 1, borderColor: loading ? colors.border : colors.text, paddingVertical: 10, alignItems: 'center', marginTop: 4, opacity: loading ? 0.5 : 1 }}
         >
           {loading
-            ? <ActivityIndicator color={colors.surface} />
-            : <Text style={s.buttonText}>{mode === 'login' ? 'Sign In' : 'Create Account'}</Text>
+            ? <ActivityIndicator color={colors.text} size="small" />
+            : <Text style={{ fontFamily: mono, fontSize: 12, color: colors.text }}>{mode === 'login' ? 'sign in' : 'create account'}</Text>
           }
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
-
-const s = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  card:           { width: '100%', maxWidth: 400, backgroundColor: colors.surface, borderRadius: 8, borderWidth: 1, borderColor: colors.border, padding: 32 },
-  logo:           { color: colors.accent, fontSize: 18, fontWeight: '700', letterSpacing: 3, textAlign: 'center', marginBottom: 6 },
-  tagline:        { color: colors.muted, fontSize: 13, textAlign: 'center', marginBottom: 28 },
-  tabs:           { flexDirection: 'row', marginBottom: 20, borderRadius: 6, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
-  tab:            { flex: 1, paddingVertical: 10, alignItems: 'center' },
-  tabActive:      { backgroundColor: colors.bg },
-  tabText:        { color: colors.muted, fontSize: 13, fontWeight: '600' },
-  tabTextActive:  { color: colors.text },
-  input:          { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 14, paddingVertical: 11, color: colors.text, fontSize: 14, marginBottom: 12 },
-  error:          { color: '#e05050', fontSize: 12, marginBottom: 12 },
-  button:         { backgroundColor: colors.accent, borderRadius: 6, paddingVertical: 13, alignItems: 'center', marginTop: 4 },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText:     { color: colors.surface, fontSize: 14, fontWeight: '700' },
-});
