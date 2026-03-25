@@ -15,6 +15,8 @@ interface WorkspaceStateResponse {
   data: {
     activeEntityType: string | null;
     activeEntityId: string | null;
+    secondaryEntityType?: string | null;
+    secondaryEntityId?: string | null;
     depthState: DepthState;
     binderOpen: boolean;
     warmContexts: WarmContext[];
@@ -34,6 +36,10 @@ interface UniverseContextValue {
   memberships: ApiMembership[];
   addMembership: (characterId: string, groupId: string) => Promise<void>;
   removeMembership: (characterId: string, groupId: string) => Promise<void>;
+  secondaryEntityType: string | null;
+  secondaryEntityId: string | null;
+  activateSecondaryEntity: (type: string, id: string) => void;
+  closeSecondaryEditor: () => void;
   pagesByContainer: Record<string, ApiPage[]>;
   loadPages: (containerId: string) => Promise<void>;
   binderOpen: boolean;
@@ -118,6 +124,8 @@ export function UniverseProvider({
   const [binderOpenState, setBinderOpenState] = useState(true);
   const [activeEntityType, setActiveEntityType] = useState<string | null>(null);
   const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
+  const [secondaryEntityType, setSecondaryEntityType] = useState<string | null>(null);
+  const [secondaryEntityId, setSecondaryEntityId] = useState<string | null>(null);
   const [depthState, setDepthState] = useState<DepthState>('entity_only');
   const [warmContexts, setWarmContexts] = useState<WarmContext[]>([]);
   const hasHydratedRef = useRef(false);
@@ -153,6 +161,13 @@ export function UniverseProvider({
         setActiveEntityId(workspaceRes.data.activeEntityId);
         setDepthState(workspaceRes.data.depthState);
         setWarmContexts(normalizeWarmContexts(workspaceRes.data.warmContexts));
+
+        // HACK: Read from stagingArea
+        const stagingArea = (workspaceRes.data as any).stagingArea;
+        if (stagingArea?.splitEditor) {
+          setSecondaryEntityType(stagingArea.splitEditor.entityType);
+          setSecondaryEntityId(stagingArea.splitEditor.entityId);
+        }
         hasHydratedRef.current = true;
       })
       .finally(() => {
@@ -177,6 +192,14 @@ export function UniverseProvider({
     }
 
     saveTimerRef.current = setTimeout(() => {
+      // HACK: Write to stagingArea
+      const stagingArea: any = {};
+      if (secondaryEntityId && secondaryEntityType) {
+        stagingArea.splitEditor = {
+          entityType: secondaryEntityType,
+          entityId: secondaryEntityId,
+        };
+      }
       requestWorkspaceState<WorkspaceStateResponse>('/api/workspace-state', {
         method: 'PUT',
         body: JSON.stringify({
@@ -186,6 +209,7 @@ export function UniverseProvider({
           depthState,
           binderOpen: binderOpenState,
           warmContexts,
+          stagingArea, // HACK
         }),
       }).catch(() => {});
     }, 800);
@@ -195,7 +219,7 @@ export function UniverseProvider({
         clearTimeout(saveTimerRef.current);
       }
     };
-  }, [universeId, activeEntityType, activeEntityId, depthState, binderOpenState, warmContexts]);
+  }, [universeId, activeEntityType, activeEntityId, depthState, binderOpenState, warmContexts, secondaryEntityType, secondaryEntityId]);
 
   function activateEntity(type: string, id: string) {
     const isSameEntity = activeEntityType === type && activeEntityId === id;
@@ -211,6 +235,16 @@ export function UniverseProvider({
       const nextEntry: WarmContext = { entityType: type, entityId: id, depthState: nextDepth };
       return [nextEntry, ...current.filter((item) => item.entityId !== id)].slice(0, 10);
     });
+  }
+
+  function activateSecondaryEntity(type: string, id: string) {
+    setSecondaryEntityType(type);
+    setSecondaryEntityId(id);
+  }
+
+  function closeSecondaryEditor() {
+    setSecondaryEntityType(null);
+    setSecondaryEntityId(null);
   }
 
   function cycleDepthState() {
@@ -241,6 +275,10 @@ export function UniverseProvider({
     if (activeEntityId === id) {
       setActiveEntityType(null);
       setActiveEntityId(null);
+    }
+    if (secondaryEntityId === id) {
+      setSecondaryEntityType(null);
+      setSecondaryEntityId(null);
     }
   }
 
@@ -296,6 +334,10 @@ export function UniverseProvider({
         memberships,
         addMembership,
         removeMembership,
+        secondaryEntityType,
+        secondaryEntityId,
+        activateSecondaryEntity,
+        closeSecondaryEditor,
         pagesByContainer,
         loadPages,
         binderOpen: binderOpenState,

@@ -90,13 +90,21 @@ function UniverseWorkspace() {
     createEntity,
   } = useUniverse();
 
+  const {
+    secondaryEntityId,
+    activateSecondaryEntity,
+    closeSecondaryEditor,
+  } = useUniverse();
+
   const [creatingType, setCreatingType] = useState<ApiEntity['type'] | null>(null);
   const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
   const [editorSaveState, setEditorSaveState] = useState<'saved' | 'saving'>('saved');
+  const [secondarySaveState, setSecondarySaveState] = useState<'saved' | 'saving'>('saved');
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [focusedPanel, setFocusedPanel] = useState<'binder' | 'editor'>('binder');
+  const [focusedPanel, setFocusedPanel] = useState<'binder' | 'editor-left' | 'editor-right'>('binder');
   const binderWrapperRef = useRef<View>(null);
   const editorWrapperRef = useRef<View>(null);
+  const secondaryEditorWrapperRef = useRef<View>(null);
 
   // App-level keyboard shortcuts
   const appKeyRef = useRef<(e: KeyboardEvent) => void>(undefined);
@@ -109,7 +117,11 @@ function UniverseWorkspace() {
     if (e.metaKey && (e.key === ';' || e.code === 'Semicolon')) {
       e.preventDefault();
       (document.activeElement as HTMLElement)?.blur?.();
-      setFocusedPanel((p) => p === 'binder' ? 'editor' : 'binder');
+      setFocusedPanel((p) => {
+        if (p === 'binder') return 'editor-left';
+        if (p === 'editor-left') return secondaryEntityId ? 'editor-right' : 'binder';
+        return 'binder'; // editor-right → binder
+      });
       return;
     }
     if (e.key === '/' && e.metaKey) {
@@ -120,6 +132,12 @@ function UniverseWorkspace() {
     if (e.key === 'Escape' && shortcutsOpen) {
       e.preventDefault();
       setShortcutsOpen(false);
+    }
+    if (e.key === 'Enter' && e.shiftKey && focusedPanel === 'editor-right') {
+      e.preventDefault();
+      closeSecondaryEditor();
+      setFocusedPanel('editor-left');
+      return;
     }
   };
 
@@ -135,26 +153,37 @@ function UniverseWorkspace() {
     if (Platform.OS !== 'web') return;
     const binderEl = binderWrapperRef.current as unknown as HTMLElement;
     const editorEl = editorWrapperRef.current as unknown as HTMLElement;
+    const secondaryEditorEl = secondaryEditorWrapperRef.current as unknown as HTMLElement;
 
     function onBinderMouseDown() {
       setFocusedPanel('binder');
       const active = document.activeElement as HTMLElement;
-      if (active && editorEl?.contains(active)) active.blur();
+      if (active && editorEl?.contains(active)) { active.blur(); }
+      if (active && secondaryEditorEl?.contains(active)) { active.blur(); }
     }
-    function onEditorMouseDown() {
-      setFocusedPanel('editor');
+    function onPrimaryEditorMouseDown() {
+      setFocusedPanel('editor-left');
       const active = document.activeElement as HTMLElement;
-      if (active && binderEl?.contains(active)) active.blur();
+      if (active && binderEl?.contains(active)) { active.blur(); }
+      if (active && secondaryEditorEl?.contains(active)) { active.blur(); }
+    }
+    function onSecondaryEditorMouseDown() {
+      setFocusedPanel('editor-right');
+      const active = document.activeElement as HTMLElement;
+      if (active && binderEl?.contains(active)) { active.blur(); }
+      if (active && editorEl?.contains(active)) { active.blur(); }
     }
 
     binderEl?.addEventListener('mousedown', onBinderMouseDown);
-    editorEl?.addEventListener('mousedown', onEditorMouseDown);
+    editorEl?.addEventListener('mousedown', onPrimaryEditorMouseDown);
+    secondaryEditorEl?.addEventListener('mousedown', onSecondaryEditorMouseDown);
 
     return () => {
       binderEl?.removeEventListener('mousedown', onBinderMouseDown);
-      editorEl?.removeEventListener('mousedown', onEditorMouseDown);
+      editorEl?.removeEventListener('mousedown', onPrimaryEditorMouseDown);
+      secondaryEditorEl?.removeEventListener('mousedown', onSecondaryEditorMouseDown);
     };
-  }, [binderOpen]);
+  }, [binderOpen, secondaryEntityId]);
 
   async function handleCreateEntity(type: ApiEntity['type']) {
     setCreatingType(type);
@@ -162,7 +191,7 @@ function UniverseWorkspace() {
       const entry = await createEntity(type);
       activateEntity('entity', entry.id);
       setJustCreatedId(entry.id);
-      setFocusedPanel('editor');
+      setFocusedPanel('editor-left');
     } catch (e: unknown) {
       console.error('Failed to create entity:', e);
     } finally {
@@ -201,7 +230,7 @@ function UniverseWorkspace() {
           {universeName}
         </Text>
         <Text style={{ fontFamily: mono, fontSize: 11, color: colors.muted }}>
-          {editorSaveState === 'saved' ? 'saved' : 'saving...'}
+          {focusedPanel === 'editor-right' ? secondarySaveState : editorSaveState}
         </Text>
         <TouchableOpacity onPress={toggle} style={{ marginLeft: 12 }}>
           <Text style={{ fontFamily: mono, fontSize: 11, color: colors.muted }}>
@@ -231,6 +260,10 @@ function UniverseWorkspace() {
               onCreateFolder={handleCreateFolder}
               creatingType={creatingType}
               isFocused={focusedPanel === 'binder'}
+              onActivateSecondary={(type, id) => {
+                activateSecondaryEntity(type, id);
+                setFocusedPanel('editor-right');
+              }}
             />
           </View>
         ) : (
@@ -254,7 +287,7 @@ function UniverseWorkspace() {
           style={{
             flex: 1,
             borderTopWidth: 2,
-            borderTopColor: focusedPanel === 'editor' ? colors.text : 'transparent',
+            borderTopColor: focusedPanel === 'editor-left' ? colors.text : 'transparent',
           }}
         >
           <ErrorBoundary colors={colors} mono={mono}>
@@ -262,10 +295,26 @@ function UniverseWorkspace() {
               justCreatedId={justCreatedId}
               onAutoFocusDone={() => setJustCreatedId(null)}
               onSaveStateChange={setEditorSaveState}
-              isFocused={focusedPanel === 'editor'}
+              isFocused={focusedPanel === 'editor-left'}
             />
           </ErrorBoundary>
         </View>
+
+        {/* Secondary editor (only if secondaryEntityId is set) */}
+        {secondaryEntityId && (
+          <>
+            <View style={{ width: 1, backgroundColor: colors.border }} />
+            <View ref={secondaryEditorWrapperRef} style={{ flex: 1, borderTopWidth: 2, borderTopColor: focusedPanel === 'editor-right' ? colors.text : 'transparent' }}>
+              <ErrorBoundary colors={colors} mono={mono}>
+                <Editor
+                  entityId={secondaryEntityId}
+                  isFocused={focusedPanel === 'editor-right'}
+                  onSaveStateChange={setSecondarySaveState}
+                />
+              </ErrorBoundary>
+            </View>
+          </>
+        )}
 
         {/* Shortcut reference overlay */}
         {shortcutsOpen && (
@@ -291,6 +340,7 @@ function UniverseWorkspace() {
                 ['Up/Down', 'move selection'],
                 ['Shift+Up/Down', 'extend selection'],
                 ['Enter', 'open entity'],
+                ['Shift+Enter', 'open in split'],
                 ['Right', 'expand'],
                 ['Left', 'collapse / parent'],
                 ['Escape', 'clear selection / filter'],
@@ -303,6 +353,7 @@ function UniverseWorkspace() {
               <ShortcutSection mono={mono} colors={colors} title="EDITOR" items={[
                 ['ArrowUp', 'name (from top of text)'],
                 ['Enter', 'text (from name)'],
+                ['Shift+Enter', 'close split (right editor)'],
                 ['Escape', 'blur editor'],
               ]} />
               <ShortcutSection mono={mono} colors={colors} title="TIMELINE" items={[
@@ -317,7 +368,7 @@ function UniverseWorkspace() {
                 ['Escape', 'exit spine / blur'],
               ]} />
               <ShortcutSection mono={mono} colors={colors} title="APP" items={[
-                ['Cmd+;', 'switch panel'],
+                ['Cmd+;', 'cycle panels'],
                 ['Cmd+\\', 'toggle binder'],
                 ['Cmd+/', 'this panel'],
               ]} />

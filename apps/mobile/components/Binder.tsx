@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useUniverse } from '../context/UniverseContext';
@@ -55,7 +55,11 @@ function buildFolderTree(entities: ApiEntity[], memberships: ApiMembership[]) {
     if (!parent || (parent.type !== 'folder' && parent.type !== 'group')) continue;
     if (!childrenOf[m.groupId]) childrenOf[m.groupId] = [];
     childrenOf[m.groupId].push(m.characterId);
-    parentOf[m.characterId] = m.groupId;
+    // Only folders create structural containment (hides from type section).
+    // Group membership is semantic — members stay in their type section.
+    if (parent.type === 'folder') {
+      parentOf[m.characterId] = m.groupId;
+    }
   }
 
   return { childrenOf, parentOf };
@@ -156,6 +160,7 @@ function BinderEntityRow({
   onRenameChange,
   onRenameSubmit,
   isDeleting,
+  onPointerDown,
   onPress,
 }: {
   entity: ApiEntity;
@@ -168,6 +173,7 @@ function BinderEntityRow({
   onRenameChange: (text: string) => void;
   onRenameSubmit: () => void;
   isDeleting: boolean;
+  onPointerDown: (e: any) => void;
   onPress: () => void;
 }) {
   const { colors, mono } = useTheme();
@@ -179,7 +185,7 @@ function BinderEntityRow({
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-      <View style={{
+      <View onPointerDown={onPointerDown} style={{
         minHeight: ROW_HEIGHT,
         flexDirection: 'row',
         alignItems: 'center',
@@ -234,6 +240,8 @@ function BinderFolderRow({
   renameValue,
   onRenameChange,
   onRenameSubmit,
+  isDropTarget,
+  onPointerDown,
   onPress,
   onToggle,
 }: {
@@ -248,6 +256,8 @@ function BinderFolderRow({
   renameValue: string;
   onRenameChange: (text: string) => void;
   onRenameSubmit: () => void;
+  isDropTarget: boolean;
+  onPointerDown: (e: any) => void;
   onPress: () => void;
   onToggle: () => void;
 }) {
@@ -260,14 +270,14 @@ function BinderFolderRow({
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-      <View style={{
+      <View onPointerDown={onPointerDown} style={{
         minHeight: ROW_HEIGHT,
         flexDirection: 'row',
         alignItems: 'center',
         paddingLeft: 12 + depth * 16,
         paddingRight: 12,
         paddingVertical: 10,
-        backgroundColor: isSelected ? colors.selection : isActive ? colors.selection : 'transparent',
+        backgroundColor: isDropTarget ? colors.selection : isSelected ? colors.selection : isActive ? colors.selection : 'transparent',
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
         borderLeftWidth: isFocused ? 2 : 0,
@@ -349,9 +359,16 @@ interface BinderProps {
   onCreateFolder: () => void;
   creatingType: EntityType | null;
   isFocused: boolean;
+  onActivateSecondary: (type: string, id: string) => void;
 }
 
-export default function Binder({ onCreateEntity, onCreateFolder, creatingType, isFocused }: BinderProps) {
+export default function Binder({
+  onCreateEntity,
+  onCreateFolder,
+  creatingType,
+  isFocused,
+  onActivateSecondary,
+}: BinderProps) {
   const { colors, mono } = useTheme();
   const {
     entities, memberships, loadingEntities,
@@ -371,9 +388,20 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType, i
   const [selectionAnchorIndex, setSelectionAnchorIndex] = useState<number | null>(null);
   const [movePickerOpen, setMovePickerOpen] = useState(false);
   const [movePickerIndex, setMovePickerIndex] = useState(0);
+  const [dragState, setDragState] = useState<{
+    entityIds: string[];
+    pointerY: number;
+    startY: number;
+    started: boolean;
+    dropTarget: { type: 'between'; index: number } | { type: 'onto'; id: string } | null;
+  } | null>(null);
 
   const scrollViewRef = useRef<ScrollView>(null);
   const filterInputRef = useRef<TextInput>(null);
+  const dragGhostLabel = useRef('');
+  const autoScrollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const scrollOffsetRef = useRef(0);
+  const binderViewRef = useRef<View>(null);
 
   // ── Derived data ───────────────────────────────────────────────────────
   const { childrenOf, parentOf } = useMemo(
@@ -467,6 +495,13 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType, i
     if (item.kind === 'section') {
       toggleExpanded(item.id);
     } else {
+      if (Platform.OS === 'web') {
+        const keyboardEvent = (window as any).event as KeyboardEvent;
+        if (keyboardEvent?.shiftKey) {
+          onActivateSecondary('entity', item.id);
+          return;
+        }
+      }
       activateEntity('entity', item.id);
     }
   }
@@ -519,6 +554,163 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType, i
       return { ...prev, [key]: !current };
     });
   }
+
+  // ── Drag & Drop ────────────────────────────────────────────────────────
+
+  function handlePointerDown(e: any, itemId: string) {
+    if (Platform.OS !== 'web' || e.button !== 0) return;
+
+    const item = navItems.find((n) => n.id === itemId);
+    if (!item || item.kind === 'section') return;
+
+    const isDraggingSelection = selectedIds.size > 0 && selectedIds.has(itemId);
+    const ids = isDraggingSelection ? [...selectedIds] : [itemId];
+
+    if (!isDraggingSelection) {
+      setSelectionAnchorIndex(null);
+    }
+
+    const binderEl = binderViewRef.current as unknown as HTMLElement;
+    if (!binderEl) return;
+    const rect = binderEl.getBoundingClientRect();
+
+    setDragState({
+      entityIds: ids,
+      pointerY: e.clientY - rect.top,
+      startY: e.clientY - rect.top,
+      started: false,
+      dropTarget: null,
+    });
+
+    dragGhostLabel.current = ids.length > 1
+      ? `${entities.find((en) => en.id === ids[0])?.name ?? ''} +${ids.length - 1}`
+      : entities.find((en) => en.id === ids[0])?.name ?? '';
+  }
+
+  const pointerMoveRef = useRef<(e: PointerEvent) => void>(undefined);
+  pointerMoveRef.current = (e: PointerEvent) => {
+    if (!dragState) return;
+
+    const binderEl = binderViewRef.current as unknown as HTMLElement;
+    if (!binderEl) return;
+    const rect = binderEl.getBoundingClientRect();
+    const relativeY = e.clientY - rect.top;
+
+    if (!dragState.started && Math.abs(relativeY - dragState.startY) < 5) {
+      return;
+    }
+
+    e.preventDefault();
+
+    const scrollEdgeSize = 40;
+    if (e.clientY < rect.top + scrollEdgeSize) {
+      if (!autoScrollRef.current) {
+        autoScrollRef.current = setInterval(() => {
+          scrollViewRef.current?.scrollTo({ y: scrollOffsetRef.current - 15, animated: false });
+        }, 16);
+      }
+    } else if (e.clientY > rect.bottom - scrollEdgeSize) {
+      if (!autoScrollRef.current) {
+        autoScrollRef.current = setInterval(() => {
+          scrollViewRef.current?.scrollTo({ y: scrollOffsetRef.current + 15, animated: false });
+        }, 16);
+      }
+    } else if (autoScrollRef.current) {
+      clearInterval(autoScrollRef.current);
+      autoScrollRef.current = null;
+    }
+
+    const yInScrollView = relativeY + scrollOffsetRef.current;
+    const rowIndex = Math.floor(yInScrollView / ROW_HEIGHT);
+    const rowOffset = yInScrollView % ROW_HEIGHT;
+
+    let dropTarget: typeof dragState.dropTarget = null;
+
+    if (rowIndex >= 0 && rowIndex < navItems.length) {
+      const targetItem = navItems[rowIndex];
+      if (rowOffset < 8) {
+        dropTarget = { type: 'between', index: rowIndex };
+      } else if (rowOffset > ROW_HEIGHT - 8) {
+        dropTarget = { type: 'between', index: rowIndex + 1 };
+      } else if (targetItem.kind === 'folder' || targetItem.kind === 'group') {
+        dropTarget = { type: 'onto', id: targetItem.id };
+      } else {
+        dropTarget = { type: 'between', index: rowIndex + 1 };
+      }
+    } else if (rowIndex >= navItems.length) {
+      dropTarget = { type: 'between', index: navItems.length };
+    }
+
+    if (dropTarget?.type === 'onto') {
+      const targetEntity = entities.find((en) => en.id === dropTarget!.id);
+      // Only characters can be dropped onto groups
+      if (targetEntity?.type === 'group') {
+        const allCharacters = dragState.entityIds.every((id) => {
+          const e = entities.find((en) => en.id === id);
+          return e?.type === 'character';
+        });
+        if (!allCharacters) dropTarget = null;
+      }
+      if (dropTarget && dropTarget.type === 'onto' && dragState.entityIds.includes(dropTarget.id)) {
+        dropTarget = null;
+      } else if (dropTarget && dropTarget.type === 'onto') {
+        let currentId: string | undefined = dropTarget.id;
+        while (currentId) {
+          if (dragState.entityIds.includes(currentId)) {
+            dropTarget = null;
+            break;
+          }
+          currentId = parentOf[currentId];
+        }
+      }
+    }
+
+    setDragState((d) => d ? { ...d, started: true, pointerY: relativeY, dropTarget } : null);
+  };
+
+  const pointerUpRef = useRef<(e: PointerEvent) => void>(undefined);
+  pointerUpRef.current = async () => {
+    if (!dragState) return;
+
+    if (autoScrollRef.current) {
+      clearInterval(autoScrollRef.current);
+      autoScrollRef.current = null;
+    }
+
+    if (dragState.started && dragState.dropTarget) {
+      const { entityIds, dropTarget } = dragState;
+
+      let targetFolderId: string | null = null;
+      if (dropTarget.type === 'onto') {
+        targetFolderId = dropTarget.id;
+      } else if (dropTarget.type === 'between') {
+        const index = dropTarget.index;
+        if (index > 0) {
+          const itemBefore = navItems[index - 1];
+          if (itemBefore.kind === 'folder' || itemBefore.kind === 'group') {
+            const isExpanded = expanded[itemBefore.id] ?? false;
+            if (isExpanded && itemBefore.depth < (navItems[index]?.depth ?? itemBefore.depth + 1)) {
+              targetFolderId = itemBefore.id;
+            } else {
+              targetFolderId = parentOf[itemBefore.id] ?? null;
+            }
+          } else {
+            targetFolderId = parentOf[itemBefore.id] ?? null;
+          }
+        }
+      }
+
+      for (const id of entityIds) {
+        const currentParent = parentOf[id];
+        if (currentParent === targetFolderId) continue;
+
+        if (currentParent) await removeMembership(id, currentParent);
+        if (targetFolderId) await addMembership(id, targetFolderId);
+      }
+    }
+
+    setDragState(null);
+  };
 
   function handleSelect(id: string) {
     setCreatePickerOpen(false);
@@ -694,6 +886,13 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType, i
   handlerRef.current = function onKeyDown(e: KeyboardEvent) {
     if (!isFocused) return;
 
+    if (e.key === 'Escape' && dragState?.started) {
+      e.preventDefault();
+      setDragState(null);
+      if (autoScrollRef.current) { clearInterval(autoScrollRef.current); autoScrollRef.current = null; }
+      return;
+    }
+
     const active = document.activeElement as HTMLElement;
     const isInInput = active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA';
 
@@ -714,7 +913,16 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType, i
     if (filterText && isInInput) {
       if (e.key === 'ArrowDown') { e.preventDefault(); moveFocus(1); return; }
       if (e.key === 'ArrowUp') { e.preventDefault(); moveFocus(-1); return; }
-      if (e.key === 'Enter') { e.preventDefault(); activateFocused(); return; }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const item = navItems[focusedIndex];
+        if (e.shiftKey && item && item.kind !== 'section') {
+          onActivateSecondary('entity', item.id);
+        } else {
+          activateFocused();
+        }
+        return;
+      }
       if (e.key === 'Escape') { e.preventDefault(); clearFilter(); return; }
       return;
     }
@@ -792,7 +1000,16 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType, i
     // Normal navigation (clears selection)
     if (e.key === 'ArrowDown') { e.preventDefault(); setSelectionAnchorIndex(null); moveFocus(1); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setSelectionAnchorIndex(null); moveFocus(-1); }
-    else if (e.key === 'Enter') { e.preventDefault(); setSelectionAnchorIndex(null); activateFocused(); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      setSelectionAnchorIndex(null);
+      const item = navItems[focusedIndex];
+      if (e.shiftKey && item && item.kind !== 'section') {
+        onActivateSecondary('entity', item.id);
+      } else {
+        activateFocused();
+      }
+    }
     else if (e.key === 'ArrowRight') { e.preventDefault(); expandFocused(); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); collapseFocused(); }
     else if (e.key === 'Escape') {
@@ -826,10 +1043,29 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType, i
     return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !dragState) return;
+
+    function onPointerMove(e: PointerEvent) { pointerMoveRef.current?.(e); }
+    function onPointerUp(e: PointerEvent) { pointerUpRef.current?.(e); }
+
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+
+    return () => {
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
+      if (autoScrollRef.current) {
+        clearInterval(autoScrollRef.current);
+        autoScrollRef.current = null;
+      }
+    };
+  }, [dragState !== null]);
+
   // ── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <View style={{ flex: 1 }}>
+    <View ref={binderViewRef} style={{ flex: 1 }}>
       {/* Header */}
       <View style={{
         flexDirection: 'row',
@@ -927,7 +1163,13 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType, i
       )}
 
       {/* Nav list */}
-      <ScrollView ref={scrollViewRef} style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        ref={scrollViewRef}
+        style={{ flex: 1, pointerEvents: dragState?.started ? 'none' : 'auto' }}
+        showsVerticalScrollIndicator={false}
+        onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.y; }}
+        scrollEventThrottle={16}
+      >
         {loadingEntities && (
           <ActivityIndicator size="small" color={colors.muted} style={{ marginTop: 16 }} />
         )}
@@ -943,14 +1185,17 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType, i
           const prev = i > 0 ? navItems[i - 1] : null;
           const needsSpacer = item.kind === 'section' && prev &&
             (prev.kind === 'folder' || prev.kind === 'entity' || prev.kind === 'group');
+          const showDropIndicator = dragState?.started && dragState.dropTarget?.type === 'between' && dragState.dropTarget.index === i;
 
           if (item.kind === 'section') {
             const sectionType = item.entityType!;
             const section = TYPE_SECTIONS.find((s) => s.type === sectionType);
             const count = (sectionEntities[sectionType] ?? []).length;
             const isExp = expanded[item.id] ?? true;
+
             return (
-              <View key={item.id}>
+              <React.Fragment key={`${item.id}:${i}`}>
+                {showDropIndicator && <View style={{ height: 2, backgroundColor: colors.text }} />}
                 {needsSpacer && <View style={{ height: 8 }} />}
                 <SectionRow
                   label={section?.label ?? sectionType}
@@ -959,7 +1204,7 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType, i
                   isFocused={focusedId === item.id}
                   onToggle={() => toggleExpanded(item.id)}
                 />
-              </View>
+              </React.Fragment>
             );
           }
 
@@ -969,9 +1214,11 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType, i
           if (item.kind === 'folder' || item.kind === 'group') {
             const isExp = expanded[entity.id] ?? false;
             const count = (childrenOf[entity.id] ?? []).length;
+            const isDropTarget = !!(dragState?.started && dragState.dropTarget?.type === 'onto' && dragState.dropTarget.id === entity.id);
             return (
-              <BinderFolderRow
-                key={entity.id}
+              <React.Fragment key={`${entity.id}:${i}`}>
+                {showDropIndicator && <View style={{ height: 2, backgroundColor: colors.text }} />}
+                <BinderFolderRow
                 entity={entity}
                 depth={item.depth}
                 isActive={activeEntityId === entity.id}
@@ -983,15 +1230,19 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType, i
                 renameValue={renameValue}
                 onRenameChange={setRenameValue}
                 onRenameSubmit={confirmRename}
+                  isDropTarget={isDropTarget}
                 onPress={() => handleSelect(entity.id)}
                 onToggle={() => toggleExpanded(entity.id)}
+                  onPointerDown={(e: any) => handlePointerDown(e, entity.id)}
               />
+              </React.Fragment>
             );
           }
 
           return (
-            <BinderEntityRow
-              key={entity.id}
+            <React.Fragment key={`${entity.id}:${i}`}>
+              {showDropIndicator && <View style={{ height: 2, backgroundColor: colors.text }} />}
+              <BinderEntityRow
               entity={entity}
               depth={item.depth}
               isActive={activeEntityId === entity.id}
@@ -1002,11 +1253,38 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType, i
               onRenameChange={setRenameValue}
               onRenameSubmit={confirmRename}
               isDeleting={deletingId === entity.id || (deletingId === '__bulk__' && selectedIds.has(entity.id))}
+                onPointerDown={(e: any) => handlePointerDown(e, entity.id)}
               onPress={() => handleSelect(entity.id)}
             />
+            </React.Fragment>
           );
         })}
+        {dragState?.started && dragState.dropTarget?.type === 'between' && dragState.dropTarget.index === navItems.length && (
+          <View style={{ height: 2, backgroundColor: colors.text }} />
+        )}
       </ScrollView>
+
+      {/* Drag Ghost */}
+      {dragState?.started && (
+        <View
+          style={{
+            position: 'absolute',
+            top: dragState.pointerY - 16,
+            left: 16,
+            right: 16,
+            opacity: 0.7,
+            backgroundColor: colors.bg,
+            borderWidth: 1,
+            borderColor: colors.border,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            zIndex: 100,
+          }}
+          pointerEvents="none"
+        >
+          <Text style={{ fontFamily: mono, fontSize: 12, color: colors.text }}>{dragGhostLabel.current}</Text>
+        </View>
+      )}
     </View>
   );
 }
