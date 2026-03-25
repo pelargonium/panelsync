@@ -495,13 +495,6 @@ export default function Binder({
     if (item.kind === 'section') {
       toggleExpanded(item.id);
     } else {
-      if (Platform.OS === 'web') {
-        const keyboardEvent = (window as any).event as KeyboardEvent;
-        if (keyboardEvent?.shiftKey) {
-          onActivateSecondary('entity', item.id);
-          return;
-        }
-      }
       activateEntity('entity', item.id);
     }
   }
@@ -642,7 +635,8 @@ export default function Binder({
     }
 
     if (dropTarget?.type === 'onto') {
-      const targetEntity = entities.find((en) => en.id === dropTarget!.id);
+      const ontoId = dropTarget.id;
+      const targetEntity = entities.find((en) => en.id === ontoId);
       // Only characters can be dropped onto groups
       if (targetEntity?.type === 'group') {
         const allCharacters = dragState.entityIds.every((id) => {

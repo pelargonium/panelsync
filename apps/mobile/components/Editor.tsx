@@ -393,7 +393,7 @@ export default function Editor({
       </Text>
 
       {/* Body */}
-      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
         {entityType === 'timeline' ? (
           <TimelineView
             events={events}
@@ -420,6 +420,7 @@ export default function Editor({
               paddingHorizontal: 16,
               paddingTop: 12,
               paddingBottom: 48,
+              flex: 1,
               minHeight: 300,
             }}
           />
