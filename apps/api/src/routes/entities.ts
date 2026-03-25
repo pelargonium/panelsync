@@ -124,7 +124,7 @@ export async function entityRoutes(server: FastifyInstance) {
     },
   );
 
-  server.post<{ Params: { universeId: string }; Body: { name: string; type: 'character' | 'location' | 'note' | 'group' } }>(
+  server.post<{ Params: { universeId: string }; Body: { name: string; type: 'character' | 'location' | 'note' | 'group' | 'folder' | 'bible' | 'timeline' } }>(
     '/universes/:universeId/entities',
     async (request, reply) => {
       const { universeId } = request.params;
@@ -242,7 +242,7 @@ export async function entityRoutes(server: FastifyInstance) {
     },
   );
 
-  server.patch<{ Params: { id: string }; Body: { name?: string; type?: 'character' | 'location' | 'note' | 'group'; color?: string; position?: number | null } }>(
+  server.patch<{ Params: { id: string }; Body: { name?: string; type?: 'character' | 'location' | 'note' | 'group' | 'folder' | 'bible' | 'timeline'; color?: string; position?: number | null } }>(
     '/entities/:id',
     async (request, reply) => {
       const { id } = request.params;

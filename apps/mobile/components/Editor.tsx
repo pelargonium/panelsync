@@ -11,6 +11,7 @@ import {
 import { api, type ApiEntity } from '../lib/api';
 import { useUniverse } from '../context/UniverseContext';
 import { useTheme } from '../context/ThemeContext';
+import TimelineView, { type TimelineEvent } from './TimelineView';
 
 type SaveState = 'saved' | 'saving' | 'error';
 
@@ -27,6 +28,7 @@ function entityTypeLabel(type: ApiEntity['type']): string {
   if (type === 'location') return 'location';
   if (type === 'group') return 'group';
   if (type === 'folder') return 'folder';
+  if (type === 'timeline') return 'timeline';
   return 'note';
 }
 
@@ -138,6 +140,7 @@ export default function Editor({
   const [name, setName] = useState('');
   const [entityType, setEntityType] = useState<ApiEntity['type']>('note');
   const [text, setText] = useState('');
+  const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -148,11 +151,14 @@ export default function Editor({
   const selectionRef = useRef({ start: 0, end: 0 });
   const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const eventsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(0);
   const latestNameRef = useRef('');
   const savedNameRef = useRef('');
   const latestTextRef = useRef('');
   const savedTextRef = useRef('');
+  const latestEventsRef = useRef<string>('[]');
+  const savedEventsRef = useRef<string>('[]');
   const autoFocusNameRef = useRef(autoFocusName);
   const onAutoFocusDoneRef = useRef(onAutoFocusDone);
   const onSaveStateChangeRef = useRef(onSaveStateChange);
@@ -173,7 +179,7 @@ export default function Editor({
   }
 
   function hasPending() {
-    return !!(titleTimerRef.current || textTimerRef.current || inFlightRef.current > 0);
+    return !!(titleTimerRef.current || textTimerRef.current || eventsTimerRef.current || inFlightRef.current > 0);
   }
 
   async function runSave(task: () => Promise<void>) {
@@ -197,8 +203,10 @@ export default function Editor({
     hydratedRef.current = false;
     if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
     if (textTimerRef.current) clearTimeout(textTimerRef.current);
+    if (eventsTimerRef.current) clearTimeout(eventsTimerRef.current);
     titleTimerRef.current = null;
     textTimerRef.current = null;
+    eventsTimerRef.current = null;
     inFlightRef.current = 0;
     setSaveState('saved');
     setConfirmDelete(false);
@@ -214,9 +222,19 @@ export default function Editor({
         savedNameRef.current = entryRes.data.name;
 
         const content = entryRes.data.bodyText ?? '';
-        setText(content);
-        latestTextRef.current = content;
-        savedTextRef.current = content;
+        if (entryRes.data.type === 'timeline') {
+          let parsed: TimelineEvent[] = [];
+          try { parsed = JSON.parse(content); } catch { parsed = []; }
+          if (!Array.isArray(parsed)) parsed = [];
+          if (parsed.length === 0) parsed = [{ id: crypto.randomUUID(), title: '', description: '', dateline: '' }];
+          setEvents(parsed);
+          latestEventsRef.current = JSON.stringify(parsed);
+          savedEventsRef.current = content || '[]';
+        } else {
+          setText(content);
+          latestTextRef.current = content;
+          savedTextRef.current = content;
+        }
         hydratedRef.current = true;
 
         if (autoFocusNameRef.current) {
@@ -233,6 +251,7 @@ export default function Editor({
       cancelled = true;
       if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
       if (textTimerRef.current) clearTimeout(textTimerRef.current);
+      if (eventsTimerRef.current) clearTimeout(eventsTimerRef.current);
     };
   }, [entityId]);
 
@@ -279,19 +298,41 @@ export default function Editor({
     return () => { if (textTimerRef.current) { clearTimeout(textTimerRef.current); textTimerRef.current = null; } };
   }, [entityId, text]);
 
+  // ── Events auto-save (timeline) ─────────────────────────────────────
+  useEffect(() => {
+    if (entityType !== 'timeline') return;
+    const serialized = JSON.stringify(events);
+    latestEventsRef.current = serialized;
+    if (!hydratedRef.current) return;
+    if (eventsTimerRef.current) clearTimeout(eventsTimerRef.current);
+    if (serialized === savedEventsRef.current) return;
+
+    notifySaveState('saving');
+    eventsTimerRef.current = setTimeout(() => {
+      eventsTimerRef.current = null;
+      runSave(async () => {
+        await api.entities.updateContent(entityId, latestEventsRef.current);
+        savedEventsRef.current = latestEventsRef.current;
+      });
+    }, 600);
+
+    return () => { if (eventsTimerRef.current) { clearTimeout(eventsTimerRef.current); eventsTimerRef.current = null; } };
+  }, [entityId, entityType, events]);
+
   // ── Auto-focus when panel becomes active ────────────────────────────
 
   useEffect(() => {
-    if (isFocused && hydratedRef.current) {
+    if (isFocused && hydratedRef.current && entityType !== 'timeline') {
       textInputRef.current?.focus();
     }
-  }, [isFocused]);
+  }, [isFocused, entityType]);
 
   // ── Keyboard (web only) ──────────────────────────────────────────────
 
   const keyRef = useRef<(e: KeyboardEvent) => void>(undefined);
   keyRef.current = (e: KeyboardEvent) => {
     if (!isFocused) return;
+    if (entityType === 'timeline') return;  // TimelineView has its own handler
 
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -353,27 +394,36 @@ export default function Editor({
 
       {/* Body */}
       <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
-        <TextInput
-          ref={textInputRef}
-          value={text}
-          onChangeText={setText}
-          onSelectionChange={(e) => { selectionRef.current = e.nativeEvent.selection; }}
-          multiline
-          scrollEnabled={false}
-          textAlignVertical="top"
-          placeholder="start writing..."
-          placeholderTextColor={colors.muted}
-          style={{
-            fontFamily: mono,
-            fontSize: 13,
-            lineHeight: 20,
-            color: colors.text,
-            paddingHorizontal: 16,
-            paddingTop: 12,
-            paddingBottom: 48,
-            minHeight: 300,
-          }}
-        />
+        {entityType === 'timeline' ? (
+          <TimelineView
+            events={events}
+            onEventsChange={setEvents}
+            isFocused={isFocused}
+            nameInputRef={nameInputRef}
+          />
+        ) : (
+          <TextInput
+            ref={textInputRef}
+            value={text}
+            onChangeText={setText}
+            onSelectionChange={(e) => { selectionRef.current = e.nativeEvent.selection; }}
+            multiline
+            scrollEnabled={false}
+            textAlignVertical="top"
+            placeholder="start writing..."
+            placeholderTextColor={colors.muted}
+            style={{
+              fontFamily: mono,
+              fontSize: 13,
+              lineHeight: 20,
+              color: colors.text,
+              paddingHorizontal: 16,
+              paddingTop: 12,
+              paddingBottom: 48,
+              minHeight: 300,
+            }}
+          />
+        )}
 
         {isGroup && (
           <>

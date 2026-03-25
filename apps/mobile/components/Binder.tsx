@@ -11,6 +11,7 @@ const TYPE_SECTIONS: Array<{ type: EntityType; label: string }> = [
   { type: 'location', label: 'Locations' },
   { type: 'note', label: 'Notes' },
   { type: 'group', label: 'Groups' },
+  { type: 'timeline', label: 'Timelines' },
 ];
 
 const ROW_HEIGHT = 44;
@@ -21,6 +22,7 @@ const CREATE_OPTIONS: Array<{ type: EntityType; label: string }> = [
   { type: 'note', label: 'note' },
   { type: 'group', label: 'group' },
   { type: 'folder', label: 'folder' },
+  { type: 'timeline', label: 'timeline' },
 ];
 
 function typeLabel(type: string): string {
@@ -29,6 +31,7 @@ function typeLabel(type: string): string {
   if (type === 'group') return 'G';
   if (type === 'note') return 'N';
   if (type === 'folder') return 'F';
+  if (type === 'timeline') return 'T';
   return '?';
 }
 

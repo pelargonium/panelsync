@@ -305,6 +305,17 @@ function UniverseWorkspace() {
                 ['Enter', 'text (from name)'],
                 ['Escape', 'blur editor'],
               ]} />
+              <ShortcutSection mono={mono} colors={colors} title="TIMELINE" items={[
+                ['Tab / Shift+Tab', 'cycle fields'],
+                ['Enter', 'next event'],
+                ['Alt+Up/Down', 'jump events'],
+                ['Alt+Shift+Up/Down', 'jump 5'],
+                ['Alt+Left', 'spine mode'],
+                ['Up/Down (spine)', 'navigate spine'],
+                ['Right (spine)', 'insert / edit'],
+                ['Delete (spine)', 'delete event'],
+                ['Escape', 'exit spine / blur'],
+              ]} />
               <ShortcutSection mono={mono} colors={colors} title="APP" items={[
                 ['Cmd+;', 'switch panel'],
                 ['Cmd+\\', 'toggle binder'],

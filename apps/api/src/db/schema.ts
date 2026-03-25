@@ -50,6 +50,7 @@ export const entityTypeEnum = pgEnum('entity_type', [
   'group',
   'bible',
   'folder',
+  'timeline',
 ]);
 
 export const pageStatusEnum = pgEnum('page_status', [
