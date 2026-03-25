@@ -345,9 +345,10 @@ interface BinderProps {
   onCreateEntity: (type: EntityType) => void;
   onCreateFolder: () => void;
   creatingType: EntityType | null;
+  isFocused: boolean;
 }
 
-export default function Binder({ onCreateEntity, onCreateFolder, creatingType }: BinderProps) {
+export default function Binder({ onCreateEntity, onCreateFolder, creatingType, isFocused }: BinderProps) {
   const { colors, mono } = useTheme();
   const {
     entities, memberships, loadingEntities,
@@ -688,6 +689,8 @@ export default function Binder({ onCreateEntity, onCreateFolder, creatingType }:
   const handlerRef = useRef<(e: KeyboardEvent) => void>(undefined);
 
   handlerRef.current = function onKeyDown(e: KeyboardEvent) {
+    if (!isFocused) return;
+
     const active = document.activeElement as HTMLElement;
     const isInInput = active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA';
 

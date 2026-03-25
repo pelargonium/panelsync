@@ -36,10 +36,12 @@ function PrimaryContent({
   justCreatedId,
   onAutoFocusDone,
   onSaveStateChange,
+  isFocused,
 }: {
   justCreatedId: string | null;
   onAutoFocusDone: () => void;
   onSaveStateChange: (state: 'saved' | 'saving') => void;
+  isFocused: boolean;
 }) {
   const { activeEntityType, activeEntityId } = useUniverse();
 
@@ -47,6 +49,7 @@ function PrimaryContent({
     return (
       <Editor
         entityId={activeEntityId}
+        isFocused={isFocused}
         autoFocusName={justCreatedId === activeEntityId}
         onAutoFocusDone={onAutoFocusDone}
         onSaveStateChange={onSaveStateChange}
@@ -91,6 +94,9 @@ function UniverseWorkspace() {
   const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
   const [editorSaveState, setEditorSaveState] = useState<'saved' | 'saving'>('saved');
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [focusedPanel, setFocusedPanel] = useState<'binder' | 'editor'>('binder');
+  const binderWrapperRef = useRef<View>(null);
+  const editorWrapperRef = useRef<View>(null);
 
   // App-level keyboard shortcuts
   const appKeyRef = useRef<(e: KeyboardEvent) => void>(undefined);
@@ -98,10 +104,18 @@ function UniverseWorkspace() {
     if (e.metaKey && e.key === '\\') {
       e.preventDefault();
       setBinderOpen(!binderOpen);
+      return;
+    }
+    if (e.metaKey && (e.key === ';' || e.code === 'Semicolon')) {
+      e.preventDefault();
+      (document.activeElement as HTMLElement)?.blur?.();
+      setFocusedPanel((p) => p === 'binder' ? 'editor' : 'binder');
+      return;
     }
     if (e.key === '/' && e.metaKey) {
       e.preventDefault();
       setShortcutsOpen((v) => !v);
+      return;
     }
     if (e.key === 'Escape' && shortcutsOpen) {
       e.preventDefault();
@@ -112,9 +126,35 @@ function UniverseWorkspace() {
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     function onKeyDown(e: KeyboardEvent) { appKeyRef.current?.(e); }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
   }, []);
+
+  // Click-to-focus panel detection (web only)
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const binderEl = binderWrapperRef.current as unknown as HTMLElement;
+    const editorEl = editorWrapperRef.current as unknown as HTMLElement;
+
+    function onBinderMouseDown() {
+      setFocusedPanel('binder');
+      const active = document.activeElement as HTMLElement;
+      if (active && editorEl?.contains(active)) active.blur();
+    }
+    function onEditorMouseDown() {
+      setFocusedPanel('editor');
+      const active = document.activeElement as HTMLElement;
+      if (active && binderEl?.contains(active)) active.blur();
+    }
+
+    binderEl?.addEventListener('mousedown', onBinderMouseDown);
+    editorEl?.addEventListener('mousedown', onEditorMouseDown);
+
+    return () => {
+      binderEl?.removeEventListener('mousedown', onBinderMouseDown);
+      editorEl?.removeEventListener('mousedown', onEditorMouseDown);
+    };
+  }, [binderOpen]);
 
   async function handleCreateEntity(type: ApiEntity['type']) {
     setCreatingType(type);
@@ -122,6 +162,7 @@ function UniverseWorkspace() {
       const entry = await createEntity(type);
       activateEntity('entity', entry.id);
       setJustCreatedId(entry.id);
+      setFocusedPanel('editor');
     } catch (e: unknown) {
       console.error('Failed to create entity:', e);
     } finally {
@@ -175,11 +216,21 @@ function UniverseWorkspace() {
       <View style={{ flex: 1, flexDirection: 'row' }}>
         {/* Binder */}
         {binderOpen ? (
-          <View style={{ width: BINDER_WIDTH, borderRightWidth: 1, borderRightColor: colors.border }}>
+          <View
+            ref={binderWrapperRef}
+            style={{
+              width: BINDER_WIDTH,
+              borderRightWidth: 1,
+              borderRightColor: colors.border,
+              borderTopWidth: 2,
+              borderTopColor: focusedPanel === 'binder' ? colors.text : 'transparent',
+            }}
+          >
             <Binder
               onCreateEntity={handleCreateEntity}
               onCreateFolder={handleCreateFolder}
               creatingType={creatingType}
+              isFocused={focusedPanel === 'binder'}
             />
           </View>
         ) : (
@@ -198,12 +249,20 @@ function UniverseWorkspace() {
         )}
 
         {/* Editor */}
-        <View style={{ flex: 1 }}>
+        <View
+          ref={editorWrapperRef}
+          style={{
+            flex: 1,
+            borderTopWidth: 2,
+            borderTopColor: focusedPanel === 'editor' ? colors.text : 'transparent',
+          }}
+        >
           <ErrorBoundary colors={colors} mono={mono}>
             <PrimaryContent
               justCreatedId={justCreatedId}
               onAutoFocusDone={() => setJustCreatedId(null)}
               onSaveStateChange={setEditorSaveState}
+              isFocused={focusedPanel === 'editor'}
             />
           </ErrorBoundary>
         </View>
@@ -242,14 +301,12 @@ function UniverseWorkspace() {
                 ['Backspace', 'delete (y/n)'],
               ]} />
               <ShortcutSection mono={mono} colors={colors} title="EDITOR" items={[
-                ['Tab', 'next block'],
-                ['Shift+Tab', 'previous block'],
-                ['Cmd+Enter', 'new block below'],
-                ['Cmd+Shift+Enter', 'new block above'],
-                ['Cmd+Shift+Bksp', 'delete block (y/n)'],
-                ['Escape', 'deselect block'],
+                ['ArrowUp', 'name (from top of text)'],
+                ['Enter', 'text (from name)'],
+                ['Escape', 'blur editor'],
               ]} />
               <ShortcutSection mono={mono} colors={colors} title="APP" items={[
+                ['Cmd+;', 'switch panel'],
                 ['Cmd+\\', 'toggle binder'],
                 ['Cmd+/', 'this panel'],
               ]} />
