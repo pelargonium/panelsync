@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
+import { fromWebEvent, fromNativeEvent, isWeb, type KeyInfo } from '../lib/keyboard';
 
 export type ScriptElementType = 'page' | 'panel' | 'scene' | 'character' | 'parenthetical' | 'dialogue';
 
@@ -96,6 +97,15 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
     setFocusedIndex(Math.max(0, index - 1));
   }
 
+  function blurCurrent() {
+    if (isWeb) {
+      (document.activeElement as HTMLElement)?.blur?.();
+    } else {
+      const el = elements[focusedIndex];
+      if (el) inputRefs.current[el.id]?.blur();
+    }
+  }
+
   // Auto-focus logic
   useEffect(() => {
     if (isFocused && elements[focusedIndex]) {
@@ -104,29 +114,20 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
     }
   }, [isFocused, focusedIndex, elements]);
 
-  // Keyboard handler
-  const keyRef = useRef<(e: KeyboardEvent) => void>(undefined);
-  keyRef.current = (e: KeyboardEvent) => {
-    if (!isFocused || Platform.OS !== 'web') return;
-
-    const active = document.activeElement as HTMLInputElement | HTMLTextAreaElement;
-    const isEditing = active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA';
-    if (!isEditing) return;
-
-    // Don't intercept keys when name input is focused (it's outside ScriptView)
-    const nameEl = nameInputRef.current as unknown as HTMLElement;
-    if (nameEl && (active === nameEl || (nameEl as any).contains?.(active))) return;
+  // ── Unified keyboard handler ───────────────────────────────────────
+  const handleKeyRef = useRef<(info: KeyInfo) => void>(undefined);
+  handleKeyRef.current = (info: KeyInfo) => {
+    if (!isFocused) return;
 
     const currentElement = elements[focusedIndex];
     if (!currentElement) return;
 
     // Enter chain
-    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      e.preventDefault();
+    if (info.key === 'Enter' && !info.shift && !info.ctrl && !info.meta && !info.alt) {
+      info.prevent();
       const currentText = currentElement.text.trim();
 
       if (currentText === '') {
-        // Empty element -> collapse up hierarchy
         if (currentElement.type === 'dialogue') {
           replaceElement(focusedIndex, 'character');
         } else if (currentElement.type === 'character') {
@@ -134,7 +135,6 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
         } else if (currentElement.type === 'panel') {
           replaceElement(focusedIndex, 'page');
         } else if (currentElement.type === 'scene') {
-          // Empty scene -> skip to character (don't leave blank scene descriptions)
           replaceElement(focusedIndex, 'character');
         } else if (currentElement.type === 'page') {
           addElement(focusedIndex, 'panel');
@@ -142,7 +142,6 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
           addElement(focusedIndex, 'dialogue');
         }
       } else {
-        // Non-empty element -> advance down hierarchy
         if (currentElement.type === 'page') {
           addElement(focusedIndex, 'panel');
         } else if (currentElement.type === 'panel') {
@@ -152,7 +151,6 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
         } else if (currentElement.type === 'character') {
           addElement(focusedIndex, 'dialogue');
         } else if (currentElement.type === 'parenthetical') {
-          // Close parens: append ) to current text, then create dialogue
           updateElement(focusedIndex, { text: currentElement.text });
           addElement(focusedIndex, 'dialogue');
         } else if (currentElement.type === 'dialogue') {
@@ -163,11 +161,11 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
     }
 
     // Tab / Shift+Tab - type cycling (only on empty elements)
-    if (e.key === 'Tab' && currentElement.text.trim() === '') {
-      e.preventDefault();
+    if (info.key === 'Tab' && currentElement.text.trim() === '') {
+      info.prevent();
       const currentIndex = SCRIPT_ELEMENT_TYPES.indexOf(currentElement.type);
       let nextIndex;
-      if (e.shiftKey) {
+      if (info.shift) {
         nextIndex = (currentIndex - 1 + SCRIPT_ELEMENT_TYPES.length) % SCRIPT_ELEMENT_TYPES.length;
       } else {
         nextIndex = (currentIndex + 1) % SCRIPT_ELEMENT_TYPES.length;
@@ -177,39 +175,26 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
     }
 
     // ArrowUp / ArrowDown - linear navigation
-    if (e.key === 'ArrowUp' && !e.altKey) {
-      e.preventDefault();
+    if (info.key === 'ArrowUp' && !info.alt) {
+      info.prevent();
       if (focusedIndex === 0) {
-        (document.activeElement as HTMLElement)?.blur();
+        blurCurrent();
         nameInputRef.current?.focus();
       } else {
         setFocusedIndex(Math.max(0, focusedIndex - 1));
-        setTimeout(() => {
-          const prevInput = inputRefs.current[elements[focusedIndex - 1]?.id] as any;
-          if (prevInput?.setSelectionRange) {
-            const len = prevInput.value?.length || 0;
-            prevInput.setSelectionRange(len, len);
-          }
-        }, 0);
       }
       return;
     }
-    if (e.key === 'ArrowDown' && !e.altKey) {
-      e.preventDefault();
+    if (info.key === 'ArrowDown' && !info.alt) {
+      info.prevent();
       setFocusedIndex(Math.min(elements.length - 1, focusedIndex + 1));
-      setTimeout(() => {
-        const nextInput = inputRefs.current[elements[focusedIndex + 1]?.id] as any;
-        if (nextInput?.setSelectionRange) {
-          nextInput.setSelectionRange(0, 0);
-        }
-      }, 0);
       return;
     }
 
     // Alt+Up / Alt+Down - block jumping (content elements)
-    if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-      e.preventDefault();
-      const isUp = e.key === 'ArrowUp';
+    if (info.alt && (info.key === 'ArrowUp' || info.key === 'ArrowDown')) {
+      info.prevent();
+      const isUp = info.key === 'ArrowUp';
       let nextIndex = focusedIndex;
       const contentTypes: ScriptElementType[] = ['scene', 'dialogue', 'parenthetical'];
 
@@ -223,20 +208,13 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
         }
       }
       setFocusedIndex(nextIndex);
-      setTimeout(() => {
-        const targetInput = inputRefs.current[elements[nextIndex]?.id] as any;
-        if (targetInput?.setSelectionRange) {
-          const len = targetInput.value?.length || 0;
-          targetInput.setSelectionRange(len, len);
-        }
-      }, 0);
       return;
     }
 
     // Alt+Left / Alt+Right - within-dialogue navigation
-    if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-      e.preventDefault();
-      const isLeft = e.key === 'ArrowLeft';
+    if (info.alt && (info.key === 'ArrowLeft' || info.key === 'ArrowRight')) {
+      info.prevent();
+      const isLeft = info.key === 'ArrowLeft';
       let targetIndex = focusedIndex;
 
       if (isLeft) {
@@ -253,40 +231,46 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
         }
       }
 
-      if (targetIndex !== focusedIndex) {
-        setFocusedIndex(targetIndex);
-        setTimeout(() => {
-          const targetInput = inputRefs.current[elements[targetIndex]?.id] as any;
-          if (targetInput?.setSelectionRange) {
-            const len = targetInput.value?.length || 0;
-            targetInput.setSelectionRange(len, len);
-          }
-        }, 0);
-      }
+      if (targetIndex !== focusedIndex) setFocusedIndex(targetIndex);
       return;
     }
 
     // Backspace on empty element
-    if (e.key === 'Backspace' && currentElement.text.trim() === '' && elements.length > 1) {
-      e.preventDefault();
+    if (info.key === 'Backspace' && currentElement.text.trim() === '' && elements.length > 1) {
+      info.prevent();
       deleteElement(focusedIndex);
       return;
     }
 
     // Escape
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      (document.activeElement as HTMLElement)?.blur();
+    if (info.key === 'Escape') {
+      info.prevent();
+      blurCurrent();
       return;
     }
   };
 
+  // Web: document-level capture phase listener
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const handler = (e: KeyboardEvent) => keyRef.current?.(e);
+    if (!isWeb) return;
+    function handler(e: KeyboardEvent) {
+      // Skip if name input is focused
+      const active = document.activeElement as HTMLElement;
+      const nameEl = nameInputRef.current as unknown as HTMLElement;
+      if (nameEl && (active === nameEl || (nameEl as any).contains?.(active))) return;
+      const isEditing = (active as any)?.tagName === 'INPUT' || (active as any)?.tagName === 'TEXTAREA';
+      if (!isEditing) return;
+
+      handleKeyRef.current?.(fromWebEvent(e));
+    }
     document.addEventListener('keydown', handler, true);
     return () => document.removeEventListener('keydown', handler, true);
   }, []);
+
+  // Native: onKeyPress handler for TextInputs
+  function nativeKeyPress(e: any) {
+    handleKeyRef.current?.(fromNativeEvent(e));
+  }
 
   return (
     <ScrollView ref={scrollViewRef} style={{ flex: 1, paddingTop: 8 }} keyboardShouldPersistTaps="handled">
@@ -312,9 +296,19 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
         const onChangeText = el.type === 'character'
           ? (v: string) => {
               const parenIndex = v.indexOf('(');
-              if (Platform.OS === 'web' && parenIndex !== -1) {
-                const input = document.activeElement as HTMLInputElement;
-                if (input?.selectionStart === parenIndex + 1) {
+              if (parenIndex !== -1) {
+                // On web, check cursor position; on native, always split on (
+                if (isWeb) {
+                  const input = document.activeElement as HTMLInputElement;
+                  if (input?.selectionStart === parenIndex + 1) {
+                    const beforeParen = v.substring(0, parenIndex).toUpperCase();
+                    const afterParen = v.substring(parenIndex + 1);
+                    updateElement(i, { text: beforeParen });
+                    addElement(i, 'parenthetical', afterParen);
+                    return;
+                  }
+                } else {
+                  // Native: split whenever ( appears (cursor position not accessible)
                   const beforeParen = v.substring(0, parenIndex).toUpperCase();
                   const afterParen = v.substring(parenIndex + 1);
                   updateElement(i, { text: beforeParen });
@@ -339,14 +333,12 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
               alignItems: 'center',
             }}
           >
-            {/* Page/Panel prefix label */}
             {prefix ? (
               <Text style={{ fontFamily: mono, ...styleForType(el.type, colors), marginRight: 8 }}>
                 {prefix}
               </Text>
             ) : null}
 
-            {/* Parenthetical decorative parens */}
             {el.type === 'parenthetical' && (
               <Text style={{ fontFamily: mono, fontSize: 12, color: colors.text, marginRight: 2 }}>(</Text>
             )}
@@ -355,6 +347,7 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
               ref={r => { if (r) inputRefs.current[el.id] = r; }}
               value={el.text}
               onChangeText={onChangeText}
+              onKeyPress={nativeKeyPress}
               placeholder={placeholder}
               placeholderTextColor={colors.muted}
               submitBehavior="submit"
@@ -363,7 +356,7 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
                 fontFamily: mono,
                 ...styleForType(el.type, colors),
                 paddingVertical: 0,
-                ...(Platform.OS === 'web' ? { outlineStyle: 'none' as any } : {}),
+                ...(isWeb ? { outlineStyle: 'none' as any } : {}),
               }}
               onFocus={() => setFocusedIndex(i)}
               multiline={false}

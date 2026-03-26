@@ -22,13 +22,14 @@
 - **Script entity type:** 'script' added to schema enum, API types, mobile types, binder, and context. Migration 0009 applied to Neon. `ScriptView.tsx` component: vertical element list with indentation-based visual hierarchy. Elements: page, panel, scene, character, parenthetical, dialogue. Pages and panels auto-number (Panel count resets per page), shown as "Page 1" / "Panel 2" prefix with optional title. Context-aware Enter chains: non-empty advances down hierarchy, empty collapses up. Tab/Shift+Tab cycles element type on empty blocks. `(` in character name auto-splits into character + parenthetical. Character names auto-uppercased. Parentheticals on own row with decorative `( )`. Alt+Up/Down jumps to content elements, Alt+Left/Right navigates dialogue groups. Elements stored as JSON in bodyText, auto-saved on 600ms debounce. Shortcut reference updated with SCRIPT section.
 - **Auth page restyled:** Stripped to match mono/minimal app style — no card, no border-radius, underlined inputs, plain text buttons, uses `useTheme()`.
 - **Universes keyboard nav:** Up/Down arrow keys to highlight universe, Enter to open, Backspace to trigger delete. Selection highlight with `colors.selection`.
+- **Cross-platform keyboard support:** All keyboard shortcuts now work on native iOS/iPad builds via TextInput `onKeyPress` handlers, not just web. Shared `KeyInfo` abstraction in `lib/keyboard.ts` with `fromWebEvent`/`fromNativeEvent` adapters. Web uses `document.addEventListener('keydown')` (capture phase), native uses `onKeyPress` on every TextInput. Applied to: ScriptView, TimelineView, Editor, Binder (hidden TextInput for nav-mode key capture), universe workspace (app-level shortcuts + `onTouchStart` for panel focus), universes list (hidden TextInput for arrow/Enter nav). Spine mode in TimelineView remains web-only (no TextInput focused). App-level Cmd shortcuts on native only fire when a TextInput is focused.
 - DESIGN.md: fully updated. "Lenses, Not Containers" foregrounded. Four binder modes designed: Everything, File, Publishing, Board. Bible as entity type specified. Staging area, perspectives, folder deletion dialog, depth control, Publishing mode all specified. Content model section added: entity pages as nested documents, block types (text, field, note, script) as universal atoms, promotion-from-selection pattern, starter fields as prompts. Dossier clarified as freeform spatial canvas (v1 = linear scroll; target = infinite canvas with coordinates on every item). Block types valid in any entity page including script blocks.
 
 ## Next Step
-Test script editor workflow end-to-end, then generate real content to validate the brainstorming loop.
+Test script editor and keyboard nav on iPad build, then generate real content to validate the brainstorming loop.
 
 ## Completed Task
-Script entity type implemented and reviewed. TASK.md can be cleared.
+Cross-platform keyboard support implemented and reviewed. TASK.md can be cleared.
 
 ---
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
+import { fromNativeEvent, fromWebEvent, isWeb, type KeyInfo } from '../lib/keyboard';
 import { generateId } from './ScriptView';
 
 export interface TimelineEvent {
@@ -71,19 +72,33 @@ export default function TimelineView({ events, onEventsChange, isFocused, nameIn
     }
   }, [isFocused, spineMode, focusedIndex, activeField, events]);
 
-  // Keyboard handler
-  const keyRef = useRef<(e: KeyboardEvent) => void>(undefined);
-  keyRef.current = (e: KeyboardEvent) => {
-    if (!isFocused || Platform.OS !== 'web') return;
+  function blurFocusedInput() {
+    if (isWeb) {
+      (document.activeElement as HTMLElement)?.blur?.();
+      return;
+    }
+    const event = events[focusedIndex];
+    if (!event) return;
+    inputRefs.current[`${event.id}-${activeField}`]?.blur();
+  }
 
-    const activeElement = document.activeElement;
-    const isEditing = activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA';
+  // Keyboard handler
+  const keyRef = useRef<(info: KeyInfo) => void>(undefined);
+  keyRef.current = (info: KeyInfo) => {
+    if (!isFocused) return;
+
+    const isEditing = isWeb
+      ? (() => {
+          const activeElement = document.activeElement;
+          return activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA';
+        })()
+      : true;
 
     if (spineMode) {
-      e.preventDefault();
-      switch (e.key) {
+      info.prevent();
+      switch (info.key) {
         case 'ArrowUp':
-          if (e.altKey && e.shiftKey) {
+          if (info.alt && info.shift) {
             // Jump 5 spine positions (alternating event/midpoint)
             setSpinePosition(p => {
               let pos = { ...p };
@@ -100,7 +115,7 @@ export default function TimelineView({ events, onEventsChange, isFocused, nameIn
           else if (spinePosition.index > 0) { setSpinePosition({ index: spinePosition.index - 1, at: 'midpoint' }); }
           break;
         case 'ArrowDown':
-          if (e.altKey && e.shiftKey) {
+          if (info.alt && info.shift) {
             const lastIndex = events.length - 1;
             setSpinePosition(p => {
               let pos = { ...p };
@@ -136,50 +151,54 @@ export default function TimelineView({ events, onEventsChange, isFocused, nameIn
       }
       // y/n for delete confirm
       if (deleteConfirmIndex !== null) {
-        if (e.key === 'y') { deleteEvent(deleteConfirmIndex); return; }
-        if (e.key === 'n') { setDeleteConfirmIndex(null); return; }
+        if (info.key === 'y') { deleteEvent(deleteConfirmIndex); return; }
+        if (info.key === 'n') { setDeleteConfirmIndex(null); return; }
       }
-      if (e.key !== 'Delete' && e.key !== 'Backspace' && e.key !== 'y' && e.key !== 'n') { setDeleteConfirmIndex(null); }
+      if (info.key !== 'Delete' && info.key !== 'Backspace' && info.key !== 'y' && info.key !== 'n') { setDeleteConfirmIndex(null); }
     } else if (isEditing) {
-      if (e.key === 'Tab') {
-        e.preventDefault();
+      if (info.key === 'Tab') {
+        info.prevent();
         const fields: Array<'title' | 'dateline' | 'description'> = ['title', 'dateline', 'description'];
         const currentFieldIndex = fields.indexOf(activeField);
-        const nextFieldIndex = (currentFieldIndex + (e.shiftKey ? -1 : 1) + fields.length) % fields.length;
+        const nextFieldIndex = (currentFieldIndex + (info.shift ? -1 : 1) + fields.length) % fields.length;
         setActiveField(fields[nextFieldIndex]);
-      } else if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
+      } else if (info.key === 'Enter' && !info.shift && !info.meta && !info.ctrl && !info.alt) {
+        info.prevent();
         addEvent(focusedIndex);
-      } else if (e.altKey && e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (e.shiftKey) { setFocusedIndex(i => Math.max(0, i - 5)); }
+      } else if (info.alt && info.key === 'ArrowUp') {
+        info.prevent();
+        if (info.shift) { setFocusedIndex(i => Math.max(0, i - 5)); }
         else if (focusedIndex > 0) { setFocusedIndex(focusedIndex - 1); }
-      } else if (e.altKey && e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (e.shiftKey) { setFocusedIndex(i => Math.min(events.length - 1, i + 5)); }
+      } else if (info.alt && info.key === 'ArrowDown') {
+        info.prevent();
+        if (info.shift) { setFocusedIndex(i => Math.min(events.length - 1, i + 5)); }
         else if (focusedIndex < events.length - 1) { setFocusedIndex(focusedIndex + 1); }
-      } else if (e.altKey && e.key === 'ArrowLeft') {
-        e.preventDefault();
+      } else if (info.alt && info.key === 'ArrowLeft') {
+        info.prevent();
         setSpineMode(true);
         setSpinePosition({ index: focusedIndex, at: 'event' });
-        (document.activeElement as HTMLElement)?.blur();
-      } else if (e.key === 'ArrowUp' && activeField === 'title' && focusedIndex === 0) {
-        e.preventDefault();
-        (document.activeElement as HTMLElement)?.blur();
+        blurFocusedInput();
+      } else if (info.key === 'ArrowUp' && activeField === 'title' && focusedIndex === 0) {
+        info.prevent();
+        blurFocusedInput();
         nameInputRef.current?.focus();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        (document.activeElement as HTMLElement)?.blur();
+      } else if (info.key === 'Escape') {
+        info.prevent();
+        blurFocusedInput();
       }
     }
   };
 
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const handler = (e: KeyboardEvent) => keyRef.current?.(e);
+    if (!isWeb) return;
+    const handler = (e: KeyboardEvent) => keyRef.current?.(fromWebEvent(e));
     document.addEventListener('keydown', handler, true);
     return () => document.removeEventListener('keydown', handler, true);
   }, []);
+
+  function nativeKeyPress(e: any) {
+    keyRef.current?.(fromNativeEvent(e));
+  }
 
   return (
     <ScrollView ref={scrollViewRef} style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
@@ -194,10 +213,10 @@ export default function TimelineView({ events, onEventsChange, isFocused, nameIn
             <View style={{ width: 16, justifyContent: 'flex-start', paddingTop: 16 }}><View style={{ height: 2, backgroundColor: colors.border }} /></View>
             <View style={{ flex: 1, paddingBottom: 16, paddingTop: 12 }}>
               {(event.dateline || (!spineMode && focusedIndex === i && activeField === 'dateline')) && (
-                <TextInput ref={r => { if (r) inputRefs.current[`${event.id}-dateline`] = r; }} value={event.dateline} onChangeText={v => updateEvent(i, { dateline: v })} placeholder="date..." placeholderTextColor={colors.muted} submitBehavior="submit" style={{ fontFamily: mono, fontSize: 10, color: colors.muted, paddingVertical: 0 }} onFocus={() => { setFocusedIndex(i); setActiveField('dateline'); setSpineMode(false); }} />
+                <TextInput ref={r => { if (r) inputRefs.current[`${event.id}-dateline`] = r; }} value={event.dateline} onChangeText={v => updateEvent(i, { dateline: v })} onKeyPress={nativeKeyPress} placeholder="date..." placeholderTextColor={colors.muted} submitBehavior="submit" style={{ fontFamily: mono, fontSize: 10, color: colors.muted, paddingVertical: 0 }} onFocus={() => { setFocusedIndex(i); setActiveField('dateline'); setSpineMode(false); }} />
               )}
-              <TextInput ref={r => { if (r) inputRefs.current[`${event.id}-title`] = r; }} value={event.title} onChangeText={v => updateEvent(i, { title: v })} placeholder="event title..." placeholderTextColor={colors.muted} submitBehavior="submit" style={{ fontFamily: mono, fontSize: 14, fontWeight: '700', color: colors.text, paddingVertical: 0 }} onFocus={() => { setFocusedIndex(i); setActiveField('title'); setSpineMode(false); }} />
-              <TextInput ref={r => { if (r) inputRefs.current[`${event.id}-description`] = r; }} value={event.description} onChangeText={v => updateEvent(i, { description: v })} placeholder="description..." placeholderTextColor={colors.muted} submitBehavior="submit" style={{ fontFamily: mono, fontSize: 13, color: colors.text, paddingVertical: 0, marginTop: 2 }} onFocus={() => { setFocusedIndex(i); setActiveField('description'); setSpineMode(false); }} />
+              <TextInput ref={r => { if (r) inputRefs.current[`${event.id}-title`] = r; }} value={event.title} onChangeText={v => updateEvent(i, { title: v })} onKeyPress={nativeKeyPress} placeholder="event title..." placeholderTextColor={colors.muted} submitBehavior="submit" style={{ fontFamily: mono, fontSize: 14, fontWeight: '700', color: colors.text, paddingVertical: 0 }} onFocus={() => { setFocusedIndex(i); setActiveField('title'); setSpineMode(false); }} />
+              <TextInput ref={r => { if (r) inputRefs.current[`${event.id}-description`] = r; }} value={event.description} onChangeText={v => updateEvent(i, { description: v })} onKeyPress={nativeKeyPress} placeholder="description..." placeholderTextColor={colors.muted} submitBehavior="submit" style={{ fontFamily: mono, fontSize: 13, color: colors.text, paddingVertical: 0, marginTop: 2 }} onFocus={() => { setFocusedIndex(i); setActiveField('description'); setSpineMode(false); }} />
               {spineMode && deleteConfirmIndex === i && (
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
                   <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>delete?</Text>

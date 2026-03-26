@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -11,6 +10,7 @@ import {
 import { api, type ApiEntity } from '../lib/api';
 import { useUniverse } from '../context/UniverseContext';
 import { useTheme } from '../context/ThemeContext';
+import { fromNativeEvent, fromWebEvent, isWeb, type KeyInfo } from '../lib/keyboard';
 import TimelineView, { type TimelineEvent } from './TimelineView';
 import ScriptView, { type ScriptElement, generateId } from './ScriptView';
 type SaveState = 'saved' | 'saving' | 'error';
@@ -369,31 +369,35 @@ export default function Editor({
 
   // ── Keyboard (web only) ──────────────────────────────────────────────
 
-  const keyRef = useRef<(e: KeyboardEvent) => void>(undefined);
-  keyRef.current = (e: KeyboardEvent) => {
+  const keyRef = useRef<(info: KeyInfo) => void>(undefined);
+  keyRef.current = (info: KeyInfo) => {
     if (!isFocused) return;
     if (entityType === 'timeline' || entityType === 'script') return;  // TimelineView and ScriptView have their own handlers
 
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      (document.activeElement as HTMLElement)?.blur?.();
+    if (info.key === 'Escape') {
+      info.prevent();
+      if (isWeb) {
+        (document.activeElement as HTMLElement)?.blur?.();
+      } else {
+        textInputRef.current?.blur();
+      }
       return;
     }
 
     // ArrowUp at top of text → focus name input
-    if (e.key === 'ArrowUp' && !e.metaKey && !e.ctrlKey) {
+    if (info.key === 'ArrowUp' && !info.meta && !info.ctrl) {
       const { start } = selectionRef.current;
       const before = latestTextRef.current.slice(0, start);
       if (!before.includes('\n')) {
-        e.preventDefault();
+        info.prevent();
         nameInputRef.current?.focus();
       }
     }
   };
 
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    function onKeyDown(e: KeyboardEvent) { keyRef.current?.(e); }
+    if (!isWeb) return;
+    function onKeyDown(e: KeyboardEvent) { keyRef.current?.(fromWebEvent(e)); }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
@@ -416,6 +420,7 @@ export default function Editor({
           ref={nameInputRef}
           value={name}
           onChangeText={setName}
+          onKeyPress={(e: any) => keyRef.current?.(fromNativeEvent(e))}
           onSubmitEditing={() => {
             if (entityType === 'script' || entityType === 'timeline') {
               // Let the sub-view handle focus — just blur the name input
@@ -460,6 +465,7 @@ export default function Editor({
             ref={textInputRef}
             value={text}
             onChangeText={setText}
+            onKeyPress={(e: any) => keyRef.current?.(fromNativeEvent(e))}
             onSelectionChange={(e) => { selectionRef.current = e.nativeEvent.selection; }}
             multiline
             scrollEnabled={false}

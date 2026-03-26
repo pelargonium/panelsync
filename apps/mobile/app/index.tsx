@@ -7,11 +7,13 @@ import {
 import { useRouter } from 'expo-router';
 import { useTheme } from '../context/ThemeContext';
 import { api, getToken, clearToken, type ApiUniverse } from '../lib/api';
+import { fromNativeEvent, fromWebEvent, isWeb, type KeyInfo } from '../lib/keyboard';
 
-function NewUniverseModal({ visible, onClose, onCreate }: {
+function NewUniverseModal({ visible, onClose, onCreate, onKeyPress }: {
   visible: boolean;
   onClose: () => void;
   onCreate: (name: string) => Promise<void>;
+  onKeyPress: (e: any) => void;
 }) {
   const { colors, mono } = useTheme();
   const [name, setName] = useState('');
@@ -45,6 +47,8 @@ function NewUniverseModal({ visible, onClose, onCreate }: {
             placeholderTextColor={colors.muted}
             value={name}
             onChangeText={setName}
+            onKeyPress={onKeyPress}
+            submitBehavior="submit"
             autoFocus
             onSubmitEditing={handleCreate}
           />
@@ -133,6 +137,7 @@ export default function WorldsDashboard() {
   const [authChecked, setAuthChecked] = useState(false);
   const [pendingDeleteUniverse, setPendingDeleteUniverse] = useState<ApiUniverse | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const hiddenInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     getToken().then(token => {
@@ -163,33 +168,39 @@ export default function WorldsDashboard() {
   }, [authChecked]);
 
   // Keyboard navigation for universe list
-  const keyRef = useRef<(e: KeyboardEvent) => void>(undefined);
-  keyRef.current = (e: KeyboardEvent) => {
+  const keyRef = useRef<(info: KeyInfo) => void>(undefined);
+  keyRef.current = (info: KeyInfo) => {
     if (modalVisible || pendingDeleteUniverse) return;
     if (universes.length === 0) return;
 
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
+    if (info.key === 'ArrowDown') {
+      info.prevent();
       setSelectedIndex(i => Math.min(universes.length - 1, i + 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
+    } else if (info.key === 'ArrowUp') {
+      info.prevent();
       setSelectedIndex(i => Math.max(0, i - 1));
-    } else if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
-      e.preventDefault();
+    } else if (info.key === 'Enter' && !info.meta && !info.ctrl) {
+      info.prevent();
       const u = universes[selectedIndex];
       if (u) router.push({ pathname: '/universe/[id]', params: { id: u.id, name: u.name } });
-    } else if (e.key === 'Backspace' && !e.metaKey) {
+    } else if (info.key === 'Backspace' && !info.meta) {
       const u = universes[selectedIndex];
       if (u) setPendingDeleteUniverse(u);
     }
   };
 
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    function onKeyDown(e: KeyboardEvent) { keyRef.current?.(e); }
+    if (!isWeb) return;
+    function onKeyDown(e: KeyboardEvent) { keyRef.current?.(fromWebEvent(e)); }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
+
+  useEffect(() => {
+    if (isWeb) return;
+    if (!authChecked || modalVisible || pendingDeleteUniverse) return;
+    setTimeout(() => hiddenInputRef.current?.focus(), 0);
+  }, [authChecked, modalVisible, pendingDeleteUniverse, universes.length]);
 
   // Keep selectedIndex in bounds when list changes
   useEffect(() => {
@@ -224,6 +235,14 @@ export default function WorldsDashboard() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <TextInput
+        ref={hiddenInputRef}
+        style={{ position: 'absolute', opacity: 0, height: 0, width: 0 }}
+        onKeyPress={(e: any) => keyRef.current?.(fromNativeEvent(e))}
+        autoCorrect={false}
+        autoCapitalize="none"
+      />
+
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 48, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
         <Text style={{ fontFamily: mono, fontSize: 13, color: colors.text, letterSpacing: 2 }}>PANELSYNC</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
@@ -276,6 +295,7 @@ export default function WorldsDashboard() {
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         onCreate={handleCreate}
+        onKeyPress={(e: any) => keyRef.current?.(fromNativeEvent(e))}
       />
       {pendingDeleteUniverse && (
         <DeleteUniverseModal

@@ -3,6 +3,7 @@ import { ActivityIndicator, Platform, ScrollView, Text, TextInput, TouchableOpac
 import { useTheme } from '../context/ThemeContext';
 import { useUniverse } from '../context/UniverseContext';
 import { api, type ApiEntity, type ApiMembership } from '../lib/api';
+import { fromNativeEvent, fromWebEvent, isWeb, type KeyInfo } from '../lib/keyboard';
 
 type EntityType = ApiEntity['type'];
 
@@ -162,6 +163,7 @@ function BinderEntityRow({
   renameValue,
   onRenameChange,
   onRenameSubmit,
+  onRenameKeyPress,
   isDeleting,
   onPointerDown,
   onPress,
@@ -175,6 +177,7 @@ function BinderEntityRow({
   renameValue: string;
   onRenameChange: (text: string) => void;
   onRenameSubmit: () => void;
+  onRenameKeyPress: (e: any) => void;
   isDeleting: boolean;
   onPointerDown: (e: any) => void;
   onPress: () => void;
@@ -214,6 +217,7 @@ function BinderEntityRow({
             value={renameValue}
             onChangeText={onRenameChange}
             onSubmitEditing={onRenameSubmit}
+            onKeyPress={onRenameKeyPress}
             style={{
               fontFamily: mono, fontSize: 13, color: colors.text,
               flex: 1, padding: 0, margin: 0,
@@ -243,6 +247,7 @@ function BinderFolderRow({
   renameValue,
   onRenameChange,
   onRenameSubmit,
+  onRenameKeyPress,
   isDropTarget,
   onPointerDown,
   onPress,
@@ -259,6 +264,7 @@ function BinderFolderRow({
   renameValue: string;
   onRenameChange: (text: string) => void;
   onRenameSubmit: () => void;
+  onRenameKeyPress: (e: any) => void;
   isDropTarget: boolean;
   onPointerDown: (e: any) => void;
   onPress: () => void;
@@ -297,6 +303,7 @@ function BinderFolderRow({
             value={renameValue}
             onChangeText={onRenameChange}
             onSubmitEditing={onRenameSubmit}
+            onKeyPress={onRenameKeyPress}
             style={{
               fontFamily: mono, fontSize: 13, color: colors.text,
               flex: 1, padding: 0, margin: 0,
@@ -401,6 +408,7 @@ export default function Binder({
 
   const scrollViewRef = useRef<ScrollView>(null);
   const filterInputRef = useRef<TextInput>(null);
+  const hiddenInputRef = useRef<TextInput>(null);
   const dragGhostLabel = useRef('');
   const autoScrollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollOffsetRef = useRef(0);
@@ -474,6 +482,13 @@ export default function Binder({
       setSelectionAnchorIndex(null);
     }
   }, [focusedId, focusedIndex]);
+
+  useEffect(() => {
+    if (isWeb) return;
+    if (!isFocused) return;
+    if (renamingId || filterText) return;
+    setTimeout(() => hiddenInputRef.current?.focus(), 0);
+  }, [isFocused, renamingId, filterText, createPickerOpen, movePickerOpen]);
 
   // ── Navigation ─────────────────────────────────────────────────────────
 
@@ -728,8 +743,10 @@ export default function Binder({
 
   function clearFilter() {
     setFilterText('');
-    if (Platform.OS === 'web') {
+    if (isWeb) {
       (document.activeElement as HTMLElement)?.blur?.();
+    } else if (isFocused) {
+      setTimeout(() => hiddenInputRef.current?.focus(), 0);
     }
   }
 
@@ -761,8 +778,10 @@ export default function Binder({
   function cancelRename() {
     setRenamingId(null);
     setRenameValue('');
-    if (Platform.OS === 'web') {
+    if (isWeb) {
       (document.activeElement as HTMLElement)?.blur?.();
+    } else if (isFocused) {
+      setTimeout(() => hiddenInputRef.current?.focus(), 0);
     }
   }
 
@@ -878,49 +897,53 @@ export default function Binder({
 
   // ── Keyboard handler (web only) ────────────────────────────────────────
 
-  const handlerRef = useRef<(e: KeyboardEvent) => void>(undefined);
+  const handlerRef = useRef<(info: KeyInfo) => void>(undefined);
 
-  handlerRef.current = function onKeyDown(e: KeyboardEvent) {
+  handlerRef.current = function onKeyDown(info: KeyInfo) {
     if (!isFocused) return;
 
-    if (e.key === 'Escape' && dragState?.started) {
-      e.preventDefault();
+    if (info.key === 'Escape' && dragState?.started) {
+      info.prevent();
       setDragState(null);
       if (autoScrollRef.current) { clearInterval(autoScrollRef.current); autoScrollRef.current = null; }
       return;
     }
 
-    const active = document.activeElement as HTMLElement;
-    const isInInput = active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA';
+    const isInInput = isWeb
+      ? (() => {
+          const active = document.activeElement as HTMLElement;
+          return active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA';
+        })()
+      : !!renamingId || filterText !== '';
 
     // Cmd+Shift+A — open create picker
-    if (e.metaKey && e.shiftKey && e.key === 'a') {
-      e.preventDefault();
+    if (info.meta && info.shift && info.key === 'a') {
+      info.prevent();
       openCreatePicker();
       return;
     }
 
     // Rename mode: only Escape cancels (Enter handled by onSubmitEditing)
-    if (renamingId && isInInput) {
-      if (e.key === 'Escape') { e.preventDefault(); cancelRename(); }
+    if (renamingId) {
+      if (info.key === 'Escape') { info.prevent(); cancelRename(); }
       return;
     }
 
     // Filter input focused: arrow nav + Enter + Escape
-    if (filterText && isInInput) {
-      if (e.key === 'ArrowDown') { e.preventDefault(); moveFocus(1); return; }
-      if (e.key === 'ArrowUp') { e.preventDefault(); moveFocus(-1); return; }
-      if (e.key === 'Enter') {
-        e.preventDefault();
+    if (filterText) {
+      if (info.key === 'ArrowDown') { info.prevent(); moveFocus(1); return; }
+      if (info.key === 'ArrowUp') { info.prevent(); moveFocus(-1); return; }
+      if (info.key === 'Enter') {
+        info.prevent();
         const item = navItems[focusedIndex];
-        if (e.shiftKey && item && item.kind !== 'section') {
+        if (info.shift && item && item.kind !== 'section') {
           onActivateSecondary('entity', item.id);
         } else {
           activateFocused();
         }
         return;
       }
-      if (e.key === 'Escape') { e.preventDefault(); clearFilter(); return; }
+      if (info.key === 'Escape') { info.prevent(); clearFilter(); return; }
       return;
     }
 
@@ -929,111 +952,111 @@ export default function Binder({
 
     // Delete confirmation mode (single or bulk)
     if (deletingId) {
-      e.preventDefault();
-      if (e.key === 'y' || e.key === 'Y') {
+      info.prevent();
+      if (info.key === 'y' || info.key === 'Y') {
         if (deletingId === '__bulk__') confirmBulkDelete();
         else confirmDeleteAction();
         return;
       }
-      if (e.key === 'n' || e.key === 'N' || e.key === 'Escape') { cancelDelete(); return; }
+      if (info.key === 'n' || info.key === 'N' || info.key === 'Escape') { cancelDelete(); return; }
       return;
     }
 
     // Move picker mode
     if (movePickerOpen) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
+      if (info.key === 'ArrowDown') {
+        info.prevent();
         setMovePickerIndex((i) => Math.min(moveTargets.length - 1, i + 1));
         return;
       }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
+      if (info.key === 'ArrowUp') {
+        info.prevent();
         setMovePickerIndex((i) => Math.max(0, i - 1));
         return;
       }
-      if (e.key === 'Enter') { e.preventDefault(); void handleMoveConfirm(movePickerIndex); return; }
-      if (e.key === 'Escape') { e.preventDefault(); cancelMove(); return; }
+      if (info.key === 'Enter') { info.prevent(); void handleMoveConfirm(movePickerIndex); return; }
+      if (info.key === 'Escape') { info.prevent(); cancelMove(); return; }
       return;
     }
 
     // Create picker mode
     if (createPickerOpen) {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-        e.preventDefault();
+      if (info.key === 'ArrowRight' || info.key === 'ArrowDown') {
+        info.prevent();
         setCreatePickerIndex((i) => Math.min(CREATE_OPTIONS.length - 1, i + 1));
         return;
       }
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-        e.preventDefault();
+      if (info.key === 'ArrowLeft' || info.key === 'ArrowUp') {
+        info.prevent();
         setCreatePickerIndex((i) => Math.max(0, i - 1));
         return;
       }
-      if (e.key === 'Enter') { e.preventDefault(); handleCreateOption(createPickerIndex); return; }
-      if (e.key === 'Escape') { e.preventDefault(); setCreatePickerOpen(false); return; }
+      if (info.key === 'Enter') { info.prevent(); handleCreateOption(createPickerIndex); return; }
+      if (info.key === 'Escape') { info.prevent(); setCreatePickerOpen(false); return; }
       return;
     }
 
     // Cmd+Shift+M — move to folder
-    if (e.metaKey && e.shiftKey && (e.key === 'm' || e.key === 'M')) {
-      e.preventDefault();
+    if (info.meta && info.shift && (info.key === 'm' || info.key === 'M')) {
+      info.prevent();
       startMove();
       return;
     }
 
     // Shift+Arrow — extend selection
-    if (e.key === 'ArrowDown' && e.shiftKey) {
-      e.preventDefault();
+    if (info.key === 'ArrowDown' && info.shift) {
+      info.prevent();
       if (selectionAnchorIndex === null) setSelectionAnchorIndex(focusedIndex >= 0 ? focusedIndex : 0);
       moveFocus(1);
       return;
     }
-    if (e.key === 'ArrowUp' && e.shiftKey) {
-      e.preventDefault();
+    if (info.key === 'ArrowUp' && info.shift) {
+      info.prevent();
       if (selectionAnchorIndex === null) setSelectionAnchorIndex(focusedIndex >= 0 ? focusedIndex : 0);
       moveFocus(-1);
       return;
     }
 
     // Normal navigation (clears selection)
-    if (e.key === 'ArrowDown') { e.preventDefault(); setSelectionAnchorIndex(null); moveFocus(1); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); setSelectionAnchorIndex(null); moveFocus(-1); }
-    else if (e.key === 'Enter') {
-      e.preventDefault();
+    if (info.key === 'ArrowDown') { info.prevent(); setSelectionAnchorIndex(null); moveFocus(1); }
+    else if (info.key === 'ArrowUp') { info.prevent(); setSelectionAnchorIndex(null); moveFocus(-1); }
+    else if (info.key === 'Enter') {
+      info.prevent();
       setSelectionAnchorIndex(null);
       const item = navItems[focusedIndex];
-      if (e.shiftKey && item && item.kind !== 'section') {
+      if (info.shift && item && item.kind !== 'section') {
         onActivateSecondary('entity', item.id);
       } else {
         activateFocused();
       }
     }
-    else if (e.key === 'ArrowRight') { e.preventDefault(); expandFocused(); }
-    else if (e.key === 'ArrowLeft') { e.preventDefault(); collapseFocused(); }
-    else if (e.key === 'Escape') {
-      e.preventDefault();
+    else if (info.key === 'ArrowRight') { info.prevent(); expandFocused(); }
+    else if (info.key === 'ArrowLeft') { info.prevent(); collapseFocused(); }
+    else if (info.key === 'Escape') {
+      info.prevent();
       if (selectionAnchorIndex !== null) { setSelectionAnchorIndex(null); }
       else if (filterText) clearFilter();
       else setFocusedId(null);
     }
-    else if (e.key === 'F2') { e.preventDefault(); startRename(); }
-    else if (e.key === 'Delete' || e.key === 'Backspace') {
-      e.preventDefault();
+    else if (info.key === 'F2') { info.prevent(); startRename(); }
+    else if (info.key === 'Delete' || info.key === 'Backspace') {
+      info.prevent();
       if (selectedIds.size > 0) startBulkDelete();
       else startDelete();
     }
     // Type-to-filter: any single printable character
-    else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
-      e.preventDefault();
+    else if (info.key.length === 1 && !info.meta && !info.ctrl && !info.alt) {
+      info.prevent();
       setSelectionAnchorIndex(null);
-      startFilter(e.key);
+      startFilter(info.key);
     }
   };
 
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
+    if (!isWeb) return;
 
     function onKeyDown(e: KeyboardEvent) {
-      handlerRef.current?.(e);
+      handlerRef.current?.(fromWebEvent(e));
     }
 
     document.addEventListener('keydown', onKeyDown);
@@ -1059,10 +1082,22 @@ export default function Binder({
     };
   }, [dragState !== null]);
 
+  function nativeKeyPress(e: any) {
+    handlerRef.current?.(fromNativeEvent(e));
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────
 
   return (
     <View ref={binderViewRef} style={{ flex: 1 }}>
+      <TextInput
+        ref={hiddenInputRef}
+        style={{ position: 'absolute', opacity: 0, height: 0, width: 0 }}
+        onKeyPress={nativeKeyPress}
+        autoCorrect={false}
+        autoCapitalize="none"
+      />
+
       {/* Header */}
       <View style={{
         flexDirection: 'row',
@@ -1149,6 +1184,8 @@ export default function Binder({
             ref={filterInputRef}
             value={filterText}
             onChangeText={setFilterText}
+            onKeyPress={nativeKeyPress}
+            submitBehavior="submit"
             style={{
               fontFamily: mono, fontSize: 12, color: colors.text, padding: 0,
               ...(Platform.OS === 'web' ? { outlineStyle: 'none' as any } : {}),
@@ -1227,6 +1264,7 @@ export default function Binder({
                 renameValue={renameValue}
                 onRenameChange={setRenameValue}
                 onRenameSubmit={confirmRename}
+                onRenameKeyPress={nativeKeyPress}
                   isDropTarget={isDropTarget}
                 onPress={() => handleSelect(entity.id)}
                 onToggle={() => toggleExpanded(entity.id)}
@@ -1249,6 +1287,7 @@ export default function Binder({
               renameValue={renameValue}
               onRenameChange={setRenameValue}
               onRenameSubmit={confirmRename}
+              onRenameKeyPress={nativeKeyPress}
               isDeleting={deletingId === entity.id || (deletingId === '__bulk__' && selectedIds.has(entity.id))}
                 onPointerDown={(e: any) => handlePointerDown(e, entity.id)}
               onPress={() => handleSelect(entity.id)}

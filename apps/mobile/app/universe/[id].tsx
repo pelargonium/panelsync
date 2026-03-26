@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -14,6 +13,7 @@ import ErrorBoundary from '../../components/ErrorBoundary';
 import { UniverseProvider, useUniverse } from '../../context/UniverseContext';
 import { useTheme } from '../../context/ThemeContext';
 import { type ApiEntity } from '../../lib/api';
+import { fromWebEvent, isWeb, type KeyInfo } from '../../lib/keyboard';
 
 const BINDER_WIDTH = 260;
 
@@ -107,16 +107,18 @@ function UniverseWorkspace() {
   const secondaryEditorWrapperRef = useRef<View>(null);
 
   // App-level keyboard shortcuts
-  const appKeyRef = useRef<(e: KeyboardEvent) => void>(undefined);
-  appKeyRef.current = (e: KeyboardEvent) => {
-    if (e.metaKey && e.key === '\\') {
-      e.preventDefault();
+  const appKeyRef = useRef<(info: KeyInfo) => void>(undefined);
+  appKeyRef.current = (info: KeyInfo) => {
+    if (info.meta && info.key === '\\') {
+      info.prevent();
       setBinderOpen(!binderOpen);
       return;
     }
-    if (e.metaKey && (e.key === ';' || e.code === 'Semicolon')) {
-      e.preventDefault();
-      (document.activeElement as HTMLElement)?.blur?.();
+    if (info.meta && info.key === ';') {
+      info.prevent();
+      if (isWeb) {
+        (document.activeElement as HTMLElement)?.blur?.();
+      }
       setFocusedPanel((p) => {
         if (p === 'binder') return 'editor-left';
         if (p === 'editor-left') return secondaryEntityId ? 'editor-right' : 'binder';
@@ -124,17 +126,17 @@ function UniverseWorkspace() {
       });
       return;
     }
-    if (e.key === '/' && e.metaKey) {
-      e.preventDefault();
+    if (info.key === '/' && info.meta) {
+      info.prevent();
       setShortcutsOpen((v) => !v);
       return;
     }
-    if (e.key === 'Escape' && shortcutsOpen) {
-      e.preventDefault();
+    if (info.key === 'Escape' && shortcutsOpen) {
+      info.prevent();
       setShortcutsOpen(false);
     }
-    if (e.key === 'Enter' && e.shiftKey && focusedPanel === 'editor-right') {
-      e.preventDefault();
+    if (info.key === 'Enter' && info.shift && focusedPanel === 'editor-right') {
+      info.prevent();
       closeSecondaryEditor();
       setFocusedPanel('editor-left');
       return;
@@ -142,15 +144,15 @@ function UniverseWorkspace() {
   };
 
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    function onKeyDown(e: KeyboardEvent) { appKeyRef.current?.(e); }
+    if (!isWeb) return;
+    function onKeyDown(e: KeyboardEvent) { appKeyRef.current?.(fromWebEvent(e)); }
     document.addEventListener('keydown', onKeyDown, true);
     return () => document.removeEventListener('keydown', onKeyDown, true);
   }, []);
 
   // Click-to-focus panel detection (web only)
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
+    if (!isWeb) return;
     const binderEl = binderWrapperRef.current as unknown as HTMLElement;
     const editorEl = editorWrapperRef.current as unknown as HTMLElement;
     const secondaryEditorEl = secondaryEditorWrapperRef.current as unknown as HTMLElement;
@@ -247,6 +249,7 @@ function UniverseWorkspace() {
         {binderOpen ? (
           <View
             ref={binderWrapperRef}
+            onTouchStart={() => setFocusedPanel('binder')}
             style={{
               width: BINDER_WIDTH,
               borderRightWidth: 1,
@@ -284,6 +287,7 @@ function UniverseWorkspace() {
         {/* Editor */}
         <View
           ref={editorWrapperRef}
+          onTouchStart={() => setFocusedPanel('editor-left')}
           style={{
             flex: 1,
             borderTopWidth: 2,
@@ -304,7 +308,7 @@ function UniverseWorkspace() {
         {secondaryEntityId && (
           <>
             <View style={{ width: 1, backgroundColor: colors.border }} />
-            <View ref={secondaryEditorWrapperRef} style={{ flex: 1, borderTopWidth: 2, borderTopColor: focusedPanel === 'editor-right' ? colors.text : 'transparent' }}>
+            <View ref={secondaryEditorWrapperRef} onTouchStart={() => setFocusedPanel('editor-right')} style={{ flex: 1, borderTopWidth: 2, borderTopColor: focusedPanel === 'editor-right' ? colors.text : 'transparent' }}>
               <ErrorBoundary colors={colors} mono={mono}>
                 <Editor
                   entityId={secondaryEntityId}
