@@ -1,16 +1,16 @@
-# Task: Panel Map Preview + Inline Panel Sizing
+# Task: Fix Vertical Board Connectors
 
-**Status:** needs Claude review
-**Plan reference:** `.claude/plans/precious-churning-puppy.md`
+**Status:** ready for implementation
 
 ---
 
 ## Objective
 
-Add two connected features to the script editor:
+The vertical layout mode in `BoardView.tsx` has a connector rendering bug. When the tree forks (parent at one row, children at different rows), the horizontal trunk connecting fork positions is interrupted by empty card areas. The trunk line `───` renders inside a 7-char connector area but cannot bridge across the 22-char card area of intermediate empty cells, leaving visible gaps.
 
-1. **Inline panel sizing** — writers type a size keyword on a panel element (e.g., "sp" → SPLASH), confirmed with Enter. The size is stored on the element and displayed as a tag.
-2. **Panel map preview** — a right-side overlay that renders proportional ASCII page grids showing how panels fill each page. Updates live as the script is edited.
+The current approach uses a single `renderCell` function with a rotation flag that swaps connector directions. This does not work because the connector system was designed for horizontal layout — vertical pipes (`│`) stack across rows (outer loop iterations) to form continuous lines, but horizontal dashes (`───`) within a single row's connector areas are separated by card-width gaps.
+
+**Fix:** Replace the rotation approach with a dedicated vertical grid-building path inside `gridLines`. The horizontal path stays as-is. The vertical path builds the grid differently so that fork connections render correctly.
 
 ---
 
@@ -18,526 +18,116 @@ Add two connected features to the script editor:
 
 | File | Action |
 |------|--------|
-| `apps/mobile/components/ScriptView.tsx` | Modify — extend ScriptElement, add size input UX |
-| `apps/mobile/components/PanelMapPreview.tsx` | **Create** — ASCII proportional page grid renderer |
-| `apps/mobile/components/Editor.tsx` | Modify — add `onScriptElements` callback prop |
-| `apps/mobile/app/universe/[id].tsx` | Modify — add preview toggle, overlay, shortcut, top-bar button |
+| `apps/mobile/components/BoardView.tsx` | Modify — replace vertical grid rendering |
 
 ## Files NOT to Touch
 
-- `apps/api/` — no backend changes
-- `apps/mobile/context/UniverseContext.tsx` — no context changes needed
-- `apps/mobile/components/TimelineView.tsx`
-- `apps/mobile/components/Binder.tsx`
-- Drizzle schema — no migration
-- `documents/CONCEPT.md` — Claude updates this after review
+- `apps/mobile/app/universe/[id].tsx` — already updated, do not modify
+- `documents/CONCEPT.md` — Claude updates after review
+- Everything else
 
 ---
 
-## Detailed Spec
+## Relevant Context
 
-### 1. ScriptView.tsx — Panel Sizing
+### Current grid structure (horizontal mode — works correctly)
 
-#### Data model
+- **Outer loop:** `rows` (vertical axis — fork positions)
+- **Inner loop:** `cols` (horizontal axis — tree depth)
+- Each cell = `CONNECTOR_WIDTH` (7) chars + card area (`INNER_WIDTH + 2` = 22 chars)
+- Connector area sits LEFT of each card
+- Vertical trunk (`│`) in connector area stacks across outer loop iterations (different rows) at the same character column → continuous vertical line
+- Horizontal branches (`───`) on center line connect junction to card
 
-Add to the existing exports:
+### What vertical mode needs
 
-```typescript
-export type PanelSize = 'splash' | 'half' | 'wide' | 'small';
-```
+- **Outer loop:** `cols` (vertical axis — tree depth flows top to bottom)
+- **Inner loop:** `rows` (horizontal axis — forks spread left to right)
+- Fork connections must span horizontally across multiple inner positions
+- The trunk connecting fork positions must be a continuous horizontal line
 
-Extend `ScriptElement`:
+### The core problem
 
-```typescript
-export interface ScriptElement {
-  id: string;
-  type: ScriptElementType;
-  text: string;
-  size?: PanelSize;  // only meaningful when type === 'panel'
-}
-```
+In horizontal mode, the outer loop handles the fork dimension. Each connector's vertical pipe at the same `col` position in successive rows creates a continuous vertical line because they share the same character column.
 
-This is backward compatible. Existing saved scripts have no `size` field — `undefined` means "standard" (equal distribution). No migration needed. `JSON.parse` of old data just produces objects without the field.
+In vertical mode, the fork dimension is the inner loop. Adjacent cells in the inner loop are side by side with card areas between them. A connector's horizontal dash in cell N can't reach cell N+1 because the card area of cell N (22 chars of space) sits between them.
 
-#### Size keyword matching
+---
 
-```typescript
-const SIZE_KEYWORDS: { prefix: string; size: PanelSize }[] = [
-  { prefix: 'splash', size: 'splash' },
-  { prefix: 'half', size: 'half' },
-  { prefix: 'wide', size: 'wide' },
-  { prefix: 'small', size: 'small' },
-];
+## Approach: Vertical connector spans through card areas
 
-function matchSizeKeyword(input: string): PanelSize | null {
-  const lower = input.trim().toLowerCase();
-  if (lower.length < 1) return null;
-  // Single character: only allow unambiguous matches (h, w)
-  // 's' is ambiguous (splash/small), require 2+ chars
-  if (lower === 's') return null;
-  const matches = SIZE_KEYWORDS.filter(k => k.prefix.startsWith(lower));
-  return matches.length === 1 ? matches[0].size : null;
-}
-```
+In vertical mode, connectors between fork positions need to pass through the card areas of intermediate empty cells. When a cell has no beat but is part of a fork span, its card area should show the horizontal trunk line (`─` characters at the center line position) instead of blank space.
 
-#### Enter handler modification
+### Implementation
 
-In the existing Enter handler (`handleKeyRef.current`), modify the `panel` case for non-empty text. **Before** the existing `addElement(focusedIndex, 'scene')` line, check for a size keyword match:
+Inside the `gridLines` useMemo, keep the existing `renderCell` function for horizontal mode but remove the rotation logic. Add a separate vertical rendering path:
 
-```typescript
-// Existing code path: currentText !== '' && currentElement.type === 'panel'
-} else if (currentElement.type === 'panel') {
-  // NEW: check if text matches a size keyword
-  const sizeMatch = matchSizeKeyword(currentText);
-  if (sizeMatch) {
-    updateElement(focusedIndex, { size: sizeMatch, text: '' });
-    addElement(focusedIndex, 'scene');
-  } else {
-    addElement(focusedIndex, 'scene');
-  }
-```
+1. **Compute a vertical connector map.** Before building text lines, scan all beats to determine which (col, row) positions need horizontal pass-through lines. For each col that has fork connections (children at different rows from their parent):
+   - Identify the row span (min fork row to max fork row)
+   - Every (col, row) position in that span that has NO beat card should render a horizontal pass-through line at the center line position
 
-Also handle the empty-text Enter path for panels with a size already set. Currently, empty panel + Enter → replaces with page. If a panel has a `size` set and text is empty, Enter should still advance to scene (the size is the meaningful content):
+2. **Build vertical grid lines.** Outer loop = `cols`, inner loop = `rows`. For each cell:
+   - **Connector area (7 chars):** In vertical mode, the connector sits LEFT of the card just like horizontal mode. But now it shows connections between the current depth and the previous depth:
+     - `hasUp`: this cell's beat has a parent at col-1 (previous depth, above)
+     - `hasDown`: not used in the connector area for vertical (depth connections go up, not down in the connector)
+     - For vertical mode, the connector area should show a vertical pipe going up if the beat has a parent at a different row, and horizontal dashes if it's part of the fork span at the parent's depth
+   - **Card area (22 chars):** If the cell has a beat, render the card normally. If the cell has no beat but is in a fork span, render horizontal `─` pass-through at the center line
 
-```typescript
-// In the empty-text Enter branch:
-} else if (currentElement.type === 'panel') {
-  if (currentElement.size) {
-    // Panel has a size — treat as non-empty, advance to scene
-    addElement(focusedIndex, 'scene');
-  } else {
-    replaceElement(focusedIndex, 'page');  // existing behavior
-  }
-```
+3. **Vertical connector between depth levels.** Between each depth level (between outer loop iterations), render connector rows. These rows show vertical pipes (`│`) dropping from parent cards down to child cards. For each row position:
+   - If a beat at (col+1, row) has a parent at (col, parentRow), show a vertical pipe at this row position
 
-#### Backspace handler modification
+### Simpler alternative: connector rows between depth bands
 
-Currently: Backspace on empty element → delete element. New: if the panel has a `size` set and text is empty, clear the size first instead of deleting:
+Instead of trying to embed connectors in the card area, add explicit connector rows between depth bands:
 
-```typescript
-// Backspace on empty element
-if (info.key === 'Backspace' && currentElement.text.trim() === '' && elements.length > 1) {
-  info.prevent();
-  // NEW: if panel has size, clear size first
-  if (currentElement.type === 'panel' && currentElement.size) {
-    updateElement(focusedIndex, { size: undefined });
-    return;
-  }
-  deleteElement(focusedIndex);
-  return;
-}
-```
+- For each depth transition (col N to col N+1), insert `CONNECTOR_HEIGHT` text lines between the card bands
+- These connector lines use the full width of the inner axis
+- Each position in the connector line either shows `│` (vertical pipe dropping from parent to child), `─` (horizontal trunk spanning fork positions), or a junction character
+- This avoids modifying card rendering at all — cards are always `[connector][card]` horizontally, and connector rows handle depth-to-depth connections vertically
 
-#### Render changes — size tag and suggestion
+**Use this simpler approach.** It separates concerns cleanly: horizontal cell layout handles fork-position arrangement, vertical connector rows handle depth connections.
 
-On panel rows, between the prefix `<Text>` ("Panel N") and the `<TextInput>`, add:
+### Detailed structure for the simpler approach
 
-1. **Size tag** when `el.size` is set:
-```tsx
-{el.type === 'panel' && el.size && (
-  <Text style={{ fontFamily: mono, fontSize: 10, color: colors.muted, marginRight: 6 }}>
-    [{el.size.toUpperCase()}]
-  </Text>
-)}
-```
-
-2. **Trailing suggestion** after the `<TextInput>`, when the current text is a prefix of a size keyword:
-```tsx
-{el.type === 'panel' && !el.size && focusedIndex === i && (() => {
-  const match = matchSizeKeyword(el.text);
-  return match ? (
-    <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted, opacity: 0.5 }}>
-      {match.toUpperCase()}
-    </Text>
-  ) : null;
-})()}
-```
-
-Note: only show the suggestion on the focused panel row that doesn't already have a size. The suggestion is just a label — no interaction, purely visual hint.
-
-#### Overflow indicator
-
-Compute page overflow alongside the existing `computeNumbering` function. Add a new function:
-
-```typescript
-const SIZE_BUDGET: Record<PanelSize, number> = {
-  splash: 1.0, half: 0.5, wide: 0.33, small: 0.15,
-};
-
-function computePageOverflows(elements: ScriptElement[]): Set<number> {
-  // Returns a set of page numbers (1-based) that overflow
-  const overflows = new Set<number>();
-  let pageNum = 0;
-  let panels: ScriptElement[] = [];
-
-  function checkPage() {
-    if (panels.length === 0) return;
-    const explicit = panels.filter(p => p.size);
-    const implicit = panels.filter(p => !p.size);
-    const explicitTotal = explicit.reduce((sum, p) => sum + SIZE_BUDGET[p.size!], 0);
-    const implicitEach = implicit.length > 0
-      ? (explicit.length === 0 ? 1.0 / panels.length : Math.max(0, (1.0 - explicitTotal) / implicit.length))
-      : 0;
-    const total = explicitTotal + implicit.length * implicitEach;
-    if (total > 1.05) overflows.add(pageNum);
-  }
-
-  for (const el of elements) {
-    if (el.type === 'page') {
-      checkPage();
-      pageNum++;
-      panels = [];
-    } else if (el.type === 'panel') {
-      panels.push(el);
-    }
-  }
-  checkPage();
-  return overflows;
-}
-```
-
-Call this with `useMemo` alongside `computeNumbering`. On panel rows belonging to overflowing pages, show a `[!]` indicator:
-
-```tsx
-{el.type === 'panel' && overflows.has(numbering.get(i)?.pageNum ?? 0) && (
-  <Text style={{ fontFamily: mono, fontSize: 10, color: colors.error, marginLeft: 4 }}>[!]</Text>
-)}
-```
-
-### 2. PanelMapPreview.tsx — New Component
-
-Create `apps/mobile/components/PanelMapPreview.tsx`.
-
-#### Props
-
-```typescript
-import { type ScriptElement, type PanelSize } from './ScriptView';
-
-interface PanelMapPreviewProps {
-  elements: ScriptElement[];
-}
-```
-
-#### Page extraction
-
-Walk the elements array. Each `type === 'page'` starts a new page. Subsequent `type === 'panel'` elements belong to that page. Non-page/panel elements are ignored.
-
-```typescript
-interface PageData {
-  pageNum: number;
-  panels: { panelNum: number; size?: PanelSize; text: string }[];
-}
-
-function extractPages(elements: ScriptElement[]): PageData[] { ... }
-```
-
-#### Budget computation and row height allocation
-
-Constants:
-```typescript
-const PAGE_ROWS = 24;
-const INNER_W = 28;
-const MIN_ROWS = 2;
-
-const SIZE_BUDGET: Record<PanelSize, number> = {
-  splash: 1.0, half: 0.5, wide: 0.33, small: 0.15,
-};
-```
-
-For each page:
-1. Panels with explicit sizes claim their budget fraction
-2. Panels without sizes split the remaining space equally
-3. If all panels have no size, each gets `1.0 / panelCount`
-4. Convert fractions to row counts: `Math.max(MIN_ROWS, Math.round(fraction * PAGE_ROWS))`
-5. Adjust rounding error by adding/subtracting from the tallest panel
-6. Flag overflow if total budget > 1.05 (5% tolerance for rounding)
-
-#### ASCII grid rendering
-
-Build a string for each page using box-drawing characters. The grid must be **proportional** — panel heights reflect their budget fraction. This is the core of the feature.
+For vertical mode, the grid alternates between **card bands** and **connector bands**:
 
 ```
-Page 1
-┌────────────────────────────┐
-│                            │
-│        Panel 1             │  (height proportional to budget)
-│        [HALF]              │
-│                            │
-│                            │
-│                            │
-├────────────────────────────┤
-│        Panel 2             │
-│                            │
-├────────────────────────────┤
-│        Panel 3             │
-│                            │
-└────────────────────────────┘
+[card band for col 0]        ← inner loop across rows, each cell = [empty connector area][card or empty]
+[connector band col 0→1]     ← CONNECTOR_HEIGHT lines showing vertical pipes and horizontal fork trunks
+[card band for col 1]        ← inner loop across rows
+[connector band col 1→2]     ← ...
+[card band for col 2]
+...
 ```
 
-Rendering rules:
-- First panel top: `┌` + `─` * INNER_W + `┐`
-- Panel separator: `├` + `─` * INNER_W + `┤`
-- Last panel bottom: `└` + `─` * INNER_W + `┘`
-- Interior rows: `│` + ` ` * INNER_W + `│`
-- Label row (centered in the panel's height): `│` + centered "Panel N [SIZE]" + `│`
-- For single-panel splash pages, the label is centered in the full 24-row box
+**Card band** (same as current, no rotation): For each `lineIdx` in `0..cardLines+GAP_LINES`, loop across `rows`. Each cell renders with a blank 7-char connector area (no directional info needed since connections are in the connector bands) and the card box if a beat exists.
 
-#### Component rendering
+**Connector band** (new, `CONNECTOR_HEIGHT` lines, suggest 3): For each line in the band, loop across `rows`. At each row position:
+- Check if any beat at (nextCol, row) has a parent at (prevCol, parentRow) — meaning a vertical connection drops here
+- Check if this row is within the horizontal fork span for this col transition
+- Render: `│` for vertical drops, `─` for horizontal trunk, junction chars at intersections, spaces elsewhere
+- The connector band width per inner position should match `CELL_WIDTH` (connector area + card area = 29 chars) so everything aligns
 
-```tsx
-export default function PanelMapPreview({ elements }: PanelMapPreviewProps) {
-  const { colors, mono } = useTheme();
-  const pages = useMemo(() => extractPages(elements), [elements]);
-
-  return (
-    <ScrollView style={{ flex: 1, padding: 12 }}>
-      {pages.map((page, i) => {
-        const { lines, overflow } = renderPageGrid(page);
-        return (
-          <View key={i} style={{ marginBottom: 16 }}>
-            <Text style={{
-              fontFamily: mono,
-              fontSize: 10,
-              color: overflow ? colors.error : colors.muted,
-              marginBottom: 4,
-            }}>
-              Page {page.pageNum}{overflow ? '  OVER' : ''}
-            </Text>
-            <Text style={{
-              fontFamily: mono,
-              fontSize: 10,
-              lineHeight: 12,
-              color: overflow ? colors.error : colors.text,
-            }}>
-              {lines}
-            </Text>
-          </View>
-        );
-      })}
-    </ScrollView>
-  );
-}
-```
-
-Use `useTheme()` from `../context/ThemeContext`. NativeWind `className` where possible, inline styles for the monospace Text art.
-
-### 3. Editor.tsx — Callback Prop
-
-Add to `EditorProps`:
-
-```typescript
-interface EditorProps {
-  entityId: string;
-  isFocused: boolean;
-  autoFocusName?: boolean;
-  onAutoFocusDone?: () => void;
-  onSaveStateChange?: (state: 'saved' | 'saving') => void;
-  onScriptElements?: (elements: ScriptElement[]) => void;  // NEW
-}
-```
-
-Add a ref to keep the callback current (same pattern as `onSaveStateChangeRef`):
-
-```typescript
-const onScriptElementsRef = useRef(onScriptElements);
-onScriptElementsRef.current = onScriptElements;
-```
-
-Add a useEffect that fires the callback when scriptElements changes:
-
-```typescript
-useEffect(() => {
-  if (entityType === 'script') {
-    onScriptElementsRef.current?.(scriptElements);
-  } else {
-    onScriptElementsRef.current?.([]);
-  }
-}, [entityType, scriptElements]);
-```
-
-### 4. [id].tsx — Preview Toggle and Integration
-
-#### State
-
-```typescript
-const [panelMapOpen, setPanelMapOpen] = useState(false);
-const [scriptElements, setScriptElements] = useState<ScriptElement[]>([]);
-```
-
-Import `PanelMapPreview` from `../../components/PanelMapPreview` and `ScriptElement` from `../../components/ScriptView`.
-
-#### PrimaryContent changes
-
-Add `onScriptElements` prop to `PrimaryContent` and forward to `Editor`:
-
-```typescript
-function PrimaryContent({
-  justCreatedId,
-  onAutoFocusDone,
-  onSaveStateChange,
-  isFocused,
-  onScriptElements,  // NEW
-}: {
-  ...existing props...
-  onScriptElements?: (elements: ScriptElement[]) => void;  // NEW
-}) {
-  ...
-  return (
-    <Editor
-      entityId={activeEntityId}
-      ...existing props...
-      onScriptElements={onScriptElements}  // NEW
-    />
-  );
-}
-```
-
-Pass from `UniverseWorkspace`:
-
-```tsx
-<PrimaryContent
-  justCreatedId={justCreatedId}
-  onAutoFocusDone={() => setJustCreatedId(null)}
-  onSaveStateChange={setEditorSaveState}
-  isFocused={focusedPanel === 'editor-left'}
-  onScriptElements={setScriptElements}
-/>
-```
-
-#### Keyboard shortcut
-
-In `appKeyRef.current`, add before the existing Escape handler:
-
-```typescript
-// Cmd+Shift+P — toggle panel map
-if (info.meta && info.shift && info.key === 'p') {
-  info.prevent();
-  setPanelMapOpen(v => !v);
-  setShortcutsOpen(false);  // mutually exclusive
-  return;
-}
-```
-
-Modify the existing `Cmd+/` handler to close panel map:
-
-```typescript
-if (info.key === '/' && info.meta) {
-  info.prevent();
-  setShortcutsOpen(v => !v);
-  setPanelMapOpen(false);  // mutually exclusive
-  return;
-}
-```
-
-Add Escape handling for panel map (alongside existing shortcuts Escape):
-
-```typescript
-if (info.key === 'Escape' && panelMapOpen) {
-  info.prevent();
-  setPanelMapOpen(false);
-  return;
-}
-```
-
-#### Overlay rendering
-
-Add the panel map overlay **after** the existing shortcuts overlay (both absolute positioned, same z-index pattern). Same visual pattern as the shortcuts overlay:
-
-```tsx
-{panelMapOpen && scriptElements.length > 0 && (
-  <View style={{
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: 280,
-    backgroundColor: colors.bg,
-    borderLeftWidth: 1,
-    borderLeftColor: colors.border,
-    zIndex: 20,
-  }}>
-    <View style={{
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 12,
-      height: 36,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    }}>
-      <Text style={{ fontFamily: mono, fontSize: 12, color: colors.text, flex: 1 }}>panel map</Text>
-      <TouchableOpacity onPress={() => setPanelMapOpen(false)}>
-        <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>x</Text>
-      </TouchableOpacity>
-    </View>
-    <PanelMapPreview elements={scriptElements} />
-  </View>
-)}
-```
-
-#### Top bar button
-
-In the top bar area (near the `?` shortcuts button, around line 237-240 in [id].tsx), add a "map" toggle that only shows when scriptElements are present:
-
-```tsx
-{scriptElements.length > 0 && (
-  <TouchableOpacity onPress={() => { setPanelMapOpen(v => !v); setShortcutsOpen(false); }}>
-    <Text style={{ fontFamily: mono, fontSize: 11, color: panelMapOpen ? colors.text : colors.muted, marginRight: 12 }}>map</Text>
-  </TouchableOpacity>
-)}
-```
-
-#### Shortcut reference update
-
-Add to the SCRIPT section:
-
-```typescript
-['type size on panel', 'set panel size (splash/half/wide/small)'],
-```
-
-Add to the APP section:
-
-```typescript
-['Cmd+Shift+P', 'toggle panel map'],
-```
+The connector band doesn't use `connectorInfo` or `junctionChar` from the horizontal path. Write a new function `verticalConnectorChar(prevCol, row, lineIdx)` that computes what to draw.
 
 ---
 
 ## Constraints
 
-- NativeWind `className` for new component layout where possible
-- Monospace font from `useTheme()` (`mono` and `colors`)
-- No Skia, no canvas, no SVG — pure `<Text>` with box-drawing characters
-- The preview must be a **graphic** proportional representation, not a text summary. Panel heights must visually reflect their size fraction.
-- No new dependencies
-- Do not modify the Drizzle schema or API
-- Do not create new context providers
+- Do not change the horizontal rendering path. It works correctly.
+- Do not change the `BeatNode` data model or any mutation functions.
+- Do not change key handlers, mode switching, or scroll logic — those already work for both directions.
+- The `focusedOverlay` and `focusedHighlight` calculations need to account for the inserted connector bands in vertical mode (they add extra lines between depth levels, shifting card positions down).
+- `connectorInfo` and `junctionChar` remain available for horizontal mode. Write separate logic for vertical connector bands.
+- Keep `renderCell` as a shared helper for card rendering (borders, text wrapping, labels). Only the connector part differs.
+- `direction` state, `scrollToFocused`, and arrow key remapping already work — do not modify them.
 
 ## Acceptance Criteria
 
-1. Panel elements accept size keywords typed inline. "sp" + Enter sets size to SPLASH and advances to scene.
-2. Size tag `[SPLASH]` visible on panel row after size is set.
-3. Trailing suggestion text appears while typing a size prefix on a panel row.
-4. Backspace on empty panel with size clears the size before deleting the element.
-5. `Cmd+Shift+P` toggles a right-side overlay showing ASCII page grids.
-6. Page grids are proportional — a HALF panel visually takes ~half the page box height.
-7. Default (no sizes): panels divide page equally.
-8. Overflow pages flagged in preview (error color) and inline (`[!]` on panel rows).
-9. Preview updates live as script is edited.
-10. Mutually exclusive with shortcuts overlay.
-11. Shortcut reference updated with new entries.
-12. App compiles without errors (`npx expo start --clear` from `apps/mobile/`).
-
----
-
-## Completion Note (Codex)
-
-- Files changed:
-  - `apps/mobile/components/ScriptView.tsx`
-  - `apps/mobile/components/PanelMapPreview.tsx` (new)
-  - `apps/mobile/components/Editor.tsx`
-  - `apps/mobile/app/universe/[id].tsx`
-  - `documents/TASK.md`
-- Verification:
-  - `npx tsc --noEmit -p apps/mobile/tsconfig.json` passed.
-- Assumptions / open risks:
-  - The panel map receives script elements from the primary editor path; split-view secondary editor changes are intentionally not piped into the panel map state.
+1. Horizontal mode renders identically to before (no regression)
+2. Vertical mode: tree depth flows top to bottom, forks spread left to right
+3. Vertical mode: fork connections show continuous horizontal trunk lines with no gaps
+4. Vertical mode: vertical pipes connect parent cards to child cards across depth levels
+5. Vertical mode: junction characters are correct at intersections
+6. Focused beat highlight and TextInput overlay position correctly in vertical mode
+7. App compiles without errors (`npx tsc --noEmit -p apps/mobile/tsconfig.json`)

@@ -40,12 +40,14 @@ function PrimaryContent({
   onSaveStateChange,
   isFocused,
   onScriptElements,
+  onEntityType,
 }: {
   justCreatedId: string | null;
   onAutoFocusDone: () => void;
   onSaveStateChange: (state: 'saved' | 'saving') => void;
   isFocused: boolean;
   onScriptElements?: (elements: ScriptElement[]) => void;
+  onEntityType?: (type: string) => void;
 }) {
   const { activeEntityType, activeEntityId } = useUniverse();
 
@@ -64,6 +66,7 @@ function PrimaryContent({
         onAutoFocusDone={onAutoFocusDone}
         onSaveStateChange={onSaveStateChange}
         onScriptElements={onScriptElements}
+        onEntityType={onEntityType}
       />
     );
   }
@@ -126,7 +129,9 @@ function UniverseWorkspace() {
   const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
   const [editorSaveState, setEditorSaveState] = useState<'saved' | 'saving'>('saved');
   const [secondarySaveState, setSecondarySaveState] = useState<'saved' | 'saving'>('saved');
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState<false | 'contextual' | 'all'>(false);
+  const [primaryEditorType, setPrimaryEditorType] = useState<string | null>(null);
+  const [secondaryEditorType, setSecondaryEditorType] = useState<string | null>(null);
   const [panelMapOpen, setPanelMapOpen] = useState(false);
   const [scriptElements, setScriptElements] = useState<ScriptElement[]>([]);
   const [focusedPanel, setFocusedPanel] = useState<'binder' | 'editor-left' | 'editor-right'>('binder');
@@ -166,7 +171,7 @@ function UniverseWorkspace() {
     }
     if (info.key === '/' && info.meta) {
       info.prevent();
-      setShortcutsOpen((v) => !v);
+      setShortcutsOpen((v) => v === false ? 'contextual' : v === 'contextual' ? 'all' : false);
       setPanelMapOpen(false);
       return;
     }
@@ -175,13 +180,14 @@ function UniverseWorkspace() {
       setPanelMapOpen(false);
       return;
     }
-    if (info.key === 'Escape' && shortcutsOpen) {
+    if (info.key === 'Escape' && shortcutsOpen !== false) {
       info.prevent();
       setShortcutsOpen(false);
     }
     if (info.key === 'Enter' && info.shift && focusedPanel === 'editor-right') {
       info.prevent();
       closeSecondaryEditor();
+      setSecondaryEditorType(null);
       setFocusedPanel('editor-left');
       return;
     }
@@ -290,8 +296,8 @@ function UniverseWorkspace() {
             </Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity onPress={() => { setShortcutsOpen((v) => !v); setPanelMapOpen(false); }} style={{ marginLeft: 12 }}>
-          <Text style={{ fontFamily: mono, fontSize: 11, color: shortcutsOpen ? colors.text : colors.muted }}>?</Text>
+        <TouchableOpacity onPress={() => { setShortcutsOpen((v) => v === false ? 'contextual' : v === 'contextual' ? 'all' : false); setPanelMapOpen(false); }} style={{ marginLeft: 12 }}>
+          <Text style={{ fontFamily: mono, fontSize: 11, color: shortcutsOpen !== false ? colors.text : colors.muted }}>?</Text>
         </TouchableOpacity>
       </View>
 
@@ -352,6 +358,7 @@ function UniverseWorkspace() {
               onSaveStateChange={setEditorSaveState}
               isFocused={focusedPanel === 'editor-left'}
               onScriptElements={setScriptElements}
+              onEntityType={setPrimaryEditorType}
             />
           </ErrorBoundary>
         </View>
@@ -366,6 +373,7 @@ function UniverseWorkspace() {
                   entityId={secondaryEntityId}
                   isFocused={focusedPanel === 'editor-right'}
                   onSaveStateChange={setSecondarySaveState}
+                  onEntityType={setSecondaryEditorType}
                 />
               </ErrorBoundary>
             </View>
@@ -373,7 +381,17 @@ function UniverseWorkspace() {
         )}
 
         {/* Shortcut reference overlay */}
-        {shortcutsOpen && (
+        {shortcutsOpen !== false && (() => {
+          const activeTypes = new Set<string>();
+          if (primaryEditorType) activeTypes.add(primaryEditorType);
+          if (secondaryEditorType) activeTypes.add(secondaryEditorType);
+          const showAll = shortcutsOpen === 'all';
+          const showTimeline = showAll || activeTypes.has('timeline');
+          const showScript = showAll || activeTypes.has('script');
+          const showBoard = showAll || activeTypes.has('board');
+          const showEditor = showAll || activeTypes.size > 0;
+
+          return (
           <View style={{
             position: 'absolute',
             right: 0,
@@ -386,7 +404,14 @@ function UniverseWorkspace() {
             zIndex: 20,
           }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, height: 36, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-              <Text style={{ fontFamily: mono, fontSize: 12, color: colors.text, flex: 1 }}>shortcuts</Text>
+              <Text style={{ fontFamily: mono, fontSize: 12, color: colors.text, flex: 1 }}>
+                {showAll ? 'all shortcuts' : 'shortcuts'}
+              </Text>
+              <TouchableOpacity onPress={() => setShortcutsOpen((v) => v === 'contextual' ? 'all' : 'contextual')} style={{ marginRight: 12 }}>
+                <Text style={{ fontFamily: mono, fontSize: 11, color: colors.muted }}>
+                  {showAll ? 'less' : 'all'}
+                </Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => setShortcutsOpen(false)}>
                 <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>x</Text>
               </TouchableOpacity>
@@ -406,12 +431,15 @@ function UniverseWorkspace() {
                 ['F2', 'rename'],
                 ['Backspace', 'delete (y/n)'],
               ]} />
+              {showEditor && (
               <ShortcutSection mono={mono} colors={colors} title="EDITOR" items={[
                 ['ArrowUp', 'name (from top of text)'],
                 ['Enter', 'text (from name)'],
                 ['Shift+Enter', 'close split (right editor)'],
                 ['Escape', 'blur editor'],
               ]} />
+              )}
+              {showTimeline && (
               <ShortcutSection mono={mono} colors={colors} title="TIMELINE" items={[
                 ['Tab / Shift+Tab', 'cycle fields'],
                 ['Enter', 'next event'],
@@ -423,6 +451,8 @@ function UniverseWorkspace() {
                 ['Delete (spine)', 'delete event'],
                 ['Escape', 'exit spine / blur'],
               ]} />
+              )}
+              {showScript && (
               <ShortcutSection mono={mono} colors={colors} title="SCRIPT" items={[
                 ['Left/Right (panel)', 'cycle panel size'],
                 ['Enter', 'next element (context-aware)'],
@@ -435,16 +465,33 @@ function UniverseWorkspace() {
                 ['ArrowUp (from top)', 'name input'],
                 ['Escape', 'blur'],
               ]} />
+              )}
+              {showBoard && (
+              <ShortcutSection mono={mono} colors={colors} title="BOARD" items={[
+                ['` (backtick)', 'overview mode'],
+                ['Enter (overview)', 'edit mode'],
+                ['V (overview)', 'toggle horizontal / vertical'],
+                ['B (overview)', 'toggle beat labels'],
+                ['Enter', 'next beat (create if none)'],
+                ['Cmd+Arrow', 'navigate (parent / child / forks)'],
+                ['Cmd+Shift+Arrow', 'create outcome'],
+                ['Alt+Arrow', 'jump 5 beats'],
+                ['Tab', 'fork alternate timeline'],
+                ['Backspace (empty)', 'delete beat'],
+                ['Shift+Tab', 'delete thread (single beat)'],
+              ]} />
+              )}
               <ShortcutSection mono={mono} colors={colors} title="APP" items={[
                 ['Cmd+;', 'cycle panels', () => cyclePanels()],
                 ['Cmd+Shift+P', 'toggle panel map', () => { setPanelMapOpen(v => !v); setShortcutsOpen(false); }],
                 ['Cmd+\\', 'toggle binder', () => setBinderOpen(!binderOpen)],
                 ['dark/light', 'toggle theme', () => toggle()],
-                ['Cmd+/', 'this panel'],
+                ['Cmd+/', 'this panel (again for all)'],
               ]} />
             </ScrollView>
           </View>
-        )}
+          );
+        })()}
 
         {panelMapOpen && scriptElements.length > 0 && (
           <View

@@ -52,6 +52,7 @@ export const entityTypeEnum = pgEnum('entity_type', [
   'folder',
   'timeline',
   'script',
+  'board',
 ]);
 
 export const pageStatusEnum = pgEnum('page_status', [

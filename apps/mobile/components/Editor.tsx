@@ -13,6 +13,7 @@ import { useTheme } from '../context/ThemeContext';
 import { fromNativeEvent, fromWebEvent, isWeb, type KeyInfo } from '../lib/keyboard';
 import TimelineView, { type TimelineEvent } from './TimelineView';
 import ScriptView, { type ScriptElement, generateId } from './ScriptView';
+import BoardView, { type BeatNode } from './BoardView';
 type SaveState = 'saved' | 'saving' | 'error';
 
 interface EditorProps {
@@ -22,6 +23,7 @@ interface EditorProps {
   onAutoFocusDone?: () => void;
   onSaveStateChange?: (state: 'saved' | 'saving') => void;
   onScriptElements?: (elements: ScriptElement[]) => void;
+  onEntityType?: (type: ApiEntity['type']) => void;
 }
 
 function entityTypeLabel(type: ApiEntity['type']): string {
@@ -31,6 +33,7 @@ function entityTypeLabel(type: ApiEntity['type']): string {
   if (type === 'folder') return 'folder';
   if (type === 'timeline') return 'timeline';
   if (type === 'script') return 'script';
+  if (type === 'board') return 'board';
   return 'note';
 }
 
@@ -136,6 +139,7 @@ export default function Editor({
   onAutoFocusDone,
   onSaveStateChange,
   onScriptElements,
+  onEntityType,
 }: EditorProps) {
   const { updateEntityName, deleteEntity } = useUniverse();
   const { colors, mono } = useTheme();
@@ -145,6 +149,7 @@ export default function Editor({
   const [text, setText] = useState('');
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [scriptElements, setScriptElements] = useState<ScriptElement[]>([]);
+  const [beats, setBeats] = useState<BeatNode[]>([]);
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -156,9 +161,13 @@ export default function Editor({
   const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scriptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const beatsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scriptFirstInputRef = useRef<TextInput>(null);
+  const boardFirstInputRef = useRef<TextInput>(null);
   const latestScriptRef = useRef<string>('[]');
   const savedScriptRef = useRef<string>('[]');
+  const latestBeatsRef = useRef<string>('[]');
+  const savedBeatsRef = useRef<string>('[]');
   const eventsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(0);
   const latestNameRef = useRef('');
@@ -189,7 +198,7 @@ export default function Editor({
   }
 
   function hasPending() {
-    return !!(titleTimerRef.current || textTimerRef.current || eventsTimerRef.current || scriptTimerRef.current || inFlightRef.current > 0);
+    return !!(titleTimerRef.current || textTimerRef.current || eventsTimerRef.current || scriptTimerRef.current || beatsTimerRef.current || inFlightRef.current > 0);
   }
 
   async function runSave(task: () => Promise<void>) {
@@ -214,10 +223,12 @@ export default function Editor({
     if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
     if (textTimerRef.current) clearTimeout(textTimerRef.current);
     if (scriptTimerRef.current) clearTimeout(scriptTimerRef.current);
+    if (beatsTimerRef.current) clearTimeout(beatsTimerRef.current);
     if (eventsTimerRef.current) clearTimeout(eventsTimerRef.current);
     titleTimerRef.current = null;
     textTimerRef.current = null;
     scriptTimerRef.current = null;
+    beatsTimerRef.current = null;
     eventsTimerRef.current = null;
     inFlightRef.current = 0;
     setSaveState('saved');
@@ -229,7 +240,9 @@ export default function Editor({
       .then((entryRes) => {
         if (cancelled) return;
         setName(entryRes.data.name);
-        setEntityType(entryRes.data.type as ApiEntity['type']);
+        const resolvedType = entryRes.data.type as ApiEntity['type'];
+        setEntityType(resolvedType);
+        onEntityType?.(resolvedType);
         latestNameRef.current = entryRes.data.name;
         savedNameRef.current = entryRes.data.name;
 
@@ -253,6 +266,16 @@ export default function Editor({
           setScriptElements(parsed);
           latestScriptRef.current = JSON.stringify(parsed);
           savedScriptRef.current = content || '[]';
+        } else if (entryRes.data.type === 'board') {
+          let parsed: BeatNode[] = [];
+          try { parsed = JSON.parse(content); } catch { parsed = []; }
+          if (!Array.isArray(parsed)) parsed = [];
+          if (parsed.length === 0) {
+            parsed = [{ id: generateId(), text: '', col: 0, row: 0, parentId: null, relation: 'sequence', children: [] }];
+          }
+          setBeats(parsed);
+          latestBeatsRef.current = JSON.stringify(parsed);
+          savedBeatsRef.current = content || '[]';
         } else {
           setText(content);
           latestTextRef.current = content;
@@ -275,6 +298,7 @@ export default function Editor({
       if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
       if (textTimerRef.current) clearTimeout(textTimerRef.current);
       if (scriptTimerRef.current) clearTimeout(scriptTimerRef.current);
+      if (beatsTimerRef.current) clearTimeout(beatsTimerRef.current);
       if (eventsTimerRef.current) clearTimeout(eventsTimerRef.current);
     };
   }, [entityId]);
@@ -364,6 +388,27 @@ export default function Editor({
     return () => { if (scriptTimerRef.current) { clearTimeout(scriptTimerRef.current); scriptTimerRef.current = null; } };
   }, [entityId, entityType, scriptElements]);
 
+  // ── Board auto-save ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (entityType !== 'board') return;
+    const serialized = JSON.stringify(beats);
+    latestBeatsRef.current = serialized;
+    if (!hydratedRef.current) return;
+    if (beatsTimerRef.current) clearTimeout(beatsTimerRef.current);
+    if (serialized === savedBeatsRef.current) return;
+
+    notifySaveState('saving');
+    beatsTimerRef.current = setTimeout(() => {
+      beatsTimerRef.current = null;
+      runSave(async () => {
+        await api.entities.updateContent(entityId, latestBeatsRef.current);
+        savedBeatsRef.current = latestBeatsRef.current;
+      });
+    }, 600);
+
+    return () => { if (beatsTimerRef.current) { clearTimeout(beatsTimerRef.current); beatsTimerRef.current = null; } };
+  }, [entityId, entityType, beats]);
+
   useEffect(() => {
     if (entityType === 'script') {
       onScriptElementsRef.current?.(scriptElements);
@@ -375,7 +420,7 @@ export default function Editor({
   // ── Auto-focus when panel becomes active ────────────────────────────
 
   useEffect(() => {
-    if (isFocused && hydratedRef.current && entityType !== 'timeline' && entityType !== 'script') {
+    if (isFocused && hydratedRef.current && entityType !== 'timeline' && entityType !== 'script' && entityType !== 'board') {
       textInputRef.current?.focus();
     }
   }, [isFocused, entityType]);
@@ -385,7 +430,7 @@ export default function Editor({
   const keyRef = useRef<(info: KeyInfo) => void>(undefined);
   keyRef.current = (info: KeyInfo) => {
     if (!isFocused) return;
-    if (entityType === 'timeline' || entityType === 'script') return;  // TimelineView and ScriptView have their own handlers
+    if (entityType === 'timeline' || entityType === 'script' || entityType === 'board') return;  // Specialized views have their own handlers
 
     if (info.key === 'Escape') {
       info.prevent();
@@ -437,6 +482,8 @@ export default function Editor({
           onSubmitEditing={() => {
             if (entityType === 'script' || entityType === 'timeline') {
               scriptFirstInputRef.current?.focus();
+            } else if (entityType === 'board') {
+              boardFirstInputRef.current?.focus();
             } else {
               textInputRef.current?.focus();
             }
@@ -450,11 +497,6 @@ export default function Editor({
       </View>
 
       <View style={{ height: 1, backgroundColor: colors.border }} />
-
-      {/* Save state */}
-      <Text style={{ fontFamily: mono, fontSize: 11, color: saveState === 'error' ? colors.error : colors.muted, position: 'absolute', top: 8, right: 16, zIndex: 10 }}>
-        {saveState === 'saved' ? 'saved' : saveState === 'saving' ? 'saving...' : 'save failed'}
-      </Text>
 
       {/* Body */}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
@@ -472,6 +514,14 @@ export default function Editor({
             isFocused={isFocused}
             nameInputRef={nameInputRef}
             firstInputRef={scriptFirstInputRef}
+          />
+        ) : entityType === 'board' ? (
+          <BoardView
+            beats={beats}
+            onBeatsChange={setBeats}
+            isFocused={isFocused}
+            nameInputRef={nameInputRef}
+            firstInputRef={boardFirstInputRef}
           />
         ) : (
           <TextInput

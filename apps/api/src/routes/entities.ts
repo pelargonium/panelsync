@@ -124,7 +124,7 @@ export async function entityRoutes(server: FastifyInstance) {
     },
   );
 
-  server.post<{ Params: { universeId: string }; Body: { name: string; type: 'character' | 'location' | 'note' | 'group' | 'folder' | 'bible' | 'timeline' | 'script' } }>(
+  server.post<{ Params: { universeId: string }; Body: { name: string; type: 'character' | 'location' | 'note' | 'group' | 'folder' | 'bible' | 'timeline' | 'script' | 'board' } }>(
     '/universes/:universeId/entities',
     async (request, reply) => {
       try {
@@ -253,7 +253,7 @@ export async function entityRoutes(server: FastifyInstance) {
     },
   );
 
-  server.patch<{ Params: { id: string }; Body: { name?: string; type?: 'character' | 'location' | 'note' | 'group' | 'folder' | 'bible' | 'timeline' | 'script'; color?: string; position?: number | null } }>(
+  server.patch<{ Params: { id: string }; Body: { name?: string; type?: 'character' | 'location' | 'note' | 'group' | 'folder' | 'bible' | 'timeline' | 'script' | 'board'; color?: string; position?: number | null } }>(
     '/entities/:id',
     async (request, reply) => {
       const { id } = request.params;
@@ -380,20 +380,21 @@ export async function entityRoutes(server: FastifyInstance) {
       const userId = request.user.sub;
 
       const groupResult = await getEntryForAccess(groupId, userId);
+      console.log('[members POST] groupId=%s type=%s characterId=%s', groupId, 'error' in groupResult ? 'ERR' : groupResult.entry.type, characterId);
       if ('error' in groupResult) {
         reply.code(groupResult.error === 'not found' ? 404 : 403);
         return { error: groupResult.error };
       }
 
-      if (groupResult.entry.type !== 'group') {
+      if (groupResult.entry.type !== 'group' && groupResult.entry.type !== 'folder') {
         reply.code(400);
-        return { error: 'group entry required' };
+        return { error: 'group or folder entry required' };
       }
 
-      const [character] = await db.select().from(entities).where(eq(entities.id, characterId)).limit(1);
-      if (!character || character.type !== 'character' || character.universeId !== groupResult.entry.universeId) {
+      const [member] = await db.select().from(entities).where(eq(entities.id, characterId)).limit(1);
+      if (!member || member.universeId !== groupResult.entry.universeId) {
         reply.code(400);
-        return { error: 'character entry required' };
+        return { error: 'entity not found in this universe' };
       }
 
       const [existing] = await db

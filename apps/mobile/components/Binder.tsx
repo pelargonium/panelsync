@@ -14,6 +14,7 @@ const TYPE_SECTIONS: Array<{ type: EntityType; label: string }> = [
   { type: 'group', label: 'Groups' },
   { type: 'timeline', label: 'Timelines' },
   { type: 'script', label: 'Scripts' },
+  { type: 'board', label: 'Boards' },
 ];
 
 const ROW_HEIGHT = 44;
@@ -26,6 +27,7 @@ const CREATE_OPTIONS: Array<{ type: EntityType; label: string }> = [
   { type: 'folder', label: 'folder' },
   { type: 'timeline', label: 'timeline' },
   { type: 'script', label: 'script' },
+  { type: 'board', label: 'board' },
 ];
 
 function typeLabel(type: string): string {
@@ -36,6 +38,7 @@ function typeLabel(type: string): string {
   if (type === 'folder') return 'F';
   if (type === 'script') return 'S';
   if (type === 'timeline') return 'T';
+  if (type === 'board') return 'B';
   return '?';
 }
 
@@ -289,8 +292,10 @@ function BinderFolderRow({
         backgroundColor: isDropTarget ? colors.selection : isSelected ? colors.selection : isActive ? colors.selection : 'transparent',
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
-        borderLeftWidth: isFocused ? 2 : 0,
-        borderLeftColor: isFocused ? colors.text : 'transparent',
+        borderLeftWidth: isFocused ? 2 : isDropTarget ? 2 : 0,
+        borderLeftColor: isFocused ? colors.text : isDropTarget ? colors.text : 'transparent',
+        borderRightWidth: isDropTarget ? 2 : 0,
+        borderRightColor: isDropTarget ? colors.text : 'transparent',
       }}>
         <TouchableOpacity onPress={onToggle} hitSlop={8} style={{ width: 16 }}>
           <Text style={{ fontFamily: mono, fontSize: 11, color: colors.muted }}>
@@ -631,7 +636,7 @@ export default function Binder({
       autoScrollRef.current = null;
     }
 
-    const yInScrollView = relativeY + scrollOffsetRef.current;
+    const yInScrollView = (relativeY - 16) + scrollOffsetRef.current;
     const rowIndex = Math.floor(yInScrollView / ROW_HEIGHT);
     const rowOffset = yInScrollView % ROW_HEIGHT;
 
@@ -639,11 +644,13 @@ export default function Binder({
 
     if (rowIndex >= 0 && rowIndex < navItems.length) {
       const targetItem = navItems[rowIndex];
-      if (rowOffset < 8) {
+      const isContainer = targetItem.kind === 'folder' || targetItem.kind === 'group';
+      const edgeZone = isContainer ? 3 : 8;
+      if (rowOffset < edgeZone) {
         dropTarget = { type: 'between', index: rowIndex };
-      } else if (rowOffset > ROW_HEIGHT - 8) {
+      } else if (rowOffset > ROW_HEIGHT - edgeZone) {
         dropTarget = { type: 'between', index: rowIndex + 1 };
-      } else if (targetItem.kind === 'folder' || targetItem.kind === 'group') {
+      } else if (isContainer) {
         dropTarget = { type: 'onto', id: targetItem.id };
       } else {
         dropTarget = { type: 'between', index: rowIndex + 1 };
@@ -653,16 +660,6 @@ export default function Binder({
     }
 
     if (dropTarget?.type === 'onto') {
-      const ontoId = dropTarget.id;
-      const targetEntity = entities.find((en) => en.id === ontoId);
-      // Only characters can be dropped onto groups
-      if (targetEntity?.type === 'group') {
-        const allCharacters = dragState.entityIds.every((id) => {
-          const e = entities.find((en) => en.id === id);
-          return e?.type === 'character';
-        });
-        if (!allCharacters) dropTarget = null;
-      }
       if (dropTarget && dropTarget.type === 'onto' && dragState.entityIds.includes(dropTarget.id)) {
         dropTarget = null;
       } else if (dropTarget && dropTarget.type === 'onto') {
