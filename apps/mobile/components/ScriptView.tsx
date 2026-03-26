@@ -3,8 +3,8 @@ import { ScrollView, Text, TextInput, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { fromWebEvent, fromNativeEvent, isWeb, type KeyInfo } from '../lib/keyboard';
 
-export type ScriptElementType = 'page' | 'panel' | 'scene' | 'character' | 'parenthetical' | 'dialogue';
-export type PanelSize = 'splash' | 'half' | 'wide' | 'small';
+export type ScriptElementType = 'page' | 'panel' | 'scene' | 'character' | 'parenthetical' | 'dialogue' | 'caption';
+export type PanelSize = 'splash' | 'half' | 'wide' | 'small' | 'banner' | 'beat';
 
 export interface ScriptElement {
   id: string;
@@ -26,65 +26,82 @@ interface ScriptViewProps {
   firstInputRef?: React.RefObject<TextInput | null>;
 }
 
-const SCRIPT_ELEMENT_TYPES: ScriptElementType[] = ['page', 'panel', 'scene', 'character', 'parenthetical', 'dialogue'];
+const SCRIPT_ELEMENT_TYPES: ScriptElementType[] = ['page', 'panel', 'scene', 'character', 'parenthetical', 'dialogue', 'caption'];
+const PANEL_SIZE_CYCLE: (PanelSize | undefined)[] = ['splash', 'half', 'wide', 'small', 'banner', 'beat', undefined];
+
 const SIZE_BUDGET: Record<PanelSize, number> = {
   splash: 1.0,
   half: 0.5,
   wide: 0.33,
   small: 0.15,
+  banner: 0.13,
+  beat: 0.10,
 };
-const SIZE_KEYWORDS: { prefix: string; size: PanelSize }[] = [
-  { prefix: 'splash', size: 'splash' },
-  { prefix: 'half', size: 'half' },
-  { prefix: 'wide', size: 'wide' },
-  { prefix: 'small', size: 'small' },
-];
 
 // Indentation levels — pushed right for breathing room
 function indentForType(type: ScriptElementType): number {
   if (type === 'page') return 16;
   if (type === 'panel') return 40;
   if (type === 'scene') return 64;
-  if (type === 'character') return 80;
-  if (type === 'parenthetical') return 80;
-  if (type === 'dialogue') return 64;
+  if (type === 'character') return 160;
+  if (type === 'parenthetical') return 160;
+  if (type === 'dialogue') return 128;
+  if (type === 'caption') return 128;
   return 16;
 }
 
 function styleForType(type: ScriptElementType, colors: any) {
   if (type === 'page') return { fontSize: 14, fontWeight: '700' as const, color: colors.text };
   if (type === 'panel') return { fontSize: 12, fontWeight: '700' as const, color: colors.text };
-  if (type === 'scene') return { fontSize: 13, color: colors.text };
   if (type === 'character') return { fontSize: 12, fontWeight: '700' as const, color: colors.text };
   if (type === 'parenthetical') return { fontSize: 12, fontStyle: 'italic' as const, color: colors.text };
-  if (type === 'dialogue') return { fontSize: 13, color: colors.text };
   return { fontSize: 13, color: colors.text };
 }
 
 // Compute auto-numbering: page numbers and per-page panel counts
-function computeNumbering(elements: ScriptElement[]): Map<number, { pageNum: number; panelNum?: number }> {
-  const map = new Map<number, { pageNum: number; panelNum?: number }>();
+function computeNumbering(elements: ScriptElement[]): Map<number, { pageNum: number; panelNum?: number; panelsOnPage?: number }> {
+  const map = new Map<number, { pageNum: number; panelNum?: number; panelsOnPage?: number }>();
   let pageCount = 0;
   let panelCount = 0;
+  let lastPageIdx = -1;
   for (let i = 0; i < elements.length; i++) {
     if (elements[i].type === 'page') {
+      if (lastPageIdx !== -1) map.get(lastPageIdx)!.panelsOnPage = panelCount;
       pageCount++;
       panelCount = 0;
+      lastPageIdx = i;
       map.set(i, { pageNum: pageCount });
     } else if (elements[i].type === 'panel') {
       panelCount++;
       map.set(i, { pageNum: pageCount, panelNum: panelCount });
     }
   }
+  if (lastPageIdx !== -1) map.get(lastPageIdx)!.panelsOnPage = panelCount;
   return map;
 }
 
-function matchSizeKeyword(input: string): PanelSize | null {
+function matchCaptionKeyword(input: string): boolean {
   const lower = input.trim().toLowerCase();
-  if (lower.length < 1) return null;
-  if (lower === 's') return null;
-  const matches = SIZE_KEYWORDS.filter((keyword) => keyword.prefix.startsWith(lower));
-  return matches.length === 1 ? matches[0].size : null;
+  return lower.length >= 2 && 'caption'.startsWith(lower);
+}
+
+function getFittestSize(elements: ScriptElement[], index: number): PanelSize | undefined {
+  // Find start of current page
+  let pageStart = 0;
+  for (let i = index; i >= 0; i--) {
+    if (elements[i].type === 'page') { pageStart = i; break; }
+  }
+  // Sum budgets of other panels on this page
+  let used = 0;
+  for (let i = pageStart; i < elements.length; i++) {
+    if (elements[i].type === 'page' && i !== pageStart) break;
+    if (elements[i].type === 'panel' && i !== index && elements[i].size) {
+      used += SIZE_BUDGET[elements[i].size!];
+    }
+  }
+  const remaining = 1.0 - used;
+  // Find largest cycle size that fits
+  return PANEL_SIZE_CYCLE.find(s => s && SIZE_BUDGET[s] <= remaining + 0.01) as PanelSize | undefined;
 }
 
 function computePageOverflows(elements: ScriptElement[]): Set<number> {
@@ -134,17 +151,6 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
     next.splice(afterIndex + 1, 0, el);
     onElementsChange(next);
     setFocusedIndex(afterIndex + 1);
-  }
-
-  function setPanelSizeAndAdvance(index: number, size: PanelSize) {
-    const next = [...elements];
-    const current = next[index];
-    if (!current || current.type !== 'panel') return;
-
-    next[index] = { ...current, size, text: '' };
-    next.splice(index + 1, 0, { id: generateId(), type: 'scene', text: '' });
-    onElementsChange(next);
-    setFocusedIndex(index + 1);
   }
 
   function replaceElement(index: number, type: ScriptElementType, text: string = '') {
@@ -206,10 +212,10 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
         } else if (currentElement.type === 'character') {
           replaceElement(focusedIndex, 'panel');
         } else if (currentElement.type === 'panel') {
-          // Empty panel should still advance into scene flow.
-          // Size metadata is optional, not required for panel progression.
           addElement(focusedIndex, 'scene');
         } else if (currentElement.type === 'scene') {
+          replaceElement(focusedIndex, 'character');
+        } else if (currentElement.type === 'caption') {
           replaceElement(focusedIndex, 'character');
         } else if (currentElement.type === 'page') {
           addElement(focusedIndex, 'panel');
@@ -220,20 +226,22 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
         if (currentElement.type === 'page') {
           addElement(focusedIndex, 'panel');
         } else if (currentElement.type === 'panel') {
-          const sizeMatch = matchSizeKeyword(currentText);
-          if (sizeMatch) {
-            setPanelSizeAndAdvance(focusedIndex, sizeMatch);
-          } else {
-            addElement(focusedIndex, 'scene');
-          }
+          addElement(focusedIndex, 'scene');
         } else if (currentElement.type === 'scene') {
           addElement(focusedIndex, 'character');
         } else if (currentElement.type === 'character') {
-          addElement(focusedIndex, 'dialogue');
+          if (matchCaptionKeyword(currentElement.text)) {
+            replaceElement(focusedIndex, 'caption', '');
+            addElement(focusedIndex, 'character');
+          } else {
+            addElement(focusedIndex, 'dialogue');
+          }
         } else if (currentElement.type === 'parenthetical') {
           updateElement(focusedIndex, { text: currentElement.text });
           addElement(focusedIndex, 'dialogue');
         } else if (currentElement.type === 'dialogue') {
+          addElement(focusedIndex, 'character');
+        } else if (currentElement.type === 'caption') {
           addElement(focusedIndex, 'character');
         }
       }
@@ -265,6 +273,28 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
       }
       return;
     }
+
+    // Panel size cycling via ArrowLeft/ArrowRight
+    if (currentElement.type === 'panel' && currentElement.text === '' && (info.key === 'ArrowLeft' || info.key === 'ArrowRight')) {
+      info.prevent();
+      const currentSize = currentElement.size;
+      // Smart default: when no size is set, start from the fittest size for this page
+      if (!currentSize) {
+        const fittest = getFittestSize(elements, focusedIndex);
+        updateElement(focusedIndex, { size: fittest });
+        return;
+      }
+      const currentIndex = PANEL_SIZE_CYCLE.indexOf(currentSize);
+      let nextIndex;
+      if (info.key === 'ArrowRight') {
+        nextIndex = (currentIndex + 1) % PANEL_SIZE_CYCLE.length;
+      } else {
+        nextIndex = (currentIndex - 1 + PANEL_SIZE_CYCLE.length) % PANEL_SIZE_CYCLE.length;
+      }
+      updateElement(focusedIndex, { size: PANEL_SIZE_CYCLE[nextIndex] });
+      return;
+    }
+
     if (info.key === 'ArrowDown' && !info.alt) {
       info.prevent();
       setFocusedIndex(Math.min(elements.length - 1, focusedIndex + 1));
@@ -365,7 +395,7 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
         // Build prefix for page/panel rows
         let prefix = '';
         if (el.type === 'page' && nums) {
-          prefix = `Page ${nums.pageNum}`;
+          prefix = `Page ${nums.pageNum} (${nums.panelsOnPage ?? 0} panels)`;
         } else if (el.type === 'panel' && nums) {
           prefix = `Panel ${nums.panelNum}`;
         }
@@ -374,8 +404,9 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
         const placeholder = el.type === 'scene' ? 'scene description'
           : el.type === 'character' ? 'character'
           : el.type === 'dialogue' ? 'dialogue'
+          : el.type === 'caption' ? 'caption'
           : el.type === 'parenthetical' ? 'parenthetical'
-          : el.type === 'panel' ? 'type size: splash / half / wide / small'
+          : el.type === 'panel' ? ''
           : prefix ? 'title' : '';
 
         // Character onChangeText with parenthetical auto-insert
@@ -424,45 +455,74 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
                 {prefix}
               </Text>
             ) : null}
-            {el.type === 'panel' && el.size ? (
-              <Text style={{ fontFamily: mono, fontSize: 10, color: colors.muted, marginRight: 6 }}>
-                [{el.size.toUpperCase()}]
-              </Text>
-            ) : null}
+
+            {el.type === 'panel' && el.text === '' && (el.size || focusedIndex === i) && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8 }}>
+                <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>
+                  {focusedIndex === i ? '← ' : ''}
+                </Text>
+                <Text style={{
+                  fontFamily: mono,
+                  fontSize: 12,
+                  color: el.size ? colors.text : colors.muted,
+                  textTransform: 'uppercase'
+                }}>
+                  {el.size ? el.size : (focusedIndex === i ? 'Select panel size' : '')}
+                </Text>
+                <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>
+                  {focusedIndex === i ? ' →' : ''}
+                </Text>
+              </View>
+            )}
 
             {el.type === 'parenthetical' && (
               <Text style={{ fontFamily: mono, fontSize: 12, color: colors.text, marginRight: 2 }}>(</Text>
             )}
 
-            <TextInput
-              ref={r => {
-                if (r) inputRefs.current[el.id] = r;
-                if (r && i === 0 && firstInputRef) (firstInputRef as React.MutableRefObject<TextInput | null>).current = r;
-              }}
-              value={el.text}
-              onChangeText={onChangeText}
-              onKeyPress={nativeKeyPress}
-              placeholder={placeholder}
-              placeholderTextColor={colors.muted}
-              submitBehavior="submit"
-              style={{
-                flex: 1,
-                fontFamily: mono,
-                ...styleForType(el.type, colors),
-                paddingVertical: 0,
-                ...(isWeb ? { outlineStyle: 'none' as any } : {}),
-              }}
-              onFocus={() => setFocusedIndex(i)}
-              multiline={false}
-            />
-            {el.type === 'panel' && !el.size && focusedIndex === i && (() => {
-              const match = matchSizeKeyword(el.text);
-              return match ? (
-                <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted, opacity: 0.5 }}>
-                  {match.toUpperCase()}
-                </Text>
-              ) : null;
-            })()}
+            {el.type === 'page' ? (
+              <TextInput
+                ref={r => {
+                  if (r) inputRefs.current[el.id] = r;
+                  if (r && i === 0 && firstInputRef) (firstInputRef as React.MutableRefObject<TextInput | null>).current = r;
+                }}
+                value=""
+                onKeyPress={nativeKeyPress}
+                submitBehavior="submit"
+                style={{ width: 0, height: 0, padding: 0, margin: 0, opacity: 0, position: 'absolute' }}
+                onFocus={() => setFocusedIndex(i)}
+              />
+            ) : (
+              <TextInput
+                ref={r => {
+                  if (r) inputRefs.current[el.id] = r;
+                  if (r && i === 0 && firstInputRef) (firstInputRef as React.MutableRefObject<TextInput | null>).current = r;
+                }}
+                value={el.text}
+                onChangeText={onChangeText}
+                onKeyPress={nativeKeyPress}
+                placeholder={placeholder}
+                placeholderTextColor={colors.muted}
+                submitBehavior="submit"
+                style={{
+                  flex: 1,
+                  fontFamily: mono,
+                  ...styleForType(el.type, colors),
+                  paddingVertical: 0,
+                  ...(isWeb ? { outlineStyle: 'none' as any } : {}),
+                }}
+                onFocus={() => {
+                  setFocusedIndex(i);
+                }}
+                multiline={false}
+              />
+            )}
+
+            {el.type === 'character' && focusedIndex === i && matchCaptionKeyword(el.text) && (
+              <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted, marginLeft: 8, opacity: 0.6 }}>
+                CAPTION
+              </Text>
+            )}
+
             {el.type === 'panel' && overflows.has(numbering.get(i)?.pageNum ?? 0) ? (
               <Text style={{ fontFamily: mono, fontSize: 10, color: colors.error, marginLeft: 4 }}>[!]</Text>
             ) : null}

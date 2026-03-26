@@ -75,17 +75,32 @@ function ShortcutSection({ mono, colors, title, items }: {
   mono: string;
   colors: { text: string; muted: string; border: string };
   title: string;
-  items: [string, string][];
+  items: [string, string, (() => void)?][];
 }) {
   return (
     <View style={{ marginBottom: 16 }}>
       <Text style={{ fontFamily: mono, fontSize: 10, color: colors.muted, letterSpacing: 1, marginBottom: 6 }}>{title}</Text>
-      {items.map(([key, desc]) => (
-        <View key={key} style={{ flexDirection: 'row', paddingVertical: 3 }}>
+      {items.map(([key, desc, onPress]) => {
+        const Content = (
+          <View key={key} style={{ flexDirection: 'row', paddingVertical: 3 }}>
           <Text style={{ fontFamily: mono, fontSize: 11, color: colors.text, width: 120 }}>{key}</Text>
-          <Text style={{ fontFamily: mono, fontSize: 11, color: colors.muted, flex: 1 }}>{desc}</Text>
-        </View>
-      ))}
+            <Text style={{ 
+              fontFamily: mono, 
+              fontSize: 11, 
+              color: onPress ? colors.text : colors.muted, 
+              flex: 1,
+              textDecorationLine: onPress ? 'underline' : 'none'
+            }}>{desc}</Text>
+          </View>
+        );
+
+        if (onPress) {
+          return (
+            <TouchableOpacity key={key} onPress={onPress}>{Content}</TouchableOpacity>
+          );
+        }
+        return Content;
+      })}
     </View>
   );
 }
@@ -119,6 +134,14 @@ function UniverseWorkspace() {
   const editorWrapperRef = useRef<View>(null);
   const secondaryEditorWrapperRef = useRef<View>(null);
 
+  function cyclePanels() {
+    setFocusedPanel((p) => {
+      if (p === 'binder') return 'editor-left';
+      if (p === 'editor-left') return secondaryEntityId ? 'editor-right' : 'binder';
+      return 'binder';
+    });
+  }
+
   // App-level keyboard shortcuts
   const appKeyRef = useRef<(info: KeyInfo) => void>(undefined);
   appKeyRef.current = (info: KeyInfo) => {
@@ -132,11 +155,7 @@ function UniverseWorkspace() {
       if (isWeb) {
         (document.activeElement as HTMLElement)?.blur?.();
       }
-      setFocusedPanel((p) => {
-        if (p === 'binder') return 'editor-left';
-        if (p === 'editor-left') return secondaryEntityId ? 'editor-right' : 'binder';
-        return 'binder'; // editor-right → binder
-      });
+      cyclePanels();
       return;
     }
     if (info.meta && info.shift && (info.key === 'p' || info.key === 'P')) {
@@ -405,10 +424,11 @@ function UniverseWorkspace() {
                 ['Escape', 'exit spine / blur'],
               ]} />
               <ShortcutSection mono={mono} colors={colors} title="SCRIPT" items={[
+                ['Left/Right (panel)', 'cycle panel size'],
                 ['Enter', 'next element (context-aware)'],
-                ['type size on panel', 'set panel size (splash/half/wide/small)'],
+                ['type caption hint', 'convert character to caption'],
                 ['Tab / Shift+Tab', 'cycle element type (empty)'],
-                ['Backspace (empty)', 'delete element'],
+                ['Backspace (empty)', 'delete element / clear size'],
                 ['Alt+Up/Down', 'jump to content'],
                 ['Alt+Left/Right', 'navigate dialogue group'],
                 ['( in character', 'insert parenthetical'],
@@ -416,9 +436,10 @@ function UniverseWorkspace() {
                 ['Escape', 'blur'],
               ]} />
               <ShortcutSection mono={mono} colors={colors} title="APP" items={[
-                ['Cmd+;', 'cycle panels'],
-                ['Cmd+Shift+P', 'show/hide panel preview'],
-                ['Cmd+\\', 'toggle binder'],
+                ['Cmd+;', 'cycle panels', () => cyclePanels()],
+                ['Cmd+Shift+P', 'toggle panel map', () => { setPanelMapOpen(v => !v); setShortcutsOpen(false); }],
+                ['Cmd+\\', 'toggle binder', () => setBinderOpen(!binderOpen)],
+                ['dark/light', 'toggle theme', () => toggle()],
                 ['Cmd+/', 'this panel'],
               ]} />
             </ScrollView>

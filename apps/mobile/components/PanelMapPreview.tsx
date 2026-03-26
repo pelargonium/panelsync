@@ -21,6 +21,8 @@ const SIZE_BUDGET: Record<PanelSize, number> = {
   half: 0.5,
   wide: 0.33,
   small: 0.15,
+  banner: 0.13,
+  beat: 0.10,
 };
 
 function extractPages(elements: ScriptElement[]): PageData[] {
