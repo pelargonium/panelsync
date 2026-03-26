@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, ScrollView, Text, TextInput, View } from 'react-native';
+import { ScrollView, Text, TextInput, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { fromWebEvent, fromNativeEvent, isWeb, type KeyInfo } from '../lib/keyboard';
 
 export type ScriptElementType = 'page' | 'panel' | 'scene' | 'character' | 'parenthetical' | 'dialogue';
+export type PanelSize = 'splash' | 'half' | 'wide' | 'small';
 
 export interface ScriptElement {
   id: string;
   type: ScriptElementType;
   text: string;
+  size?: PanelSize;
 }
 
 export function generateId() {
@@ -21,9 +23,22 @@ interface ScriptViewProps {
   onElementsChange: (elements: ScriptElement[]) => void;
   isFocused: boolean;
   nameInputRef: React.RefObject<TextInput | null>;
+  firstInputRef?: React.RefObject<TextInput | null>;
 }
 
 const SCRIPT_ELEMENT_TYPES: ScriptElementType[] = ['page', 'panel', 'scene', 'character', 'parenthetical', 'dialogue'];
+const SIZE_BUDGET: Record<PanelSize, number> = {
+  splash: 1.0,
+  half: 0.5,
+  wide: 0.33,
+  small: 0.15,
+};
+const SIZE_KEYWORDS: { prefix: string; size: PanelSize }[] = [
+  { prefix: 'splash', size: 'splash' },
+  { prefix: 'half', size: 'half' },
+  { prefix: 'wide', size: 'wide' },
+  { prefix: 'small', size: 'small' },
+];
 
 // Indentation levels — pushed right for breathing room
 function indentForType(type: ScriptElementType): number {
@@ -64,13 +79,53 @@ function computeNumbering(elements: ScriptElement[]): Map<number, { pageNum: num
   return map;
 }
 
-export default function ScriptView({ elements, onElementsChange, isFocused, nameInputRef }: ScriptViewProps) {
+function matchSizeKeyword(input: string): PanelSize | null {
+  const lower = input.trim().toLowerCase();
+  if (lower.length < 1) return null;
+  if (lower === 's') return null;
+  const matches = SIZE_KEYWORDS.filter((keyword) => keyword.prefix.startsWith(lower));
+  return matches.length === 1 ? matches[0].size : null;
+}
+
+function computePageOverflows(elements: ScriptElement[]): Set<number> {
+  const overflows = new Set<number>();
+  let pageNum = 0;
+  let panels: ScriptElement[] = [];
+
+  function checkPage() {
+    if (panels.length === 0) return;
+    const explicit = panels.filter((panel) => panel.size);
+    const implicit = panels.filter((panel) => !panel.size);
+    const explicitTotal = explicit.reduce((sum, panel) => sum + SIZE_BUDGET[panel.size!], 0);
+    const implicitEach = implicit.length > 0
+      ? (explicit.length === 0 ? 1.0 / panels.length : Math.max(0, (1.0 - explicitTotal) / implicit.length))
+      : 0;
+    const total = explicitTotal + implicit.length * implicitEach;
+    if (total > 1.05) overflows.add(pageNum);
+  }
+
+  for (const element of elements) {
+    if (element.type === 'page') {
+      checkPage();
+      pageNum++;
+      panels = [];
+    } else if (element.type === 'panel') {
+      panels.push(element);
+    }
+  }
+  checkPage();
+
+  return overflows;
+}
+
+export default function ScriptView({ elements, onElementsChange, isFocused, nameInputRef, firstInputRef }: ScriptViewProps) {
   const { colors, mono } = useTheme();
   const [focusedIndex, setFocusedIndex] = useState(0);
   const inputRefs = useRef<Record<string, TextInput>>({});
   const scrollViewRef = useRef<ScrollView>(null);
 
   const numbering = useMemo(() => computeNumbering(elements), [elements]);
+  const overflows = useMemo(() => computePageOverflows(elements), [elements]);
 
   // Element mutation helpers
   function addElement(afterIndex: number, type: ScriptElementType, text: string = '') {
@@ -81,8 +136,24 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
     setFocusedIndex(afterIndex + 1);
   }
 
+  function setPanelSizeAndAdvance(index: number, size: PanelSize) {
+    const next = [...elements];
+    const current = next[index];
+    if (!current || current.type !== 'panel') return;
+
+    next[index] = { ...current, size, text: '' };
+    next.splice(index + 1, 0, { id: generateId(), type: 'scene', text: '' });
+    onElementsChange(next);
+    setFocusedIndex(index + 1);
+  }
+
   function replaceElement(index: number, type: ScriptElementType, text: string = '') {
-    onElementsChange(elements.map((e, i) => i === index ? { ...e, type, text } : e));
+    onElementsChange(elements.map((e, i) => {
+      if (i !== index) return e;
+      const next = { ...e, type, text };
+      if (type !== 'panel') delete next.size;
+      return next;
+    }));
     setFocusedIndex(index);
   }
 
@@ -106,13 +177,15 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
     }
   }
 
-  // Auto-focus logic
+  // Auto-focus logic — only when focusedIndex or panel focus changes, not on every edit
   useEffect(() => {
-    if (isFocused && elements[focusedIndex]) {
-      const input = inputRefs.current[elements[focusedIndex].id];
+    const el = elements[focusedIndex];
+    if (isFocused && el) {
+      const input = inputRefs.current[el.id];
       setTimeout(() => input?.focus(), 0);
     }
-  }, [isFocused, focusedIndex, elements]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFocused, focusedIndex]);
 
   // ── Unified keyboard handler ───────────────────────────────────────
   const handleKeyRef = useRef<(info: KeyInfo) => void>(undefined);
@@ -133,7 +206,9 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
         } else if (currentElement.type === 'character') {
           replaceElement(focusedIndex, 'panel');
         } else if (currentElement.type === 'panel') {
-          replaceElement(focusedIndex, 'page');
+          // Empty panel should still advance into scene flow.
+          // Size metadata is optional, not required for panel progression.
+          addElement(focusedIndex, 'scene');
         } else if (currentElement.type === 'scene') {
           replaceElement(focusedIndex, 'character');
         } else if (currentElement.type === 'page') {
@@ -145,7 +220,12 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
         if (currentElement.type === 'page') {
           addElement(focusedIndex, 'panel');
         } else if (currentElement.type === 'panel') {
-          addElement(focusedIndex, 'scene');
+          const sizeMatch = matchSizeKeyword(currentText);
+          if (sizeMatch) {
+            setPanelSizeAndAdvance(focusedIndex, sizeMatch);
+          } else {
+            addElement(focusedIndex, 'scene');
+          }
         } else if (currentElement.type === 'scene') {
           addElement(focusedIndex, 'character');
         } else if (currentElement.type === 'character') {
@@ -238,6 +318,10 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
     // Backspace on empty element
     if (info.key === 'Backspace' && currentElement.text.trim() === '' && elements.length > 1) {
       info.prevent();
+      if (currentElement.type === 'panel' && currentElement.size) {
+        updateElement(focusedIndex, { size: undefined });
+        return;
+      }
       deleteElement(focusedIndex);
       return;
     }
@@ -269,6 +353,7 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
 
   // Native: onKeyPress handler for TextInputs
   function nativeKeyPress(e: any) {
+    if (isWeb) return;
     handleKeyRef.current?.(fromNativeEvent(e));
   }
 
@@ -290,6 +375,7 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
           : el.type === 'character' ? 'character'
           : el.type === 'dialogue' ? 'dialogue'
           : el.type === 'parenthetical' ? 'parenthetical'
+          : el.type === 'panel' ? 'type size: splash / half / wide / small'
           : prefix ? 'title' : '';
 
         // Character onChangeText with parenthetical auto-insert
@@ -338,13 +424,21 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
                 {prefix}
               </Text>
             ) : null}
+            {el.type === 'panel' && el.size ? (
+              <Text style={{ fontFamily: mono, fontSize: 10, color: colors.muted, marginRight: 6 }}>
+                [{el.size.toUpperCase()}]
+              </Text>
+            ) : null}
 
             {el.type === 'parenthetical' && (
               <Text style={{ fontFamily: mono, fontSize: 12, color: colors.text, marginRight: 2 }}>(</Text>
             )}
 
             <TextInput
-              ref={r => { if (r) inputRefs.current[el.id] = r; }}
+              ref={r => {
+                if (r) inputRefs.current[el.id] = r;
+                if (r && i === 0 && firstInputRef) (firstInputRef as React.MutableRefObject<TextInput | null>).current = r;
+              }}
               value={el.text}
               onChangeText={onChangeText}
               onKeyPress={nativeKeyPress}
@@ -361,6 +455,17 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
               onFocus={() => setFocusedIndex(i)}
               multiline={false}
             />
+            {el.type === 'panel' && !el.size && focusedIndex === i && (() => {
+              const match = matchSizeKeyword(el.text);
+              return match ? (
+                <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted, opacity: 0.5 }}>
+                  {match.toUpperCase()}
+                </Text>
+              ) : null;
+            })()}
+            {el.type === 'panel' && overflows.has(numbering.get(i)?.pageNum ?? 0) ? (
+              <Text style={{ fontFamily: mono, fontSize: 10, color: colors.error, marginLeft: 4 }}>[!]</Text>
+            ) : null}
 
             {el.type === 'parenthetical' && (
               <Text style={{ fontFamily: mono, fontSize: 12, color: colors.text, marginLeft: 2 }}>)</Text>

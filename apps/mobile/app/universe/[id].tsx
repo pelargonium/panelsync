@@ -10,6 +10,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import Editor from '../../components/Editor';
 import Binder from '../../components/Binder';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import PanelMapPreview from '../../components/PanelMapPreview';
+import { type ScriptElement } from '../../components/ScriptView';
 import { UniverseProvider, useUniverse } from '../../context/UniverseContext';
 import { useTheme } from '../../context/ThemeContext';
 import { type ApiEntity } from '../../lib/api';
@@ -37,13 +39,21 @@ function PrimaryContent({
   onAutoFocusDone,
   onSaveStateChange,
   isFocused,
+  onScriptElements,
 }: {
   justCreatedId: string | null;
   onAutoFocusDone: () => void;
   onSaveStateChange: (state: 'saved' | 'saving') => void;
   isFocused: boolean;
+  onScriptElements?: (elements: ScriptElement[]) => void;
 }) {
   const { activeEntityType, activeEntityId } = useUniverse();
+
+  useEffect(() => {
+    if (!(activeEntityType === 'entity' && activeEntityId)) {
+      onScriptElements?.([]);
+    }
+  }, [activeEntityType, activeEntityId, onScriptElements]);
 
   if (activeEntityType === 'entity' && activeEntityId) {
     return (
@@ -53,6 +63,7 @@ function PrimaryContent({
         autoFocusName={justCreatedId === activeEntityId}
         onAutoFocusDone={onAutoFocusDone}
         onSaveStateChange={onSaveStateChange}
+        onScriptElements={onScriptElements}
       />
     );
   }
@@ -101,6 +112,8 @@ function UniverseWorkspace() {
   const [editorSaveState, setEditorSaveState] = useState<'saved' | 'saving'>('saved');
   const [secondarySaveState, setSecondarySaveState] = useState<'saved' | 'saving'>('saved');
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [panelMapOpen, setPanelMapOpen] = useState(false);
+  const [scriptElements, setScriptElements] = useState<ScriptElement[]>([]);
   const [focusedPanel, setFocusedPanel] = useState<'binder' | 'editor-left' | 'editor-right'>('binder');
   const binderWrapperRef = useRef<View>(null);
   const editorWrapperRef = useRef<View>(null);
@@ -126,9 +139,21 @@ function UniverseWorkspace() {
       });
       return;
     }
+    if (info.meta && info.shift && (info.key === 'p' || info.key === 'P')) {
+      info.prevent();
+      setPanelMapOpen((value) => !value);
+      setShortcutsOpen(false);
+      return;
+    }
     if (info.key === '/' && info.meta) {
       info.prevent();
       setShortcutsOpen((v) => !v);
+      setPanelMapOpen(false);
+      return;
+    }
+    if (info.key === 'Escape' && panelMapOpen) {
+      info.prevent();
+      setPanelMapOpen(false);
       return;
     }
     if (info.key === 'Escape' && shortcutsOpen) {
@@ -239,7 +264,14 @@ function UniverseWorkspace() {
             {mode === 'dark' ? 'light' : 'dark'}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setShortcutsOpen((v) => !v)} style={{ marginLeft: 12 }}>
+        {scriptElements.length > 0 && (
+          <TouchableOpacity onPress={() => { setPanelMapOpen((value) => !value); setShortcutsOpen(false); }} style={{ marginLeft: 12 }}>
+            <Text style={{ fontFamily: mono, fontSize: 11, color: panelMapOpen ? colors.text : colors.muted }}>
+              map
+            </Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity onPress={() => { setShortcutsOpen((v) => !v); setPanelMapOpen(false); }} style={{ marginLeft: 12 }}>
           <Text style={{ fontFamily: mono, fontSize: 11, color: shortcutsOpen ? colors.text : colors.muted }}>?</Text>
         </TouchableOpacity>
       </View>
@@ -300,6 +332,7 @@ function UniverseWorkspace() {
               onAutoFocusDone={() => setJustCreatedId(null)}
               onSaveStateChange={setEditorSaveState}
               isFocused={focusedPanel === 'editor-left'}
+              onScriptElements={setScriptElements}
             />
           </ErrorBoundary>
         </View>
@@ -373,6 +406,7 @@ function UniverseWorkspace() {
               ]} />
               <ShortcutSection mono={mono} colors={colors} title="SCRIPT" items={[
                 ['Enter', 'next element (context-aware)'],
+                ['type size on panel', 'set panel size (splash/half/wide/small)'],
                 ['Tab / Shift+Tab', 'cycle element type (empty)'],
                 ['Backspace (empty)', 'delete element'],
                 ['Alt+Up/Down', 'jump to content'],
@@ -383,10 +417,46 @@ function UniverseWorkspace() {
               ]} />
               <ShortcutSection mono={mono} colors={colors} title="APP" items={[
                 ['Cmd+;', 'cycle panels'],
+                ['Cmd+Shift+P', 'show/hide panel preview'],
                 ['Cmd+\\', 'toggle binder'],
                 ['Cmd+/', 'this panel'],
               ]} />
             </ScrollView>
+          </View>
+        )}
+
+        {panelMapOpen && scriptElements.length > 0 && (
+          <View
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: 280,
+              backgroundColor: colors.bg,
+              borderLeftWidth: 1,
+              borderLeftColor: colors.border,
+              zIndex: 20,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 12,
+                height: 36,
+                borderBottomWidth: 1,
+                borderBottomColor: colors.border,
+              }}
+            >
+              <Text style={{ fontFamily: mono, fontSize: 12, color: colors.text, flex: 1 }}>
+                panel map
+              </Text>
+              <TouchableOpacity onPress={() => setPanelMapOpen(false)}>
+                <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>x</Text>
+              </TouchableOpacity>
+            </View>
+            <PanelMapPreview elements={scriptElements} />
           </View>
         )}
       </View>

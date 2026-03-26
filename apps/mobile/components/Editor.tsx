@@ -21,6 +21,7 @@ interface EditorProps {
   autoFocusName?: boolean;
   onAutoFocusDone?: () => void;
   onSaveStateChange?: (state: 'saved' | 'saving') => void;
+  onScriptElements?: (elements: ScriptElement[]) => void;
 }
 
 function entityTypeLabel(type: ApiEntity['type']): string {
@@ -134,6 +135,7 @@ export default function Editor({
   autoFocusName = false,
   onAutoFocusDone,
   onSaveStateChange,
+  onScriptElements,
 }: EditorProps) {
   const { updateEntityName, deleteEntity } = useUniverse();
   const { colors, mono } = useTheme();
@@ -154,6 +156,7 @@ export default function Editor({
   const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scriptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scriptFirstInputRef = useRef<TextInput>(null);
   const latestScriptRef = useRef<string>('[]');
   const savedScriptRef = useRef<string>('[]');
   const eventsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -167,12 +170,14 @@ export default function Editor({
   const autoFocusNameRef = useRef(autoFocusName);
   const onAutoFocusDoneRef = useRef(onAutoFocusDone);
   const onSaveStateChangeRef = useRef(onSaveStateChange);
+  const onScriptElementsRef = useRef(onScriptElements);
   const updateEntityNameRef = useRef(updateEntityName);
 
   useEffect(() => {
     autoFocusNameRef.current = autoFocusName;
     onAutoFocusDoneRef.current = onAutoFocusDone;
     onSaveStateChangeRef.current = onSaveStateChange;
+    onScriptElementsRef.current = onScriptElements;
     updateEntityNameRef.current = updateEntityName;
   });
 
@@ -359,6 +364,14 @@ export default function Editor({
     return () => { if (scriptTimerRef.current) { clearTimeout(scriptTimerRef.current); scriptTimerRef.current = null; } };
   }, [entityId, entityType, scriptElements]);
 
+  useEffect(() => {
+    if (entityType === 'script') {
+      onScriptElementsRef.current?.(scriptElements);
+    } else {
+      onScriptElementsRef.current?.([]);
+    }
+  }, [entityType, scriptElements]);
+
   // ── Auto-focus when panel becomes active ────────────────────────────
 
   useEffect(() => {
@@ -423,8 +436,7 @@ export default function Editor({
           onKeyPress={(e: any) => keyRef.current?.(fromNativeEvent(e))}
           onSubmitEditing={() => {
             if (entityType === 'script' || entityType === 'timeline') {
-              // Let the sub-view handle focus — just blur the name input
-              (nameInputRef.current as any)?.blur?.();
+              scriptFirstInputRef.current?.focus();
             } else {
               textInputRef.current?.focus();
             }
@@ -459,6 +471,7 @@ export default function Editor({
             onElementsChange={setScriptElements}
             isFocused={isFocused}
             nameInputRef={nameInputRef}
+            firstInputRef={scriptFirstInputRef}
           />
         ) : (
           <TextInput

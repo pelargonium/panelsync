@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PanelSync — Chalkboard</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+    :root {
+      --bg:          #0c0c0c;
+      --surface:     #131313;
+      --border:      #252525;
+      --accent:      #c8a84b;
+      --accent-dim:  #6b5a28;
+      --text:        #ddd0b0;
+      --text-dim:    #5a5040;
+      --green:       #4a8c6a;
+      --red:         #8c4a4a;
+      /* Branch colours — three distinct tints */
+      --branch-0:    #c8a84b;   /* amber  — main trunk */
+      --branch-1:    #6a8cc8;   /* blue   — branch 1  */
+      --branch-2:    #8cc86a;   /* green  — branch 2  */
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    .logo     { font-size: 11px; font-weight: 700; letter-spacing: 0.25em; text-transform: uppercase; color: var(--accent); }
+    .subtitle { font-size: 11px; color: var(--text-dim); letter-spacing: 0.08em; }
+
+    /* Mode indicator */
+    .mode-tag {
+      margin-left: auto;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .mode-tag b { color: var(--accent); font-weight: 500; }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      padding: 6px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      flex-shrink: 0;
+      align-items: center;
+    }
+    .btn {
+      font-family: inherit;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .btn:hover { border-color: var(--accent-dim); color: var(--accent); }
+    .btn.active { border-color: var(--accent); color: var(--accent); }
+    .btn.danger:hover { border-color: var(--red); color: var(--red); }
+
+    .separator { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
+
+    /* Branch count indicator */
+    .branch-dots { display: flex; gap: 5px; margin-left: 4px; }
+    .branch-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      transition: background 0.2s;
+    }
+    .branch-dot.active-0 { background: var(--branch-0); border-color: var(--branch-0); }
+    .branch-dot.active-1 { background: var(--branch-1); border-color: var(--branch-1); }
+    .branch-dot.active-2 { background: var(--branch-2); border-color: var(--branch-2); }
+
+    /* ── Canvas area ── */
+    .canvas-wrap {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* The infinite board — panned via transform */
+    #board {
+      position: absolute;
+      top: 0; left: 0;
+      transform-origin: 0 0;
+      /* width/height are large enough to never clip */
+      width: 8000px;
+      height: 4000px;
+    }
+
+    /* SVG connector lines drawn behind cards */
+    #connector-svg {
+      position: absolute;
+      top: 0; left: 0;
+      width: 8000px;
+      height: 4000px;
+      pointer-events: none;
+    }
+
+    /* ── Beat card ── */
+    .card {
+      position: absolute;
+      width: 200px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      transition: border-color 0.15s;
+    }
+
+    /* Colour the left edge by branch */
+    .card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 2px;
+    }
+    .card.branch-0::before { background: var(--branch-0); }
+    .card.branch-1::before { background: var(--branch-1); }
+    .card.branch-2::before { background: var(--branch-2); }
+
+    .card.focused { border-color: var(--accent); }
+    .card.branch-1.focused { border-color: var(--branch-1); }
+    .card.branch-2.focused { border-color: var(--branch-2); }
+
+    /* Card header: beat number + branch label */
+    .card-header {
+      padding: 5px 8px 4px 10px;
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .card.branch-0 .card-header .branch-label { color: var(--branch-0); }
+    .card.branch-1 .card-header .branch-label { color: var(--branch-1); }
+    .card.branch-2 .card-header .branch-label { color: var(--branch-2); }
+
+    /* The editable text area inside the card */
+    .card textarea {
+      width: 100%;
+      min-height: 70px;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 11.5px;
+      line-height: 1.55;
+      padding: 8px 10px;
+      resize: none;
+      cursor: text;
+      user-select: text;
+    }
+    .card textarea::placeholder { color: var(--text-dim); }
+
+    /* Card footer: action hints */
+    .card-footer {
+      padding: 4px 10px 5px;
+      font-size: 9px;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+    }
+    .card-footer kbd {
+      font-family: inherit;
+      font-size: 9px;
+      color: var(--accent-dim);
+    }
+
+    /* ── Timeline view overlay ── */
+    #timeline-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: var(--bg);
+      overflow-y: auto;
+      padding: 32px 40px;
+    }
+    #timeline-overlay.visible { display: block; }
+
+    .timeline-title {
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 24px;
+    }
+
+    /* ASCII timeline rendered as <pre> */
+    pre#timeline-output {
+      font-family: inherit;
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: var(--accent);
+      white-space: pre;
+    }
+
+    .close-timeline {
+      position: fixed;
+      top: 80px;
+      right: 40px;
+    }
+
+    /* ── Branch selector modal ── */
+    #branch-select-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    #branch-select-modal.visible { display: flex; }
+
+    .modal-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 24px 28px;
+      min-width: 320px;
+    }
+    .modal-title {
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+    }
+    .branch-option {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      margin-bottom: 8px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: border-color 0.15s;
+    }
+    .branch-option:hover { border-color: var(--accent); color: var(--accent); }
+    .branch-option .opt-label { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 3px; }
+
+    /* ── Status bar ── */
+    .statusbar {
+      padding: 5px 18px;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 24px;
+      flex-shrink: 0;
+    }
+    .statusbar b { color: var(--accent); font-weight: 500; }
+
+    ::-webkit-scrollbar       { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">PanelSync</span>
+  <span class="subtitle">// chalkboard</span>
+  <span class="mode-tag">MODE: <b id="modeLabel">EDIT</b></span>
+</header>
+
+<div class="toolbar">
+  <!-- Start a new branch off the currently focused card -->
+  <button class="btn" id="btnBranch" title="Fork a new branch from current card">[ + Branch ]</button>
+
+  <div class="separator"></div>
+
+  <!-- Active branch indicators -->
+  <span style="font-size:10px;color:var(--text-dim);letter-spacing:0.1em;">BRANCHES:</span>
+  <div class="branch-dots" id="branchDots"></div>
+
+  <div class="separator"></div>
+
+  <!-- Zoom controls -->
+  <button class="btn" id="btnZoomOut">[ Zoom Out ]</button>
+  <button class="btn" id="btnZoomIn">[ Zoom In ]</button>
+  <button class="btn" id="btnFit">[ Fit All ]</button>
+
+  <div class="separator"></div>
+
+  <!-- Codify: open branch selector then render timeline -->
+  <button class="btn" id="btnCodeify">[ Codify Branch → ]</button>
+</div>
+
+<!-- ── Main board ── -->
+<div class="canvas-wrap" id="canvasWrap">
+  <svg id="connector-svg"></svg>
+  <div id="board"></div>
+
+  <!-- Timeline overlay (shown after codifying) -->
+  <div id="timeline-overlay">
+    <div class="timeline-title">// CODIFIED TIMELINE</div>
+    <button class="btn close-timeline" id="btnCloseTimeline">[ ← Back ]</button>
+    <pre id="timeline-output"></pre>
+  </div>
+</div>
+
+<!-- Branch selection modal -->
+<div id="branch-select-modal">
+  <div class="modal-box">
+    <div class="modal-title">Select branch to codify</div>
+    <div id="branchOptions"></div>
+    <button class="btn danger" style="margin-top:12px;width:100%" id="btnCancelModal">[ Cancel ]</button>
+  </div>
+</div>
+
+<div class="statusbar">
+  <span>BEATS: <b id="statBeats">1</b></span>
+  <span>BRANCHES: <b id="statBranches">1</b></span>
+  <span id="statHint">Enter → right  |  ⌘↑↓ → branch  |  ⌘← → back  |  Drag to pan</span>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DATA MODEL
+//
+// The board is a graph of "beat nodes". Each node looks like:
+//   {
+//     id:        string,          // unique id, e.g. "b0", "b1"
+//     text:      string,          // what the user typed
+//     branchIdx: number,          // 0, 1, or 2 — which colour branch
+//     col:       number,          // grid column (x position)
+//     row:       number,          // grid row    (y position)
+//     parentId:  string|null,     // which node spawned this one
+//     children:  string[],        // ids of nodes that follow this one
+//   }
+//
+// Layout is a simple grid:
+//   x = ORIGIN_X + col * (CARD_W + GAP_X)
+//   y = ORIGIN_Y + row * (CARD_H + GAP_Y)
+//
+// Branches go right (col+1) and offset up/down (row changes).
+// The main trunk always stays at row 0.
+// ═══════════════════════════════════════════════════════════════
+
+const CARD_W   = 200;
+const CARD_H   = 130;   // approximate rendered height (text area + header + footer)
+const GAP_X    = 60;    // horizontal gap between cards
+const GAP_Y    = 40;    // vertical gap between rows
+const ORIGIN_X = 60;
+const ORIGIN_Y = 200;   // leave room above for branches going upward
+const MAX_BRANCHES = 3;
+
+// Colour names for branch labels
+const BRANCH_NAMES = ['MAIN', 'BRANCH A', 'BRANCH B'];
+
+// ── State ──────────────────────────────────────────────────────
+let nodes        = {};       // id → node object
+let focusedId    = null;     // which card is currently being edited
+let zoom         = 1.0;
+let panX         = 0;
+let panY         = 0;
+let isPanning    = false;
+let panStart     = { x: 0, y: 0 };
+let activeBranches = new Set([0]);  // branch indices currently in use
+
+// Track the furthest row used per branch so new branches don't overlap
+let branchRowMap = { 0: 0 };  // branchIdx → row used
+
+// ── Initialise with one root card ─────────────────────────────
+function init() {
+  const rootId = addNode(null, 0, 0, 0);
+  focusCard(rootId);
+  render();
+  updateStatus();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NODE MANAGEMENT
+// ═══════════════════════════════════════════════════════════════
+
+let _nextId = 0;
+function newId() { return 'b' + (_nextId++); }
+
+// addNode: create a new beat node and add it to the graph.
+//   parentId  — the node this follows (null for root)
+//   branchIdx — which colour branch (0/1/2)
+//   col, row  — grid position
+function addNode(parentId, branchIdx, col, row) {
+  const id = newId();
+  nodes[id] = { id, text: '', branchIdx, col, row, parentId, children: [] };
+
+  // Register this row for the branch so future branches avoid it
+  branchRowMap[branchIdx] = row;
+
+  // Wire up parent → child
+  if (parentId && nodes[parentId]) {
+    nodes[parentId].children.push(id);
+  }
+  return id;
+}
+
+// getNodePos: convert grid col/row to pixel x/y on the board
+function getNodePos(node) {
+  return {
+    x: ORIGIN_X + node.col * (CARD_W + GAP_X),
+    y: ORIGIN_Y + node.row * (CARD_H + GAP_Y),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADVANCING: Enter key → create or focus next card in same branch
+// ═══════════════════════════════════════════════════════════════
+function advanceFromNode(id) {
+  const node = nodes[id];
+  if (!node) return;
+
+  // If this node already has a child on the same branch, jump to it
+  const sameChild = node.children.find(cid => nodes[cid].branchIdx === node.branchIdx);
+  if (sameChild) {
+    focusCard(sameChild);
+    return;
+  }
+
+  // Otherwise create the next card to the right, same row
+  const nextCol = node.col + 1;
+  const nextRow = node.row;
+  const newId_  = addNode(id, node.branchIdx, nextCol, nextRow);
+  renderCard(newId_);
+  renderConnectors();
+  focusCard(newId_);
+  updateStatus();
+  scrollToCard(newId_);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// VERTICAL NAVIGATION: Cmd+Up / Cmd+Down
+//
+// Looks for an existing card at the same column but one row
+// above (dir=-1) or below (dir=+1) the current card.
+//
+// If a card exists there → focus it.
+// If not → create a new branch card in that slot, using the
+//   next available branch colour index.
+// ═══════════════════════════════════════════════════════════════
+function navigateVertical(id, dir) {
+  const node      = nodes[id];
+  const targetRow = node.row + dir;
+  const targetCol = node.col;
+
+  // Look for an existing node at (targetCol, targetRow)
+  const existing = Object.values(nodes).find(
+    n => n.col === targetCol && n.row === targetRow
+  );
+
+  if (existing) {
+    // Card already exists — just move focus there
+    focusCard(existing.id);
+    scrollToCard(existing.id);
+    return;
+  }
+
+  // No card there — find an unused branch index for the new card
+  const usedBranches = new Set(Object.values(nodes).map(n => n.branchIdx));
+  let newBranchIdx = -1;
+  for (let i = 0; i < MAX_BRANCHES; i++) {
+    if (!usedBranches.has(i)) { newBranchIdx = i; break; }
+  }
+
+  if (newBranchIdx === -1) {
+    // All 3 branch slots are taken — flash feedback
+    const btn = document.getElementById('btnBranch');
+    btn.style.color = '#8c4a4a';
+    btn.style.borderColor = '#8c4a4a';
+    setTimeout(() => { btn.style.color = ''; btn.style.borderColor = ''; }, 600);
+    updateStatus('Max 3 branches reached');
+    return;
+  }
+
+  // Create the new card. Its parent is the current card,
+  // so the connector line will draw from here to the new branch.
+  activeBranches.add(newBranchIdx);
+  const newId_ = addNode(id, newBranchIdx, targetCol, targetRow);
+  renderCard(newId_);
+  renderConnectors();
+  focusCard(newId_);
+  updateBranchDots();
+  updateStatus();
+  scrollToCard(newId_);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BRANCHING: create a new branch from the focused card
+// ═══════════════════════════════════════════════════════════════
+function branchFromNode(id) {
+  const node = nodes[id];
+  if (!node) return;
+
+  // Find an unused branch index (max 3)
+  const usedBranches = new Set(Object.values(nodes).map(n => n.branchIdx));
+  let newBranchIdx = -1;
+  for (let i = 0; i < MAX_BRANCHES; i++) {
+    if (!usedBranches.has(i)) { newBranchIdx = i; break; }
+  }
+
+  if (newBranchIdx === -1) {
+    // Already at max branches — flash the toolbar button as feedback
+    const btn = document.getElementById('btnBranch');
+    btn.style.color = '#8c4a4a';
+    btn.style.borderColor = '#8c4a4a';
+    setTimeout(() => { btn.style.color = ''; btn.style.borderColor = ''; }, 600);
+    updateStatus('Max 3 branches reached');
+    return;
+  }
+
+  // Pick a row that doesn't collide with existing branches.
+  // Alternate above/below: branch 1 goes up (row -1), branch 2 goes further up or down.
+  const usedRows = new Set(Object.values(nodes).filter(n => n.col === node.col + 1).map(n => n.row));
+  let targetRow = node.row - 1;
+  // If that row is taken, try row+1, then row-2, etc.
+  let attempt = 1;
+  while (usedRows.has(targetRow)) {
+    targetRow = node.row + (attempt % 2 === 0 ? attempt/2 : -(Math.ceil(attempt/2)));
+    attempt++;
+  }
+
+  activeBranches.add(newBranchIdx);
+
+  const newId_ = addNode(id, newBranchIdx, node.col + 1, targetRow);
+  renderCard(newId_);
+  renderConnectors();
+  focusCard(newId_);
+  updateBranchDots();
+  updateStatus();
+  scrollToCard(newId_);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDERING: DOM card creation
+// ═══════════════════════════════════════════════════════════════
+function render() {
+  // Full re-render — clear and rebuild everything
+  document.getElementById('board').innerHTML = '';
+  document.getElementById('connector-svg').innerHTML = '';
+  Object.keys(nodes).forEach(renderCard);
+  renderConnectors();
+  updateBranchDots();
+}
+
+function renderCard(id) {
+  const node = nodes[id];
+  const pos  = getNodePos(node);
+  const board = document.getElementById('board');
+
+  // Remove old DOM element if it exists (for re-renders)
+  const existing = document.getElementById('card-' + id);
+  if (existing) existing.remove();
+
+  const div = document.createElement('div');
+  div.className = `card branch-${node.branchIdx}`;
+  div.id = 'card-' + id;
+  div.style.left = pos.x + 'px';
+  div.style.top  = pos.y + 'px';
+
+  div.innerHTML = `
+    <div class="card-header">
+      <span>BEAT ${node.col + 1}</span>
+      <span class="branch-label">${BRANCH_NAMES[node.branchIdx]}</span>
+    </div>
+    <textarea
+      id="ta-${id}"
+      placeholder="Describe this beat…"
+      rows="3"
+      spellcheck="false"
+    >${escapeHtml(node.text)}</textarea>
+    <div class="card-footer">
+      <span><kbd>Enter</kbd> →</span>
+      <span><kbd>⌘↑↓</kbd> branch</span>
+      <span><kbd>⌘←</kbd> back</span>
+    </div>
+  `;
+
+  board.appendChild(div);
+
+  // ── Wire textarea events ──────────────────────────────────────
+  const ta = div.querySelector('textarea');
+
+  // Save text on every keystroke
+  ta.addEventListener('input', () => {
+    node.text = ta.value;
+  });
+
+  // Focus the card when clicking anywhere on it
+  div.addEventListener('mousedown', (e) => {
+    // Don't steal focus from the textarea itself
+    if (e.target === ta) return;
+    focusCard(id);
+  });
+
+  ta.addEventListener('focus', () => focusCard(id));
+
+  // ── Keyboard navigation ────────────────────────────────────────
+  // Enter          → advance right (create card if needed)
+  // Cmd + Right    → same as Enter
+  // Cmd + Left     → go back to parent card
+  // Cmd + Up       → go to card above (same col, row-1) — creates one if empty
+  // Cmd + Down     → go to card below (same col, row+1) — creates one if empty
+  // Shift + Enter  → insert a newline inside the beat text (normal typing)
+  ta.addEventListener('keydown', (e) => {
+    const cmd = e.metaKey || e.ctrlKey;  // Cmd on Mac, Ctrl on Windows
+
+    // ── Enter (no modifier) or Cmd+Right → advance right ──────
+    if ((e.key === 'Enter' && !e.shiftKey && !cmd) ||
+        (e.key === 'ArrowRight' && cmd)) {
+      e.preventDefault();
+      advanceFromNode(id);
+      return;
+    }
+
+    // ── Cmd+Left → go back to parent ──────────────────────────
+    if (e.key === 'ArrowLeft' && cmd) {
+      e.preventDefault();
+      const node = nodes[id];
+      if (node.parentId) {
+        focusCard(node.parentId);
+        scrollToCard(node.parentId);
+      }
+      return;
+    }
+
+    // ── Cmd+Up → navigate or create card above ────────────────
+    if (e.key === 'ArrowUp' && cmd) {
+      e.preventDefault();
+      navigateVertical(id, -1);  // -1 = up (row decreases)
+      return;
+    }
+
+    // ── Cmd+Down → navigate or create card below ──────────────
+    if (e.key === 'ArrowDown' && cmd) {
+      e.preventDefault();
+      navigateVertical(id, +1);  // +1 = down (row increases)
+      return;
+    }
+  });
+}
+
+// ── renderConnectors: draw SVG lines between parent → child cards ──
+//
+// Lines are drawn as simple L-shaped paths:
+//   start at the right edge mid-point of the parent card
+//   go right by GAP_X/2
+//   then go up/down to the child's row
+//   then go right to the left edge of the child card
+function renderConnectors() {
+  const svg = document.getElementById('connector-svg');
+  svg.innerHTML = '';
+
+  Object.values(nodes).forEach(node => {
+    node.children.forEach(childId => {
+      const child    = nodes[childId];
+      const pPos     = getNodePos(node);
+      const cPos     = getNodePos(child);
+      const branchColor = getBranchColor(child.branchIdx);
+
+      // Start: right-centre of parent
+      const x1 = pPos.x + CARD_W;
+      const y1 = pPos.y + CARD_H / 2;
+
+      // End: left-centre of child
+      const x2 = cPos.x;
+      const y2 = cPos.y + CARD_H / 2;
+
+      // Midpoint for the L-bend
+      const mx = x1 + GAP_X / 2;
+
+      // Draw: right → bend → right (elbow connector)
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', `M ${x1} ${y1} H ${mx} V ${y2} H ${x2}`);
+      path.setAttribute('stroke', branchColor);
+      path.setAttribute('stroke-width', '1');
+      path.setAttribute('fill', 'none');
+      path.setAttribute('opacity', '0.5');
+      svg.appendChild(path);
+
+      // Small arrow tip at the end
+      const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      arrow.setAttribute('points', `${x2},${y2} ${x2-6},${y2-4} ${x2-6},${y2+4}`);
+      arrow.setAttribute('fill', branchColor);
+      arrow.setAttribute('opacity', '0.5');
+      svg.appendChild(arrow);
+    });
+  });
+}
+
+function getBranchColor(idx) {
+  return ['#c8a84b', '#6a8cc8', '#8cc86a'][idx] || '#c8a84b';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FOCUS
+// ═══════════════════════════════════════════════════════════════
+function focusCard(id) {
+  // Unfocus old card
+  if (focusedId) {
+    const old = document.getElementById('card-' + focusedId);
+    if (old) old.classList.remove('focused');
+  }
+  focusedId = id;
+  const el = document.getElementById('card-' + id);
+  if (el) {
+    el.classList.add('focused');
+    // Focus the textarea so the user can type immediately
+    const ta = el.querySelector('textarea');
+    if (ta && document.activeElement !== ta) ta.focus();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ZOOM & PAN
+// ═══════════════════════════════════════════════════════════════
+function applyTransform() {
+  document.getElementById('board').style.transform =
+    `translate(${panX}px, ${panY}px) scale(${zoom})`;
+  document.getElementById('connector-svg').style.transform =
+    `translate(${panX}px, ${panY}px) scale(${zoom})`;
+}
+
+function scrollToCard(id) {
+  const node = nodes[id];
+  if (!node) return;
+  const pos  = getNodePos(node);
+  const wrap = document.getElementById('canvasWrap');
+  // Centre the card in the viewport
+  panX = wrap.clientWidth  / 2 - (pos.x + CARD_W / 2) * zoom;
+  panY = wrap.clientHeight / 2 - (pos.y + CARD_H / 2) * zoom;
+  applyTransform();
+}
+
+function fitAll() {
+  // Calculate the bounding box of all cards
+  const nodeList = Object.values(nodes);
+  if (nodeList.length === 0) return;
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  nodeList.forEach(n => {
+    const pos = getNodePos(n);
+    minX = Math.min(minX, pos.x);
+    minY = Math.min(minY, pos.y);
+    maxX = Math.max(maxX, pos.x + CARD_W);
+    maxY = Math.max(maxY, pos.y + CARD_H);
+  });
+
+  const wrap    = document.getElementById('canvasWrap');
+  const padding = 60;
+  const scaleX  = (wrap.clientWidth  - padding * 2) / (maxX - minX);
+  const scaleY  = (wrap.clientHeight - padding * 2) / (maxY - minY);
+  zoom = Math.min(scaleX, scaleY, 1.0);  // don't zoom in past 100%
+
+  panX = padding - minX * zoom;
+  panY = padding - minY * zoom;
+  applyTransform();
+}
+
+// ── Drag to pan ───────────────────────────────────────────────
+const canvasWrap = document.getElementById('canvasWrap');
+
+canvasWrap.addEventListener('mousedown', (e) => {
+  // Only pan on the background (not on cards)
+  if (e.target.closest('.card')) return;
+  isPanning = true;
+  panStart  = { x: e.clientX - panX, y: e.clientY - panY };
+  canvasWrap.style.cursor = 'grabbing';
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!isPanning) return;
+  panX = e.clientX - panStart.x;
+  panY = e.clientY - panStart.y;
+  applyTransform();
+});
+
+window.addEventListener('mouseup', () => {
+  isPanning = false;
+  canvasWrap.style.cursor = '';
+});
+
+// Scroll wheel to zoom
+canvasWrap.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  zoom = Math.max(0.15, Math.min(2.0, zoom * delta));
+  applyTransform();
+}, { passive: false });
+
+// ═══════════════════════════════════════════════════════════════
+// BRANCH DOTS (toolbar indicators)
+// ═══════════════════════════════════════════════════════════════
+function updateBranchDots() {
+  const container = document.getElementById('branchDots');
+  container.innerHTML = '';
+  for (let i = 0; i < MAX_BRANCHES; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'branch-dot';
+    if (activeBranches.has(i)) dot.classList.add(`active-${i}`);
+    container.appendChild(dot);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CODIFY: render a branch as an ASCII timeline
+//
+// Collects all nodes on a given branchIdx in column order,
+// then renders them as a horizontal ASCII chain:
+//
+//   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+//   │  BEAT 1     │────▶│  BEAT 2     │────▶│  BEAT 3     │
+//   │ Hero wakes  │     │ Sees smoke  │     │ Runs outside│
+//   └─────────────┘     └─────────────┘     └─────────────┘
+// ═══════════════════════════════════════════════════════════════
+function codifyBranch(branchIdx) {
+  // Collect nodes on this branch, sorted by column
+  const branchNodes = Object.values(nodes)
+    .filter(n => n.branchIdx === branchIdx)
+    .sort((a, b) => a.col - b.col);
+
+  if (branchNodes.length === 0) {
+    return `(no beats on ${BRANCH_NAMES[branchIdx]})`;
+  }
+
+  const BOX_W   = 20;  // inner width of each beat box
+  const LINES   = 5;   // rows per card (top border + 3 content + bottom border)
+  const CONN    = '────▶';
+
+  // Build the timeline row by row
+  // Row 0: top borders
+  // Row 1: beat label
+  // Row 2: text line 1
+  // Row 3: text line 2 (or blank)
+  // Row 4: bottom borders
+
+  const rows = ['', '', '', '', ''];
+
+  branchNodes.forEach((node, i) => {
+    const isLast = i === branchNodes.length - 1;
+
+    // Wrap the beat text into two lines of BOX_W chars
+    const words    = node.text.trim().replace(/\n/g, ' ') || '—';
+    const line1    = words.slice(0, BOX_W).padEnd(BOX_W);
+    const line2    = words.length > BOX_W
+      ? (words.slice(BOX_W, BOX_W * 2) + (words.length > BOX_W * 2 ? '…' : '')).padEnd(BOX_W)
+      : ' '.repeat(BOX_W);
+
+    const beatLabel = `BEAT ${node.col + 1} [${BRANCH_NAMES[branchIdx]}]`.slice(0, BOX_W).padEnd(BOX_W);
+
+    rows[0] += '┌' + '─'.repeat(BOX_W) + '┐';
+    rows[1] += '│' + beatLabel          + '│';
+    rows[2] += '│' + line1              + '│';
+    rows[3] += '│' + line2              + '│';
+    rows[4] += '└' + '─'.repeat(BOX_W) + '┘';
+
+    // Connector between cards
+    if (!isLast) {
+      rows[0] += ' '.repeat(CONN.length);
+      rows[1] += ' '.repeat(CONN.length);
+      rows[2] += CONN;
+      rows[3] += ' '.repeat(CONN.length);
+      rows[4] += ' '.repeat(CONN.length);
+    }
+  });
+
+  const header  = `// CODIFIED TIMELINE — ${BRANCH_NAMES[branchIdx].toUpperCase()}\n// ${branchNodes.length} beats\n\n`;
+  return header + rows.join('\n');
+}
+
+// ── Show branch selector modal ────────────────────────────────
+function openCodeifyModal() {
+  const modal   = document.getElementById('branch-select-modal');
+  const options = document.getElementById('branchOptions');
+  options.innerHTML = '';
+
+  activeBranches.forEach(idx => {
+    const count = Object.values(nodes).filter(n => n.branchIdx === idx).length;
+    const opt   = document.createElement('div');
+    opt.className = 'branch-option';
+    opt.innerHTML = `
+      <div class="opt-label">${BRANCH_NAMES[idx]}</div>
+      <div>${count} beat${count !== 1 ? 's' : ''}</div>
+    `;
+    opt.style.borderLeftColor = getBranchColor(idx);
+    opt.style.borderLeftWidth = '3px';
+    opt.addEventListener('click', () => {
+      modal.classList.remove('visible');
+      showTimeline(idx);
+    });
+    options.appendChild(opt);
+  });
+
+  modal.classList.add('visible');
+}
+
+function showTimeline(branchIdx) {
+  const output = codifyBranch(branchIdx);
+  document.getElementById('timeline-output').textContent = output;
+  document.getElementById('timeline-overlay').classList.add('visible');
+  document.getElementById('modeLabel').textContent = 'TIMELINE';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATUS BAR
+// ═══════════════════════════════════════════════════════════════
+function updateStatus(hint) {
+  document.getElementById('statBeats').textContent    = Object.keys(nodes).length;
+  document.getElementById('statBranches').textContent = activeBranches.size;
+  if (hint) document.getElementById('statHint').textContent = hint;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOOLBAR BUTTON WIRING
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('btnBranch').addEventListener('click', () => {
+  if (focusedId) branchFromNode(focusedId);
+});
+
+document.getElementById('btnZoomOut').addEventListener('click', () => {
+  zoom = Math.max(0.15, zoom * 0.75);
+  applyTransform();
+});
+
+document.getElementById('btnZoomIn').addEventListener('click', () => {
+  zoom = Math.min(2.0, zoom * 1.33);
+  applyTransform();
+});
+
+document.getElementById('btnFit').addEventListener('click', fitAll);
+
+document.getElementById('btnCodeify').addEventListener('click', openCodeifyModal);
+
+document.getElementById('btnCancelModal').addEventListener('click', () => {
+  document.getElementById('branch-select-modal').classList.remove('visible');
+});
+
+document.getElementById('btnCloseTimeline').addEventListener('click', () => {
+  document.getElementById('timeline-overlay').classList.remove('visible');
+  document.getElementById('modeLabel').textContent = 'EDIT';
+});
+
+// ── HTML escaping helper ───────────────────────────────────────
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+init();
+applyTransform();
+</script>
+
+</body>
+</html>

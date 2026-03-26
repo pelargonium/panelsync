@@ -4,7 +4,7 @@ import {
   Modal, TextInput, KeyboardAvoidingView,
   Platform, ActivityIndicator, RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { useTheme } from '../context/ThemeContext';
 import { api, getToken, clearToken, type ApiUniverse } from '../lib/api';
 import { fromNativeEvent, fromWebEvent, isWeb, type KeyInfo } from '../lib/keyboard';
@@ -80,6 +80,7 @@ function DeleteUniverseModal({ universe, onClose, onDeleted }: {
   onDeleted: (id: string) => void;
 }) {
   const { colors, mono } = useTheme();
+  const [step, setStep] = useState<'confirm' | 'final'>('confirm');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,26 +102,48 @@ function DeleteUniverseModal({ universe, onClose, onDeleted }: {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={onClose} />
         <View style={{ backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border, padding: 24, width: '90%', maxWidth: 480 }}>
-          <Text style={{ fontFamily: mono, fontSize: 14, color: colors.text, marginBottom: 8 }}>Delete "{universe.name}"?</Text>
-          <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted, marginBottom: 16 }}>
-            This will permanently delete the universe and all its content.
-          </Text>
-          {error && <Text style={{ fontFamily: mono, fontSize: 12, color: colors.error, marginBottom: 8 }}>{error}</Text>}
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
-            <TouchableOpacity onPress={onClose} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
-              <Text style={{ fontFamily: mono, fontSize: 13, color: colors.muted }}>cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleDelete}
-              disabled={loading}
-              style={{ paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: colors.error }}
-            >
-              {loading
-                ? <ActivityIndicator color={colors.error} size="small" />
-                : <Text style={{ fontFamily: mono, fontSize: 13, color: colors.error }}>delete</Text>
-              }
-            </TouchableOpacity>
-          </View>
+          {step === 'confirm' ? (
+            <>
+              <Text style={{ fontFamily: mono, fontSize: 14, color: colors.text, marginBottom: 8 }}>Delete "{universe.name}"?</Text>
+              <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted, marginBottom: 16 }}>
+                This will permanently delete the universe and all its content.
+              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
+                <TouchableOpacity onPress={onClose} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
+                  <Text style={{ fontFamily: mono, fontSize: 13, color: colors.muted }}>cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setStep('final')}
+                  style={{ paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: colors.error }}
+                >
+                  <Text style={{ fontFamily: mono, fontSize: 13, color: colors.error }}>delete</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={{ fontFamily: mono, fontSize: 14, color: colors.error, marginBottom: 8 }}>Are you sure?</Text>
+              <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted, marginBottom: 16 }}>
+                This can't be undone. "{universe.name}" and everything in it will be gone.
+              </Text>
+              {error && <Text style={{ fontFamily: mono, fontSize: 12, color: colors.error, marginBottom: 8 }}>{error}</Text>}
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
+                <TouchableOpacity onPress={onClose} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
+                  <Text style={{ fontFamily: mono, fontSize: 13, color: colors.muted }}>cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleDelete}
+                  disabled={loading}
+                  style={{ paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: colors.error }}
+                >
+                  {loading
+                    ? <ActivityIndicator color={colors.error} size="small" />
+                    : <Text style={{ fontFamily: mono, fontSize: 13, color: colors.error }}>delete forever</Text>
+                  }
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -129,6 +152,7 @@ function DeleteUniverseModal({ universe, onClose, onDeleted }: {
 
 export default function WorldsDashboard() {
   const router = useRouter();
+  const pathname = usePathname();
   const { colors, mono, toggle, mode } = useTheme();
   const [universes, setUniverses] = useState<ApiUniverse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -173,6 +197,15 @@ export default function WorldsDashboard() {
     if (modalVisible || pendingDeleteUniverse) return;
     if (universes.length === 0) return;
 
+    // Only handle keys when the dashboard is the active route
+    if (pathname !== '/') return;
+
+    // Don't handle keys when an input/textarea is focused
+    if (isWeb) {
+      const active = document.activeElement as HTMLElement;
+      if (active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA') return;
+    }
+
     if (info.key === 'ArrowDown') {
       info.prevent();
       setSelectedIndex(i => Math.min(universes.length - 1, i + 1));
@@ -183,7 +216,8 @@ export default function WorldsDashboard() {
       info.prevent();
       const u = universes[selectedIndex];
       if (u) router.push({ pathname: '/universe/[id]', params: { id: u.id, name: u.name } });
-    } else if (info.key === 'Backspace' && !info.meta) {
+    } else if (info.key === 'Backspace' && info.meta) {
+      info.prevent();
       const u = universes[selectedIndex];
       if (u) setPendingDeleteUniverse(u);
     }

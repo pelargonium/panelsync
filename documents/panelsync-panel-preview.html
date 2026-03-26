@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PanelSync — Panel Map Preview</title>
+  <style>
+    /* ─── Google Font: JetBrains Mono for that clean terminal feel ─── */
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+    :root {
+      --bg:         #0c0c0c;
+      --surface:    #131313;
+      --border:     #252525;
+      --accent:     #c8a84b;   /* warm amber — like ink on paper */
+      --accent-dim: #6b5a28;
+      --text:       #ddd0b0;
+      --text-dim:   #5a5040;
+      --green:      #4a8c6a;   /* subtle green for page headers */
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      /* JetBrains Mono falls back to Courier New if the import fails */
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ─── Top header bar ─── */
+    header {
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .subtitle {
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 0.08em;
+    }
+
+    /* ─── Main two-pane layout ─── */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Each pane is a flex column: header label + content */
+    .pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0; /* lets flex children shrink below content size */
+    }
+
+    .pane-label {
+      padding: 7px 16px;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    /* Vertical divider between panes */
+    .divider {
+      width: 1px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    /* ─── Script input textarea ─── */
+    textarea {
+      flex: 1;
+      background: var(--surface);
+      border: none;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 12.5px;
+      line-height: 1.65;
+      padding: 16px;
+      resize: none;
+      outline: none;
+      tab-size: 2;
+    }
+
+    textarea::placeholder { color: var(--text-dim); }
+    textarea::selection   { background: var(--accent-dim); }
+
+    /* ─── ASCII preview panel ─── */
+    .preview {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: auto;
+      padding: 16px 20px 32px;
+    }
+
+    /* The <pre> that holds all the ASCII art */
+    pre#output {
+      font-family: inherit;
+      font-size: 12.5px;
+      line-height: 1.5;
+      white-space: pre;
+      color: var(--accent);
+    }
+
+    /* Empty state / hint text inside the pre */
+    .hint {
+      color: var(--text-dim);
+      font-size: 12px;
+      line-height: 1.9;
+    }
+
+    /* ─── Bottom status bar ─── */
+    .statusbar {
+      padding: 5px 18px;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 24px;
+      flex-shrink: 0;
+    }
+
+    .statusbar span { color: var(--accent-dim); }
+    .statusbar b    { color: var(--accent);     font-weight: 500; }
+
+    /* ─── Custom scrollbar (webkit) ─── */
+    ::-webkit-scrollbar          { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track    { background: var(--bg); }
+    ::-webkit-scrollbar-thumb    { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">PanelSync</span>
+  <span class="subtitle">// panel map preview</span>
+</header>
+
+<div class="main">
+
+  <!-- ── LEFT PANE: raw script input ── -->
+  <div class="pane">
+    <div class="pane-label">Script Input</div>
+    <textarea
+      id="scriptInput"
+      spellcheck="false"
+      placeholder="PAGE 1&#10;&#10;PANEL 1 (SPLASH)&#10;Wide establishing shot of the city.&#10;&#10;PAGE 2&#10;&#10;PANEL 1 (WIDE)&#10;Close up on the hero's face.&#10;&#10;PANEL 2&#10;The villain steps out of the shadows.&#10;&#10;PANEL 3 (SMALL)&#10;A bullet casing hits the floor."
+    ></textarea>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ── RIGHT PANE: ASCII panel map ── -->
+  <div class="pane">
+    <div class="pane-label">Panel Map</div>
+    <div class="preview">
+      <pre id="output"><span class="hint">Paste your script on the left.
+
+Expected markers:
+  PAGE 1
+  PANEL 1 (SPLASH | HALF | WIDE | SMALL)
+
+Size keywords are detected anywhere on the
+PANEL line or the line immediately after it.</span></pre>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Status bar shows live stats ── -->
+<div class="statusbar">
+  <span>PAGES: <b id="statPages">—</b></span>
+  <span>PANELS: <b id="statPanels">—</b></span>
+  <span id="statSizes"></span>
+</div>
+
+<script>
+  // ═══════════════════════════════════════════════════════════════
+  // PAGE BUDGET SYSTEM
+  //
+  // Each size keyword has a defined percentage of a page it consumes.
+  // These are the "true" costs — they don't flex based on what other
+  // panels are on the page. If panels add up to more than 100%, the
+  // page is considered "overfull" and we flag it.
+  //
+  // Budget values (as decimals, so 1.0 = 100% = a full page):
+  //   SPLASH   = 1.00  (entire page — nothing else should follow)
+  //   HALF     = 0.50  (half the page)
+  //   WIDE     = 0.33  (roughly one tier / one third)
+  //   STANDARD = 0.25  (assumes a ~4-panel page as baseline)
+  //   SMALL    = 0.15  (small inset)
+  // ═══════════════════════════════════════════════════════════════
+  const SIZE_BUDGET = {
+    SPLASH:   1.00,
+    HALF:     0.50,
+    WIDE:     0.33,
+    STANDARD: 0.25,
+    SMALL:    0.15,
+  };
+
+  // Total rows we draw the page box at (the "canvas" height in characters).
+  // Each panel gets rows proportional to its budget fraction of this total.
+  const PAGE_ROWS = 24;
+
+  // Minimum rows any panel can be rendered at (so the label always fits)
+  const MIN_ROWS = 3;
+
+  // Inner width of the ASCII box in characters (not counting the │ borders)
+  const INNER_W = 36;
+
+
+  // ═══════════════════════════════════════════════════════════════
+  // STEP 1 — SIZE DETECTION
+  //
+  // Given a line of text, returns one of the five size keys above.
+  // We uppercase the input so matching is case-insensitive.
+  // ═══════════════════════════════════════════════════════════════
+  function detectSize(text) {
+    const t = text.toUpperCase();
+    if (/SPLASH|FULL[- ]?PAGE|FULL[- ]?BLEED|DOUBLE[- ]?PAGE|\bDPS\b/.test(t)) return 'SPLASH';
+    if (/HALF[- ]?PAGE|\bHALF\b/.test(t))                                       return 'HALF';
+    if (/\bWIDE\b|PANORAMIC|\bTIER\b|HORIZONTAL|BANNER/.test(t))                return 'WIDE';
+    if (/\bSMALL\b|\bINSET\b|INSERT|\bTINY\b/.test(t))                         return 'SMALL';
+    return 'STANDARD';
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════
+  // STEP 2 — SCRIPT PARSER
+  //
+  // Walks every line looking for PAGE and PANEL markers.
+  // Returns an array of page objects:
+  //   [
+  //     {
+  //       panels: [ { number, size }, ... ],
+  //       budget: 0.0–1.0+   ← sum of SIZE_BUDGET values for all panels
+  //       overflow: true/false
+  //     },
+  //     ...
+  //   ]
+  // ═══════════════════════════════════════════════════════════════
+  function parseScript(text) {
+    const lines        = text.split('\n');
+    const pages        = [];
+    let   currentPage  = null;
+    let   currentPanel = null;
+    let   panelLineIdx = -1;
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+
+      // ── PAGE marker ────────────────────────────────────────────
+      if (/^P(?:AGE)?\.?\s+\d+/i.test(trimmed) || /^PAGE\s+[A-Z]+/i.test(trimmed)) {
+        if (currentPage) finalise(currentPage) && pages.push(currentPage);
+        currentPage  = { panels: [] };
+        currentPanel = null;
+        panelLineIdx = -1;
+        continue;
+      }
+
+      // ── PANEL marker ───────────────────────────────────────────
+      const panelMatch = trimmed.match(/^PANEL\s+(\d+)/i);
+      if (panelMatch) {
+        if (!currentPage) currentPage = { panels: [] };
+        currentPanel = { number: parseInt(panelMatch[1], 10), size: detectSize(trimmed) };
+        currentPage.panels.push(currentPanel);
+        panelLineIdx = i;
+        continue;
+      }
+
+      // ── Look-ahead: check the line right after a PANEL for size ─
+      if (currentPanel && i === panelLineIdx + 1 && currentPanel.size === 'STANDARD') {
+        const found = detectSize(trimmed);
+        if (found !== 'STANDARD') currentPanel.size = found;
+      }
+    }
+
+    // Save the last page
+    if (currentPage) { finalise(currentPage); pages.push(currentPage); }
+
+    return pages.filter(p => p.panels.length > 0);
+  }
+
+  // ── finalise(): compute the page budget and set the overflow flag.
+  //    Called once all panels for a page have been collected.
+  //    Mutates the page object in place and returns it.
+  function finalise(page) {
+    // Sum up what fraction of the page the panels collectively claim.
+    // e.g. one HALF (0.5) + two STANDARD (0.25 each) = 1.0 → exactly full
+    page.budget   = page.panels.reduce((sum, p) => sum + (SIZE_BUDGET[p.size] || 0.25), 0);
+
+    // Round to 2 decimal places to avoid floating-point noise like 1.0000000001
+    page.budget   = Math.round(page.budget * 100) / 100;
+
+    // Overflow if the panels claim more than a page allows
+    page.overflow = page.budget > 1.0;
+
+    // Also flag if the page is suspiciously underfull (< 50% used)
+    // This is a soft warning — not an error, just a note
+    page.underfull = page.budget < 0.5;
+
+    return page;
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════
+  // STEP 3 — ASCII PAGE RENDERER
+  //
+  // Converts a finalised page object into a multi-line ASCII string.
+  //
+  // Each panel's row height is calculated from its budget fraction:
+  //   rows = Math.round( (panelBudget / totalBudget) * PAGE_ROWS )
+  //
+  // If the page overflows (budget > 1.0), panels beyond 100% are
+  // drawn with a !! overflow marker instead of normal content.
+  //
+  // Lines are prefixed with special tags for later HTML colouring:
+  //   @@  = page header (green)
+  //   !!  = overflow warning (red)
+  //   ~~  = underfull note (yellow/dim)
+  // ═══════════════════════════════════════════════════════════════
+  function renderPage(page, pageNum) {
+    const panels = page.panels;
+    const lines  = [];
+
+    // Page header line
+    const budgetPct = Math.round(page.budget * 100);
+    const budgetTag = page.overflow
+      ? `!!  PAGE ${pageNum}  [OVERFLOW: ${budgetPct}% used]`
+      : page.underfull
+        ? `~~  PAGE ${pageNum}  [${budgetPct}% used]`
+        : `@@  PAGE ${pageNum}  [${budgetPct}% used]`;
+    lines.push(budgetTag);
+
+    if (panels.length === 0) {
+      lines.push('┌' + '─'.repeat(INNER_W) + '┐');
+      lines.push('│' + '  (no panels)'.padEnd(INNER_W) + '│');
+      lines.push('└' + '─'.repeat(INNER_W) + '┘');
+      return lines.join('\n');
+    }
+
+    // ── Calculate row heights from the true budget fractions ─────
+    //
+    // We use each panel's share of the *total budgeted space* to
+    // determine its rendered height. This means even on an overflow
+    // page the boxes stay proportional to each other — but the
+    // overflow warning makes the problem visible.
+    //
+    // Example: HALF(0.5) + WIDE(0.33) + STANDARD(0.25) = 1.08 (overflow)
+    //   HALF    → 0.5/1.08  ≈ 46% of PAGE_ROWS
+    //   WIDE    → 0.33/1.08 ≈ 31%
+    //   STANDARD→ 0.25/1.08 ≈ 23%
+    const totalBudget = page.budget;  // already computed in finalise()
+
+    let heights = panels.map(p => {
+      const fraction = (SIZE_BUDGET[p.size] || 0.25) / totalBudget;
+      return Math.max(MIN_ROWS, Math.round(fraction * PAGE_ROWS));
+    });
+
+    // Rounding can leave us off by a row or two; absorb into tallest panel
+    const rowSum  = heights.reduce((a, b) => a + b, 0);
+    const delta   = PAGE_ROWS - rowSum;
+    const maxIdx  = heights.indexOf(Math.max(...heights));
+    heights[maxIdx] = Math.max(MIN_ROWS, heights[maxIdx] + delta);
+
+    // ── Track running budget as we draw each panel ───────────────
+    // This lets us show how much page is left BEFORE each panel.
+    let spent = 0;
+
+    panels.forEach((panel, i) => {
+      const h       = heights[i];
+      const isFirst = i === 0;
+      const isLast  = i === panels.length - 1;
+
+      // How much of the page this panel costs
+      const cost      = SIZE_BUDGET[panel.size] || 0.25;
+      const remaining = Math.round((1.0 - spent) * 100); // % left before this panel
+      spent += cost;
+      const afterPct  = Math.round((1.0 - spent) * 100); // % left after this panel
+
+      // Whether this panel is itself over-budget (started after 100% was used)
+      const isOver = (spent - cost) >= 1.0;
+
+      // ── Top border ─────────────────────────────────────────────
+      if (isFirst) {
+        lines.push('┌' + '─'.repeat(INNER_W) + '┐');
+      } else {
+        lines.push('├' + '─'.repeat(INNER_W) + '┤');
+      }
+
+      // ── Panel label row ─────────────────────────────────────────
+      // Shows: panel number, size, budget cost, and remaining space
+      const costStr   = `${Math.round(cost * 100)}%`;
+      const afterStr  = afterPct < 0 ? `${Math.abs(afterPct)}% OVER` : `${afterPct}% left`;
+      const label     = `  PANEL ${panel.number}  [${panel.size}] ${costStr} → ${afterStr}`;
+      const padded    = label.padEnd(INNER_W);
+
+      // Prefix the label line with !! if we're in overflow territory
+      const labelPrefix = isOver ? '!!' : '  ';
+      lines.push(`${labelPrefix}│` + padded + '│');
+
+      // ── Interior blank rows ─────────────────────────────────────
+      for (let r = 1; r < h; r++) {
+        lines.push('  │' + ' '.repeat(INNER_W) + '│');
+      }
+
+      // ── Bottom border (last panel only) ─────────────────────────
+      if (isLast) {
+        lines.push('  └' + '─'.repeat(INNER_W) + '┘');
+
+        // If we're over budget, add a clear error line below the box
+        if (page.overflow) {
+          const over = Math.round((page.budget - 1.0) * 100);
+          lines.push(`!!    ▲ PAGE OVERFLOW: ${over}% too many panels`);
+        }
+      }
+    });
+
+    return lines.join('\n');
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════
+  // STEP 4 — MAIN RENDER LOOP
+  // ═══════════════════════════════════════════════════════════════
+  function render() {
+    const text   = document.getElementById('scriptInput').value;
+    const output = document.getElementById('output');
+
+    if (!text.trim()) {
+      output.innerHTML = hint();
+      setStatus(0, 0, {}, 0);
+      return;
+    }
+
+    const pages = parseScript(text);
+
+    if (pages.length === 0) {
+      output.innerHTML = '<span class="hint">No PAGE or PANEL markers detected.\n\nTry:\n  PAGE 1\n  PANEL 1 (SPLASH)\n  PANEL 2 (HALF)</span>';
+      setStatus(0, 0, {}, 0);
+      return;
+    }
+
+    // Render each page, join with spacing
+    const rawPages = pages.map((page, i) => renderPage(page, i + 1));
+    const joined   = rawPages.join('\n\n\n');
+
+    // ── Colourise lines by their prefix tag ──────────────────────
+    //   @@  → green  (normal page header)
+    //   !!  → red    (overflow)
+    //   ~~  → yellow (underfull)
+    //   (no prefix) → normal amber
+    const html = joined
+      .split('\n')
+      .map(line => {
+        const esc = escHtml(line);
+        if (line.startsWith('@@')) return `<span style="color:var(--green)">${escHtml(line.slice(2))}</span>`;
+        if (line.startsWith('!!')) return `<span style="color:#c0392b;font-weight:500">${escHtml(line.slice(2))}</span>`;
+        if (line.startsWith('~~')) return `<span style="color:#b8860b">${escHtml(line.slice(2))}</span>`;
+        return esc;
+      })
+      .join('\n');
+
+    output.innerHTML = html;
+
+    // ── Status bar ────────────────────────────────────────────────
+    const totalPanels  = pages.reduce((s, p) => s + p.panels.length, 0);
+    const overflowCount = pages.filter(p => p.overflow).length;
+    const sizeCounts   = {};
+    pages.forEach(pg => pg.panels.forEach(p => {
+      sizeCounts[p.size] = (sizeCounts[p.size] || 0) + 1;
+    }));
+    setStatus(pages.length, totalPanels, sizeCounts, overflowCount);
+  }
+
+  function setStatus(pages, panels, sizes, overflows) {
+    document.getElementById('statPages').textContent  = pages  || '—';
+    document.getElementById('statPanels').textContent = panels || '—';
+
+    const sizeStr = Object.entries(sizes).map(([k, v]) => `${v}× ${k}`).join('  ');
+    let statusExtra = sizeStr;
+    if (overflows > 0) {
+      statusExtra += `  |  ⚠ ${overflows} page${overflows > 1 ? 's' : ''} overflow`;
+    }
+    document.getElementById('statSizes').textContent = statusExtra;
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function hint() {
+    return `<span class="hint">Paste your script on the left.
+
+Expected markers:
+  PAGE 1
+  PANEL 1 (SPLASH | HALF | WIDE | SMALL)
+
+Size budgets:
+  SPLASH   = 100%  (full page)
+  HALF     =  50%
+  WIDE     =  33%
+  STANDARD =  25%  (default)
+  SMALL    =  15%
+
+Each panel shows its cost and how much
+page remains after it. Overflow is flagged
+in red when panels exceed 100%.</span>`;
+  }
+
+  document.getElementById('scriptInput').addEventListener('input', render);
+  render();
+</script>
+
+</body>
+</html>
