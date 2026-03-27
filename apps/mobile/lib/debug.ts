@@ -86,10 +86,10 @@ export function initNetworkCapture() {
     const start = Date.now();
     try {
       const res = await origFetch(input, init);
-      emit({ type: 'network', timestamp: start, method, url, status: res.status, duration: Date.now() - start });
+      setTimeout(() => emit({ type: 'network', timestamp: start, method, url, status: res.status, duration: Date.now() - start }), 0);
       return res;
     } catch (e: any) {
-      emit({ type: 'network', timestamp: start, method, url, error: e?.message ?? 'unknown', duration: Date.now() - start });
+      setTimeout(() => emit({ type: 'network', timestamp: start, method, url, error: e?.message ?? 'unknown', duration: Date.now() - start }), 0);
       throw e;
     }
   };

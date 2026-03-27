@@ -429,7 +429,7 @@ export default function Binder({
     const result: Record<string, ApiEntity[]> = {};
     for (const section of TYPE_SECTIONS) {
       result[section.type] = entities
-        .filter((e) => e.type === section.type && !parentOf[e.id])
+        .filter((e) => e.type === section.type)
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     }
     return result;

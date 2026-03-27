@@ -141,7 +141,7 @@ export default function Editor({
   onScriptElements,
   onEntityType,
 }: EditorProps) {
-  const { updateEntityName, deleteEntity } = useUniverse();
+  const { updateEntityName, duplicateEntity, deleteEntity, activateEntity } = useUniverse();
   const { colors, mono } = useTheme();
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
@@ -572,6 +572,12 @@ export default function Editor({
         paddingVertical: 8,
         gap: 12,
       }}>
+        <TouchableOpacity onPress={async () => {
+          const copy = await duplicateEntity(entityId);
+          activateEntity('entity', copy.id);
+        }}>
+          <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>duplicate</Text>
+        </TouchableOpacity>
         {confirmDelete ? (
           <>
             <Text style={{ fontFamily: mono, fontSize: 12, color: colors.muted }}>delete {entityTypeLabel(entityType)}?</Text>

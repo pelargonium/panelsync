@@ -30,6 +30,7 @@ interface UniverseContextValue {
   loadingEntities: boolean;
   refreshEntities: () => Promise<void>;
   createEntity: (type: ApiEntity['type']) => Promise<ApiEntity>;
+  duplicateEntity: (id: string) => Promise<ApiEntity>;
   deleteEntity: (id: string) => Promise<void>;
   updateEntityName: (id: string, name: string) => void;
   updateEntityPosition: (id: string, position: number) => void;
@@ -106,6 +107,7 @@ function defaultNameForType(type: ApiEntity['type']) {
   if (type === 'folder') return 'Untitled Folder';
   if (type === 'timeline') return 'Untitled Timeline';
   if (type === 'script') return 'Untitled Script';
+  if (type === 'board') return 'Untitled Board';
   return 'Untitled Note';
 }
 
@@ -266,6 +268,34 @@ export function UniverseProvider({
     return res.data;
   }
 
+  async function duplicateEntity(id: string) {
+    const source = await api.entities.get(id);
+    const res = await api.entities.create(universeId, {
+      type: source.data.type as ApiEntity['type'],
+      name: source.data.name + ' copy',
+    });
+    if (source.data.bodyText) {
+      await api.entities.updateContent(res.data.id, source.data.bodyText);
+    }
+    // Copy folder placement: if source is in a folder, put copy in the same folder
+    const parentMembership = memberships.find((m) => {
+      const parent = entities.find((e) => e.id === m.groupId);
+      return m.characterId === id && parent?.type === 'folder';
+    });
+    if (parentMembership) {
+      await addMembership(res.data.id, parentMembership.groupId);
+    }
+    // Copy group members: if source is a group, duplicate all its memberships
+    if (source.data.type === 'group') {
+      const members = memberships.filter((m) => m.groupId === id);
+      for (const m of members) {
+        await addMembership(m.characterId, res.data.id);
+      }
+    }
+    setEntities((current) => [...current, res.data]);
+    return res.data;
+  }
+
   async function deleteEntity(id: string) {
     await api.entities.delete(id);
 
@@ -329,6 +359,7 @@ export function UniverseProvider({
         loadingEntities,
         refreshEntities,
         createEntity,
+        duplicateEntity,
         deleteEntity,
         updateEntityName,
         updateEntityPosition,
