@@ -3,7 +3,7 @@ import { ActivityIndicator, Platform, ScrollView, Text, TextInput, TouchableOpac
 import { useTheme } from '../context/ThemeContext';
 import { useUniverse } from '../context/UniverseContext';
 import { api, type ApiEntity, type ApiMembership } from '../lib/api';
-import { fromNativeEvent, fromWebEvent, isWeb, type KeyInfo } from '../lib/keyboard';
+import { fromNativeEvent, fromWebEvent, isWeb, shouldIgnoreNativeTextInputKey, subscribeNativeKeys, type KeyInfo } from '../lib/keyboard';
 
 type EntityType = ApiEntity['type'];
 
@@ -1061,6 +1061,13 @@ export default function Binder({
   }, []);
 
   useEffect(() => {
+    if (isWeb) return;
+    return subscribeNativeKeys((info) => {
+      handlerRef.current?.(info);
+    });
+  }, []);
+
+  useEffect(() => {
     if (Platform.OS !== 'web' || !dragState) return;
 
     function onPointerMove(e: PointerEvent) { pointerMoveRef.current?.(e); }
@@ -1080,7 +1087,9 @@ export default function Binder({
   }, [dragState !== null]);
 
   function nativeKeyPress(e: any) {
-    handlerRef.current?.(fromNativeEvent(e));
+    const info = fromNativeEvent(e);
+    if (shouldIgnoreNativeTextInputKey(info)) return;
+    handlerRef.current?.(info);
   }
 
   // ── Render ─────────────────────────────────────────────────────────────

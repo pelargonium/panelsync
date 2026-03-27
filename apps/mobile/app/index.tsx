@@ -7,7 +7,7 @@ import {
 import { usePathname, useRouter } from 'expo-router';
 import { useTheme } from '../context/ThemeContext';
 import { api, getToken, clearToken, type ApiUniverse } from '../lib/api';
-import { fromNativeEvent, fromWebEvent, isWeb, type KeyInfo } from '../lib/keyboard';
+import { fromNativeEvent, fromWebEvent, isWeb, shouldIgnoreNativeTextInputKey, subscribeNativeKeys, type KeyInfo } from '../lib/keyboard';
 
 function NewUniverseModal({ visible, onClose, onCreate, onKeyPress }: {
   visible: boolean;
@@ -232,9 +232,22 @@ export default function WorldsDashboard() {
 
   useEffect(() => {
     if (isWeb) return;
+    return subscribeNativeKeys((info) => {
+      keyRef.current?.(info);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (isWeb) return;
     if (!authChecked || modalVisible || pendingDeleteUniverse) return;
     setTimeout(() => hiddenInputRef.current?.focus(), 0);
   }, [authChecked, modalVisible, pendingDeleteUniverse, universes.length]);
+
+  function nativeKeyPress(e: any) {
+    const info = fromNativeEvent(e);
+    if (shouldIgnoreNativeTextInputKey(info)) return;
+    keyRef.current?.(info);
+  }
 
   // Keep selectedIndex in bounds when list changes
   useEffect(() => {
@@ -272,7 +285,7 @@ export default function WorldsDashboard() {
       <TextInput
         ref={hiddenInputRef}
         style={{ position: 'absolute', opacity: 0, height: 0, width: 0 }}
-        onKeyPress={(e: any) => keyRef.current?.(fromNativeEvent(e))}
+        onKeyPress={nativeKeyPress}
         autoCorrect={false}
         autoCapitalize="none"
       />
@@ -329,7 +342,7 @@ export default function WorldsDashboard() {
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         onCreate={handleCreate}
-        onKeyPress={(e: any) => keyRef.current?.(fromNativeEvent(e))}
+        onKeyPress={nativeKeyPress}
       />
       {pendingDeleteUniverse && (
         <DeleteUniverseModal

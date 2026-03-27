@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
-import { fromNativeEvent, fromWebEvent, isWeb, type KeyInfo } from '../lib/keyboard';
+import { fromNativeEvent, fromWebEvent, isWeb, shouldIgnoreNativeTextInputKey, subscribeNativeKeys, type KeyInfo } from '../lib/keyboard';
 import { generateId } from './ScriptView';
 
 export interface BeatNode {
@@ -299,12 +299,12 @@ export default function BoardView({ beats, onBeatsChange, isFocused, nameInputRe
     else if (normalized[0]) setFocusedId(normalized[0].id);
   }
 
-  function occupiedRowsAtCol(current: BeatNode[], col: number): Set<number> {
-    return new Set(current.filter((beat) => beat.col === col).map((beat) => beat.row));
+  function allOccupiedRows(current: BeatNode[]): Set<number> {
+    return new Set(current.map((beat) => beat.row));
   }
 
   function pickRowNear(current: BeatNode[], col: number, baseRow: number, direction: -1 | 1): number {
-    const occupied = occupiedRowsAtCol(current, col);
+    const occupied = allOccupiedRows(current);
     let step = 1;
     while (step < 5000) {
       const candidate = baseRow + (direction * step);
@@ -513,35 +513,55 @@ export default function BoardView({ beats, onBeatsChange, isFocused, nameInputRe
   function connectorInfo(col: number, row: number): { hasUp: boolean; hasDown: boolean; hasLeft: boolean; hasRight: boolean } {
     if (col === 0) return { hasUp: false, hasDown: false, hasLeft: false, hasRight: false };
 
-    let minConnRow = Infinity;
-    let maxConnRow = -Infinity;
-    let hasConnections = false;
-    let parentJunction = false;
+    let hasUp = false;
+    let hasDown = false;
+    let hasLeft = false;
 
     for (const b of normalizedBeats) {
       if (b.col !== col) continue;
       if (!b.parentId) continue;
       const parent = beatMap.get(b.parentId);
       if (!parent || parent.col !== col - 1) continue;
-      if (parent.row === b.row) continue;
+      const parentRow = parent.row;
+      const childRow = b.row;
 
-      hasConnections = true;
-      minConnRow = Math.min(minConnRow, parent.row, b.row);
-      maxConnRow = Math.max(maxConnRow, parent.row, b.row);
-      if (row === parent.row) parentJunction = true;
+      if (parentRow === childRow) {
+        continue;
+      }
+
+      const low = Math.min(parentRow, childRow);
+      const high = Math.max(parentRow, childRow);
+
+      // Interior of this specific segment gets continuous vertical pipe.
+      if (row > low && row < high) {
+        hasUp = true;
+        hasDown = true;
+      }
+
+      // Parent junction: line from left and vertical branch toward child.
+      if (row === parentRow) {
+        hasLeft = true;
+        if (childRow < parentRow) hasUp = true;
+        if (childRow > parentRow) hasDown = true;
+      }
+
+      // Child landing row: branch arrives vertically at this row.
+      if (row === childRow) {
+        if (parentRow < childRow) hasUp = true;
+        if (parentRow > childRow) hasDown = true;
+      }
     }
 
     const beat = byPos.get(`${col}:${row}`) ?? null;
     const beatParent = beat?.parentId ? beatMap.get(beat.parentId) : null;
     const beatFromLeft = !!beatParent && beatParent.col === col - 1;
-
-    const inSpan = hasConnections && row >= minConnRow && row <= maxConnRow;
+    const hasRight = !!beat && beatFromLeft;
 
     return {
-      hasUp: inSpan && row > minConnRow,
-      hasDown: inSpan && row < maxConnRow,
-      hasLeft: parentJunction || (beatFromLeft && beatParent?.row === row),
-      hasRight: !!beat && beatFromLeft,
+      hasUp,
+      hasDown,
+      hasLeft: hasLeft || (beatFromLeft && beatParent?.row === row),
+      hasRight,
     };
   }
 
@@ -656,6 +676,11 @@ export default function BoardView({ beats, onBeatsChange, isFocused, nameInputRe
     }
 
     if (mode === 'overview') {
+      if (info.key === 'Enter' || info.key === 'NumpadEnter') {
+        info.prevent();
+        setMode('edit');
+        return;
+      }
       if (info.key === 'v' || info.key === 'V') {
         info.prevent();
         setDirection((d) => (d === 'horizontal' ? 'vertical' : 'horizontal'));
@@ -680,11 +705,6 @@ export default function BoardView({ beats, onBeatsChange, isFocused, nameInputRe
       if (info.alt && info.key === jumpPrevKey) { info.prevent(); jumpAlong(-1); return; }
       if (info.alt && info.key === jumpNextKey) { info.prevent(); jumpAlong(1); return; }
 
-      if (info.key === 'Enter') {
-        info.prevent();
-        setMode('edit');
-        return;
-      }
     }
   };
 
@@ -699,7 +719,10 @@ export default function BoardView({ beats, onBeatsChange, isFocused, nameInputRe
       const hiddenInputEl = hiddenInputRef.current as unknown as HTMLElement | null;
 
       if (mode === 'edit' && activeInput && active !== activeInput) return;
-      if (mode === 'overview' && hiddenInputEl && active !== hiddenInputEl) return;
+      // In overview we intentionally allow document-level handling even when the
+      // hidden input is not the active element, so Enter and navigation remain
+      // reliable after mode switches/layout toggles.
+      if (mode === 'overview' && hiddenInputEl && active === nameEl) return;
 
       handleKeyRef.current?.(fromWebEvent(e));
     }
@@ -708,9 +731,18 @@ export default function BoardView({ beats, onBeatsChange, isFocused, nameInputRe
     return () => document.removeEventListener('keydown', onKeyDown, true);
   }, [mode, focusedId, nameInputRef]);
 
+  useEffect(() => {
+    if (isWeb) return;
+    return subscribeNativeKeys((info) => {
+      handleKeyRef.current?.(info);
+    });
+  }, []);
+
   function nativeKeyPress(e: any) {
     if (isWeb) return;
-    handleKeyRef.current?.(fromNativeEvent(e));
+    const info = fromNativeEvent(e);
+    if (shouldIgnoreNativeTextInputKey(info)) return;
+    handleKeyRef.current?.(info);
   }
 
   // ── Build the entire grid as text lines ─────────────────────────────

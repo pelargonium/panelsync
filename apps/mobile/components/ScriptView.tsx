@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
-import { fromWebEvent, fromNativeEvent, isWeb, type KeyInfo } from '../lib/keyboard';
+import { fromWebEvent, fromNativeEvent, isWeb, shouldIgnoreNativeTextInputKey, subscribeNativeKeys, type KeyInfo } from '../lib/keyboard';
 
 export type ScriptElementType = 'page' | 'panel' | 'scene' | 'character' | 'parenthetical' | 'dialogue' | 'caption';
 export type PanelSize = 'splash' | 'half' | 'wide' | 'small' | 'banner' | 'beat';
@@ -46,7 +46,7 @@ function indentForType(type: ScriptElementType): number {
   if (type === 'character') return 160;
   if (type === 'parenthetical') return 160;
   if (type === 'dialogue') return 128;
-  if (type === 'caption') return 128;
+  if (type === 'caption') return 160;
   return 16;
 }
 
@@ -54,6 +54,7 @@ function styleForType(type: ScriptElementType, colors: any) {
   if (type === 'page') return { fontSize: 14, fontWeight: '700' as const, color: colors.text };
   if (type === 'panel') return { fontSize: 12, fontWeight: '700' as const, color: colors.text };
   if (type === 'character') return { fontSize: 12, fontWeight: '700' as const, color: colors.text };
+  if (type === 'caption') return { fontSize: 12, fontWeight: '700' as const, color: colors.text };
   if (type === 'parenthetical') return { fontSize: 12, fontStyle: 'italic' as const, color: colors.text };
   return { fontSize: 13, color: colors.text };
 }
@@ -140,6 +141,7 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
   const [focusedIndex, setFocusedIndex] = useState(0);
   const inputRefs = useRef<Record<string, TextInput>>({});
   const scrollViewRef = useRef<ScrollView>(null);
+  const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const numbering = useMemo(() => computeNumbering(elements), [elements]);
   const overflows = useMemo(() => computePageOverflows(elements), [elements]);
@@ -184,12 +186,20 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
   }
 
   // Auto-focus logic — only when focusedIndex or panel focus changes, not on every edit
+  // Uses cancellable timeout to prevent focus fights when click-to-focus on the
+  // workspace wrapper races with onFocus on the clicked TextInput.
   useEffect(() => {
+    if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+    focusTimerRef.current = null;
     const el = elements[focusedIndex];
     if (isFocused && el) {
       const input = inputRefs.current[el.id];
-      setTimeout(() => input?.focus(), 0);
+      focusTimerRef.current = setTimeout(() => {
+        focusTimerRef.current = null;
+        input?.focus();
+      }, 0);
     }
+    return () => { if (focusTimerRef.current) { clearTimeout(focusTimerRef.current); focusTimerRef.current = null; } };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFocused, focusedIndex]);
 
@@ -216,7 +226,7 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
         } else if (currentElement.type === 'scene') {
           replaceElement(focusedIndex, 'character');
         } else if (currentElement.type === 'caption') {
-          replaceElement(focusedIndex, 'character');
+          replaceElement(focusedIndex, 'panel');
         } else if (currentElement.type === 'page') {
           addElement(focusedIndex, 'panel');
         } else {
@@ -231,8 +241,8 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
           addElement(focusedIndex, 'character');
         } else if (currentElement.type === 'character') {
           if (matchCaptionKeyword(currentElement.text)) {
-            replaceElement(focusedIndex, 'caption', '');
-            addElement(focusedIndex, 'character');
+            replaceElement(focusedIndex, 'caption', 'CAPTION');
+            addElement(focusedIndex, 'dialogue');
           } else {
             addElement(focusedIndex, 'dialogue');
           }
@@ -242,7 +252,7 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
         } else if (currentElement.type === 'dialogue') {
           addElement(focusedIndex, 'character');
         } else if (currentElement.type === 'caption') {
-          addElement(focusedIndex, 'character');
+          addElement(focusedIndex, 'dialogue');
         }
       }
       return;
@@ -381,10 +391,19 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
     return () => document.removeEventListener('keydown', handler, true);
   }, []);
 
+  useEffect(() => {
+    if (isWeb) return;
+    return subscribeNativeKeys((info) => {
+      handleKeyRef.current?.(info);
+    });
+  }, []);
+
   // Native: onKeyPress handler for TextInputs
   function nativeKeyPress(e: any) {
     if (isWeb) return;
-    handleKeyRef.current?.(fromNativeEvent(e));
+    const info = fromNativeEvent(e);
+    if (shouldIgnoreNativeTextInputKey(info)) return;
+    handleKeyRef.current?.(info);
   }
 
   return (
@@ -435,6 +454,8 @@ export default function ScriptView({ elements, onElementsChange, isFocused, name
               }
               updateElement(i, { text: v.toUpperCase() });
             }
+          : el.type === 'caption'
+          ? (v: string) => updateElement(i, { text: v.toUpperCase() })
           : (v: string) => updateElement(i, { text: v });
 
         return (

@@ -15,7 +15,7 @@ import { type ScriptElement } from '../../components/ScriptView';
 import { UniverseProvider, useUniverse } from '../../context/UniverseContext';
 import { useTheme } from '../../context/ThemeContext';
 import { type ApiEntity } from '../../lib/api';
-import { fromWebEvent, isWeb, type KeyInfo } from '../../lib/keyboard';
+import { fromWebEvent, isWeb, subscribeNativeKeys, type KeyInfo } from '../../lib/keyboard';
 
 const BINDER_WIDTH = 260;
 
@@ -198,6 +198,13 @@ function UniverseWorkspace() {
     function onKeyDown(e: KeyboardEvent) { appKeyRef.current?.(fromWebEvent(e)); }
     document.addEventListener('keydown', onKeyDown, true);
     return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, []);
+
+  useEffect(() => {
+    if (isWeb) return;
+    return subscribeNativeKeys((info) => {
+      appKeyRef.current?.(info);
+    });
   }, []);
 
   // Click-to-focus panel detection (web only)

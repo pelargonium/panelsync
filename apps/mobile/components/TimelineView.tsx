@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
-import { fromNativeEvent, fromWebEvent, isWeb, type KeyInfo } from '../lib/keyboard';
+import { fromNativeEvent, fromWebEvent, isWeb, shouldIgnoreNativeTextInputKey, subscribeNativeKeys, type KeyInfo } from '../lib/keyboard';
 import { generateId } from './ScriptView';
 
 export interface TimelineEvent {
@@ -196,8 +196,17 @@ export default function TimelineView({ events, onEventsChange, isFocused, nameIn
     return () => document.removeEventListener('keydown', handler, true);
   }, []);
 
+  useEffect(() => {
+    if (isWeb) return;
+    return subscribeNativeKeys((info) => {
+      keyRef.current?.(info);
+    });
+  }, []);
+
   function nativeKeyPress(e: any) {
-    keyRef.current?.(fromNativeEvent(e));
+    const info = fromNativeEvent(e);
+    if (shouldIgnoreNativeTextInputKey(info)) return;
+    keyRef.current?.(info);
   }
 
   return (
