@@ -1,7 +1,7 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/client.js';
-import { hierarchyLevels, universes, universeMembers } from '../db/schema.js';
+import { containers, drafts, hierarchyLevels, pages, scriptBlocks, universes, universeMembers } from '../db/schema.js';
 
 interface CreateUniverseBody {
   name: string;
@@ -167,6 +167,22 @@ export async function universesRoutes(server: FastifyInstance) {
     if (!universe) { reply.code(404); return { error: 'not found' }; }
     if (universe.ownerId !== userId) { reply.code(403); return { error: 'only the owner can delete a universe' }; }
 
+    // Delete in dependency order: script_blocks → pages → drafts → containers → universe
+    // (pages/drafts reference containers without ON DELETE CASCADE)
+    const containerRows = await db.select({ id: containers.id }).from(containers).where(eq(containers.universeId, id));
+    const containerIds = containerRows.map((r) => r.id);
+    if (containerIds.length > 0) {
+      const pageRows = await db.select({ id: pages.id }).from(pages).where(
+        inArray(pages.containerId, containerIds)
+      );
+      const pageIds = pageRows.map((r) => r.id);
+      if (pageIds.length > 0) {
+        await db.delete(scriptBlocks).where(inArray(scriptBlocks.pageId, pageIds));
+        await db.delete(pages).where(inArray(pages.id, pageIds));
+      }
+      await db.delete(drafts).where(eq(drafts.universeId, id));
+      await db.delete(containers).where(eq(containers.universeId, id));
+    }
     await db.delete(universes).where(eq(universes.id, id));
     reply.code(204);
   });
