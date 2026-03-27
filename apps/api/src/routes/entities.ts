@@ -380,7 +380,6 @@ export async function entityRoutes(server: FastifyInstance) {
       const userId = request.user.sub;
 
       const groupResult = await getEntryForAccess(groupId, userId);
-      console.log('[members POST] groupId=%s type=%s characterId=%s', groupId, 'error' in groupResult ? 'ERR' : groupResult.entry.type, characterId);
       if ('error' in groupResult) {
         reply.code(groupResult.error === 'not found' ? 404 : 403);
         return { error: groupResult.error };
